@@ -2,7 +2,7 @@
 
 **Bayesian framework for identifying mediating plasma proteins between risk factors and disease outcomes using GWAS summary statistics.**
 
-Version 1.1.0-dev | Diptavo Dey (2026)
+Version 1.1.0-dev
 
 ---
 
