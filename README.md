@@ -294,17 +294,3 @@ awk -F'\t' 'NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; print; next} $(h["P_mediator"]
 Check `beta2` and `se_beta2` under M=1 for the estimated causal effect of the protein on cancer. The `mediated_effect` (β₁×β₂) quantifies how much of the RF→Cancer effect flows through this protein.
 
 ---
-
-## Citation
-
-If you use BMEDIATOR, please cite:
-
-> Dey D. (2026) BMEDIATOR: A Bayesian framework for identifying mediating plasma proteins using summary-statistics-based Mendelian randomization. [manuscript in preparation]
-
-Machine-readable citation metadata is available in `CITATION.cff`.
-
----
-
-## License
-
-GNU General Public License v3.0. See `LICENSE`.
