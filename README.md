@@ -2,23 +2,13 @@
 
 **Bayesian framework for identifying mediating plasma proteins between risk factors and disease outcomes using GWAS summary statistics.**
 
-Version 1.2.0-dev | Diptavo Dey (2026)
-
----
-
-## Release Status
-
-BMEDIATOR is distributed as a C++17 command-line research tool with helper R,
-Python, and shell scripts. It is not an R package. The repository is intended to
-contain source code, documentation, workflow scripts, small synthetic test data,
-and compact curated protein reference resources only; full GWAS, pQTL, outcome,
-PLINK reference, and generated analysis files should be stored outside git.
+Version 1.2.0-dev 
 
 ---
 
 ## Overview
 
-BMEDIATOR identifies which plasma proteins (PP) are genuine causal mediators on the pathway from a risk factor (RF) to a disease outcome (e.g., cancer), using only summary statistics from three sources:
+BMEDIATOR identifies which intermediate phenotypes (e.g. plasma proteins; PP) are true causal mediators on the pathway from a risk factor (RF) to a disease outcome (e.g., cancer), using only summary statistics from three sources:
 
 1. **RF GWAS** — genome-wide significant instruments for the risk factor
 2. **pQTL study** — protein quantitative trait loci (cis and trans)
@@ -379,18 +369,3 @@ awk -F'\t' 'NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; print; next} $(h["P_mediator_l
 
 Check `beta2` and `se_beta2` under M=1 for the estimated causal effect of the protein on cancer. The `mediated_effect` (β₁×β₂) quantifies how much of the RF→Cancer effect flows through this protein.
 
----
-
-## Citation
-
-If you use BMEDIATOR, please cite:
-
-> Dey D. (2026) BMEDIATOR: A Bayesian framework for identifying mediating plasma proteins using summary-statistics-based Mendelian randomization. [manuscript in preparation]
-
-Machine-readable citation metadata is available in `CITATION.cff`.
-
----
-
-## License
-
-GNU General Public License v3.0. See `LICENSE`.
