@@ -29,3 +29,17 @@ jobs:
       - name: Run smoke test with OpenMP build
         run: make test
 
+  macos-openmp:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenMP runtime
+        run: brew install libomp
+
+      - name: Build with Apple Clang and OpenMP
+        run: make USE_OPENMP=1
+
+      - name: Run smoke test
+        run: make test

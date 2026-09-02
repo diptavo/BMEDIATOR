@@ -93,7 +93,18 @@ make clean
 make USE_OPENMP=1
 ```
 
-Use `USE_OPENMP=1` only with compilers that support `-fopenmp`.
+On Linux with GCC, `USE_OPENMP=1` uses the compiler's native `-fopenmp`
+support. Apple Clang requires the separate OpenMP runtime:
+
+```bash
+brew install libomp
+make clean
+make USE_OPENMP=1
+```
+
+The Makefile detects Homebrew `libomp` automatically. For another installation
+location, set `OPENMP_ROOT=/path/to/libomp`. A normal serial build does not
+require OpenMP.
 
 ---
 

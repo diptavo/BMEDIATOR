@@ -1,12 +1,29 @@
 CXX      ?= g++
 USE_OPENMP ?= 0
+OPENMP_ROOT ?=
 
 BASE_CXXFLAGS = -std=c++17 -O3 -Wall -Wextra -I. -Wno-unused-variable -Wno-unused-function
 BASE_LDFLAGS  = -lm
 
 ifeq ($(USE_OPENMP),1)
-  BASE_CXXFLAGS += -fopenmp
-  BASE_LDFLAGS  += -fopenmp
+  COMPILER_VERSION := $(shell $(CXX) --version 2>/dev/null)
+  ifneq ($(findstring Apple clang,$(COMPILER_VERSION)),)
+    ifeq ($(strip $(OPENMP_ROOT)),)
+      OPENMP_ROOT := $(shell \
+        if command -v brew >/dev/null 2>&1; then brew --prefix libomp 2>/dev/null; \
+        elif test -d /opt/homebrew/opt/libomp; then printf '%s' /opt/homebrew/opt/libomp; \
+        elif test -d /usr/local/opt/libomp; then printf '%s' /usr/local/opt/libomp; \
+        fi)
+    endif
+    ifeq ($(strip $(OPENMP_ROOT)),)
+      $(error USE_OPENMP=1 with Apple Clang requires libomp. Install Homebrew and run 'brew install libomp', or set OPENMP_ROOT=/path/to/libomp)
+    endif
+    BASE_CXXFLAGS += -Xpreprocessor -fopenmp -I$(OPENMP_ROOT)/include
+    BASE_LDFLAGS  += -L$(OPENMP_ROOT)/lib -Wl,-rpath,$(OPENMP_ROOT)/lib -lomp
+  else
+    BASE_CXXFLAGS += -fopenmp
+    BASE_LDFLAGS  += -fopenmp
+  endif
 endif
 
 CXXFLAGS ?= $(BASE_CXXFLAGS)
@@ -53,5 +70,6 @@ help:
 	@echo "  make clean        Remove build artifacts"
 	@echo ""
 	@echo "Variables:"
-	@echo "  USE_OPENMP=1      Enable OpenMP flags for compilers that support -fopenmp"
+	@echo "  USE_OPENMP=1      Enable OpenMP; Apple Clang requires Homebrew libomp"
+	@echo "  OPENMP_ROOT=<dir> Override the detected libomp installation prefix"
 	@echo "  CXX=<compiler>    Override C++ compiler"
