@@ -1,0 +1,9 @@
+n_sumstat_files	4907
+n_unique_seqids	4907
+n_mapped_symbol	4907
+n_mapped_target_full_name	4907
+n_mapped_uniprot	4895
+n_mapped_hg38_tss	4770
+n_missing_symbol	0
+n_missing_hg38_tss	137
+n_missing_uniprot	12

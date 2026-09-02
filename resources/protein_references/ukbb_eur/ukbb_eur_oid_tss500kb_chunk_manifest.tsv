@@ -1,0 +1,7 @@
+chunk_id	chunk_label	resource_subset	n_rows
+1	ukbb_eur_oid_tss500kb_chunk_001	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_001.tsv	500
+2	ukbb_eur_oid_tss500kb_chunk_002	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_002.tsv	500
+3	ukbb_eur_oid_tss500kb_chunk_003	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_003.tsv	500
+4	ukbb_eur_oid_tss500kb_chunk_004	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_004.tsv	500
+5	ukbb_eur_oid_tss500kb_chunk_005	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_005.tsv	500
+6	ukbb_eur_oid_tss500kb_chunk_006	/data/Dutta_lab/BMEDIATOR/generated/UKBB_EUR_resource/chunks/ukbb_eur_oid_tss500kb_chunk_006.tsv	440

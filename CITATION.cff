@@ -1,10 +1,11 @@
 cff-version: 1.2.0
 message: "If you use BMEDIATOR, please cite this software."
 title: "BMEDIATOR: Bayesian Mediation MR"
-version: "1.0.0"
-date-released: "2026-08-08"
+version: "1.2.0-dev"
 authors:
   - family-names: "Dey"
     given-names: "Diptavo"
 license: "GPL-3.0-only"
+repository-code: "https://github.com/diptavo/BMEDIATOR"
+url: "https://github.com/diptavo/BMEDIATOR"
 abstract: "Bayesian framework for identifying mediating plasma proteins between risk factors and disease outcomes using GWAS summary statistics."

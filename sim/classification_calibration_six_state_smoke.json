@@ -1,0 +1,895 @@
+{
+  "global": {
+    "seed": 20260803,
+    "rf_p_threshold": 5e-06,
+    "cis_p_threshold": 5e-06,
+    "cis_window_bp": 1000000,
+    "max_cavi_iter": 80,
+    "max_eb_iter": 6,
+    "eb_tol": 0.0001,
+    "elbo_tol": 1e-06,
+    "threads": 1,
+    "prior_p0": 0.75,
+    "prior_p1": 0.08,
+    "prior_p2": 0.06,
+    "prior_p3": 0.04,
+    "prior_p4": 0.04,
+    "prior_p5": 0.03,
+    "fixed_priors": true,
+    "eb_prior_strength": 100.0,
+    "m1_min_cis_only": 2,
+    "m1_min_second_stage_z": 1.5,
+    "m1_resid_corr_threshold": 0.35,
+    "m1_resid_corr_penalty": 0.0,
+    "direction_mode": "report"
+  },
+  "classification": {
+    "replicates": 2,
+    "proteins_per_scenario": 10,
+    "scenarios": [
+      "M0",
+      "M1",
+      "M2",
+      "M3",
+      "M4",
+      "M5"
+    ],
+    "cells": [
+      {
+        "name": "balanced_medium_m0",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.0,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M0"
+        ]
+      },
+      {
+        "name": "balanced_medium_m1",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.16240000000000002,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M1"
+        ]
+      },
+      {
+        "name": "balanced_medium_m2",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.0,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M2"
+        ]
+      },
+      {
+        "name": "balanced_medium_m3",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.24,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M3"
+        ]
+      },
+      {
+        "name": "balanced_medium_m4",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.0,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M4"
+        ]
+      },
+      {
+        "name": "balanced_medium_m5",
+        "set_counts": {
+          "A": 3,
+          "B": 3,
+          "C": 3
+        },
+        "scenario_set_counts": {
+          "M0": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M1": {
+            "A": 3,
+            "B": 3,
+            "C": 3
+          },
+          "M2": {
+            "A": 3,
+            "B": 3,
+            "C": 2
+          },
+          "M3": {
+            "A": 4,
+            "B": 0,
+            "C": 0
+          },
+          "M4": {
+            "A": 0,
+            "B": 4,
+            "C": 0
+          },
+          "M5": {
+            "A": 3,
+            "B": 1,
+            "C": 4
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.32,
+        "beta2": 0.34,
+        "beta3": 0.2,
+        "rho_m5": 0.94,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.015,
+        "psi_sd": 0.02,
+        "phi_sd": 0.01,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.34,
+            "beta2": 0.36,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.32,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.24,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.34,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.26,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.12,
+        "shared_rf_outcome_sd": 0.0,
+        "scenarios": [
+          "M5"
+        ]
+      }
+    ]
+  },
+  "calibration": {
+    "replicates": 2,
+    "proteins_per_replicate": 120,
+    "scenarios": [
+      "M0",
+      "M1",
+      "M2",
+      "M3",
+      "M4",
+      "M5"
+    ],
+    "scenario_mix": {
+      "M0": 0.75,
+      "M1": 0.08,
+      "M2": 0.06,
+      "M3": 0.04,
+      "M4": 0.04,
+      "M5": 0.03
+    },
+    "cells": [
+      {
+        "name": "calibration_medium",
+        "set_count_distribution": {
+          "A": [
+            2,
+            3,
+            4
+          ],
+          "B": [
+            2,
+            3,
+            4
+          ],
+          "C": [
+            1,
+            2,
+            3
+          ]
+        },
+        "scenario_set_count_distribution": {
+          "M3": {
+            "A": [
+              3,
+              4,
+              5
+            ],
+            "B": [
+              0
+            ],
+            "C": [
+              0
+            ]
+          },
+          "M4": {
+            "A": [
+              0
+            ],
+            "B": [
+              3,
+              4,
+              5
+            ],
+            "C": [
+              0
+            ]
+          },
+          "M5": {
+            "A": [
+              2,
+              3,
+              4
+            ],
+            "B": [
+              0,
+              1
+            ],
+            "C": [
+              3,
+              4,
+              5
+            ]
+          }
+        },
+        "gamma_range": [
+          0.28,
+          0.38
+        ],
+        "cis_effect_range": [
+          0.22,
+          0.34
+        ],
+        "beta1": 0.3,
+        "beta2": 0.3,
+        "beta3": 0.18,
+        "rho_m5": 0.94,
+        "rf_se": 0.042,
+        "pqtl_se": 0.045,
+        "outcome_se": 0.05,
+        "delta_sd": 0.02,
+        "psi_sd": 0.025,
+        "phi_sd": 0.012,
+        "scenario_overrides": {
+          "M0": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.0,
+            "phi_sd": 0.0
+          },
+          "M1": {
+            "beta1": 0.32,
+            "beta2": 0.32,
+            "beta3": 0.04,
+            "delta_sd": 0.015,
+            "psi_sd": 0.02,
+            "phi_sd": 0.01
+          },
+          "M2": {
+            "beta1": 0.3,
+            "beta2": 0.0,
+            "beta3": 0.0,
+            "delta_sd": 0.01,
+            "psi_sd": 0.01,
+            "phi_sd": 0.005
+          },
+          "M3": {
+            "beta1": 0.0,
+            "beta2": 0.0,
+            "beta3": 0.22,
+            "delta_sd": 0.0,
+            "psi_sd": 0.015,
+            "phi_sd": 0.0
+          },
+          "M4": {
+            "beta1": 0.0,
+            "beta2": 0.32,
+            "beta3": 0.0,
+            "delta_sd": 0.0,
+            "psi_sd": 0.01,
+            "phi_sd": 0.01
+          },
+          "M5": {
+            "beta1": 0.24,
+            "beta2": 0.0,
+            "beta3": 0.12,
+            "rho_m5": 0.96,
+            "delta_sd": 0.1,
+            "psi_sd": 0.12,
+            "phi_sd": 0.005
+          }
+        },
+        "shared_rf_panel": true,
+        "shared_rf_count": 24,
+        "shared_rf_outcome_beta": 0.0,
+        "shared_rf_outcome_sd": 0.0
+      }
+    ]
+  }
+}

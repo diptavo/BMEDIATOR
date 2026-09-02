@@ -81,36 +81,6 @@ static bool harmonize_snp(SumStat& s, const BimEntry& ref) {
     return true;
 }
 
-static void read_full_sumstats(const std::string& file,
-                               std::map<std::string, SumStat>& ss,
-                               std::map<std::string, double>& pvals) {
-    std::ifstream fin(file);
-    if (!fin.is_open()) {
-        std::cerr << "Error: cannot open " << file << "\n";
-        std::exit(1);
-    }
-
-    std::string line;
-    std::getline(fin, line);
-    int n = 0;
-    while (std::getline(fin, line)) {
-        if (line.empty()) continue;
-        std::istringstream iss(line);
-        SumStat s;
-        double pval, sample_n;
-        if (!(iss >> s.rsid >> s.a1 >> s.a2 >> s.freq
-                  >> s.beta >> s.se >> pval >> sample_n >> s.chr >> s.bp)) {
-            continue;
-        }
-        for (auto& c : s.a1) c = toupper(c);
-        for (auto& c : s.a2) c = toupper(c);
-        ss[s.rsid] = s;
-        pvals[s.rsid] = pval;
-        n++;
-    }
-    std::cout << "  Read " << n << " SNPs from " << file << "\n";
-}
-
 static std::string trim(const std::string& s) {
     size_t start = s.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -368,27 +338,6 @@ static double ld_r_with_cache(const PlinkData& plink,
     double r = plink.compute_ld_r(a, b);
     cache[key] = r;
     return r;
-}
-
-static bool is_ld_overlap(const PlinkData& plink,
-                          std::map<std::pair<int, int>, double>& cache,
-                          const std::map<int, std::vector<RfInstrumentRef>>& rf_by_chr,
-                          const SumStat& s,
-                          double r2_thresh,
-                          int window_bp,
-                          std::set<std::string>* overlapping_rf_rsids = nullptr) {
-    auto neighbors = nearby_rf_instruments(rf_by_chr, s.chr, s.bp, window_bp);
-    auto self_it = plink.rsid_to_idx.find(s.rsid);
-    if (self_it == plink.rsid_to_idx.end()) return false;
-    bool overlap = false;
-    for (const auto& rf : neighbors) {
-        double r2 = ld_r2_with_cache(plink, cache, self_it->second, rf.bim_idx);
-        if (r2 >= r2_thresh) {
-            overlap = true;
-            if (overlapping_rf_rsids) overlapping_rf_rsids->insert(rf.rsid);
-        }
-    }
-    return overlap;
 }
 
 static ProxyMatch best_rf_proxy_for_cis(const PlinkData& plink,
@@ -684,6 +633,8 @@ static void copy_mediation_outputs(const Options& opts,
     hyp.p1 = opts.prior_p1;
     hyp.p2 = opts.prior_p2;
     hyp.p3 = opts.prior_p3;
+    hyp.p4 = opts.prior_p4;
+    hyp.p5 = opts.prior_p5;
     hyp.sigma2_beta1 = opts.prior_sigma2_beta1;
     hyp.sigma2_beta2 = opts.prior_sigma2_beta2;
     hyp.sigma2_beta3 = opts.prior_sigma2_beta3;
@@ -693,6 +644,9 @@ static void copy_mediation_outputs(const Options& opts,
 
     std::sort(results.begin(), results.end(),
               [](const ProteinResult& a, const ProteinResult& b) {
+                  if (a.selection_probability != b.selection_probability) {
+                      return a.selection_probability > b.selection_probability;
+                  }
                   return a.prob_M1 > b.prob_M1;
               });
 
@@ -832,6 +786,7 @@ static void build_legacy_sets(std::vector<ProteinData>& proteins,
     std::map<std::pair<int, int>, double> ld_r2_cache;
     std::map<std::pair<int, int>, double> ld_r_cache;
     for (auto& prot : proteins) {
+        prot.ld_reference_used = true;
         auto pq_it = pqtl.ss_by_protein.find(prot.protein_id);
         auto pp_it = pqtl.pval_by_protein.find(prot.protein_id);
         if (pq_it == pqtl.ss_by_protein.end() || pp_it == pqtl.pval_by_protein.end()) continue;
@@ -983,6 +938,7 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
     std::map<std::pair<int, int>, double> ld_r_cache;
 
     for (auto& prot : proteins) {
+        prot.ld_reference_used = true;
         auto pq_it = pqtl.ss_by_protein.find(prot.protein_id);
         auto pp_it = pqtl.pval_by_protein.find(prot.protein_id);
         if (pq_it == pqtl.ss_by_protein.end() || pp_it == pqtl.pval_by_protein.end()) continue;
@@ -1000,6 +956,17 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
             auto ref_it = plink.rsid_to_idx.find(rsid);
             if (pval_it == pp_it->second.end() || ref_it == plink.rsid_to_idx.end()) continue;
             cis_all.push_back({rsid, s.chr, s.bp, ref_it->second, pval_it->second});
+            auto outcome_it = cancer_ss.find(rsid);
+            if (outcome_it != cancer_ss.end() &&
+                std::isfinite(s.beta) && std::isfinite(s.se) && s.se > 0.0 &&
+                std::isfinite(outcome_it->second.beta) &&
+                std::isfinite(outcome_it->second.se) && outcome_it->second.se > 0.0) {
+                prot.regional_cis_rsid.push_back(rsid);
+                prot.regional_pp_beta.push_back(s.beta);
+                prot.regional_pp_se.push_back(s.se);
+                prot.regional_outcome_beta.push_back(outcome_it->second.beta);
+                prot.regional_outcome_se.push_back(outcome_it->second.se);
+            }
             if (pval_it->second >= opts.p_thresh_cis) continue;
             cis_candidate_bim.push_back(ref_it->second);
             cis_candidate_pval.push_back(pval_it->second);
@@ -1115,6 +1082,7 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
         apply_set_qc(prot, plink, plink.n_samples, qc, opts.n_pqtl, opts.n_cancer,
                      total_heidi_removed, opts);
         assign_ld_weights(prot, plink, ld_r2_cache, opts.ld_block_max_size);
+        prot.regional_data_complete = prot.regional_cis_rsid.size() >= 2;
 
         if (prot.nTotal() > 0) n_with_instruments++;
         processed++;

@@ -20,6 +20,85 @@ struct LocalScales {
     double sigma2_beta3;
 };
 
+struct RegionalEvidence {
+    int n_variants = 0;
+    double pp_shared = 0.0;
+    double pp_distinct = 0.0;
+    double shared_given_both = 0.0;
+};
+
+inline double log_sum_exp_values(const std::vector<double>& values) {
+    if (values.empty()) return -std::numeric_limits<double>::infinity();
+    double max_value = *std::max_element(values.begin(), values.end());
+    if (!std::isfinite(max_value)) return max_value;
+    double total = 0.0;
+    for (double value : values) total += std::exp(value - max_value);
+    return max_value + std::log(total);
+}
+
+inline double wakefield_log_abf(double beta, double se, double prior_variance) {
+    if (!std::isfinite(beta) || !std::isfinite(se) || se <= 0.0 || prior_variance <= 0.0) {
+        return -std::numeric_limits<double>::infinity();
+    }
+    double variance = se * se;
+    double shrinkage = prior_variance / (variance + prior_variance);
+    double z = beta / se;
+    return 0.5 * (std::log(1.0 - shrinkage) + shrinkage * z * z);
+}
+
+inline RegionalEvidence compute_regional_evidence(const ProteinData& prot,
+                                                   const Options& opts) {
+    RegionalEvidence result;
+    if (!prot.regional_data_complete) return result;
+
+    std::vector<double> log_bf_pp;
+    std::vector<double> log_bf_outcome;
+    std::vector<double> log_bf_shared;
+    size_t count = std::min(
+        std::min(prot.regional_pp_beta.size(), prot.regional_pp_se.size()),
+        std::min(prot.regional_outcome_beta.size(), prot.regional_outcome_se.size())
+    );
+    log_bf_pp.reserve(count);
+    log_bf_outcome.reserve(count);
+    log_bf_shared.reserve(count);
+    for (size_t idx = 0; idx < count; ++idx) {
+        double pp = wakefield_log_abf(prot.regional_pp_beta[idx], prot.regional_pp_se[idx],
+                                      opts.regional_prior_var_pp);
+        double outcome = wakefield_log_abf(prot.regional_outcome_beta[idx],
+                                           prot.regional_outcome_se[idx],
+                                           opts.regional_prior_var_outcome);
+        if (!std::isfinite(pp) || !std::isfinite(outcome)) continue;
+        log_bf_pp.push_back(pp);
+        log_bf_outcome.push_back(outcome);
+        log_bf_shared.push_back(pp + outcome);
+    }
+    result.n_variants = static_cast<int>(log_bf_pp.size());
+    if (result.n_variants < 2) return result;
+
+    double log_sum_pp = log_sum_exp_values(log_bf_pp);
+    double log_sum_outcome = log_sum_exp_values(log_bf_outcome);
+    double log_sum_shared = log_sum_exp_values(log_bf_shared);
+    double log_all_pairs = log_sum_pp + log_sum_outcome;
+    double ratio = std::exp(std::min(0.0, log_sum_shared - log_all_pairs));
+    double log_sum_distinct = ratio >= 1.0
+                                ? -std::numeric_limits<double>::infinity()
+                                : log_all_pairs + std::log1p(-ratio);
+
+    std::vector<double> log_hypotheses = {
+        0.0,
+        std::log(opts.regional_prior_pp) + log_sum_pp,
+        std::log(opts.regional_prior_outcome) + log_sum_outcome,
+        std::log(opts.regional_prior_pp) + std::log(opts.regional_prior_outcome) + log_sum_distinct,
+        std::log(opts.regional_prior_shared) + log_sum_shared
+    };
+    double normalizer = log_sum_exp_values(log_hypotheses);
+    result.pp_distinct = std::exp(log_hypotheses[3] - normalizer);
+    result.pp_shared = std::exp(log_hypotheses[4] - normalizer);
+    double both = result.pp_distinct + result.pp_shared;
+    result.shared_given_both = both > 0.0 ? result.pp_shared / both : 0.0;
+    return result;
+}
+
 inline IvwSummary compute_ivw_summary(const std::vector<double>& bx,
                                       const std::vector<double>& by,
                                       const std::vector<double>& se_by) {
@@ -123,10 +202,12 @@ inline void finalize_direction_metrics(ProteinResult& res) {
 
 inline double selection_probability_for_mode(const ProteinResult& r,
                                              const Options& opts) {
+    double mediation_probability = opts.allow_unresolved_selection
+                                      ? r.prob_M1 : r.prob_mediator_ld_resolved;
     if (opts.direction_mode == "prioritize") {
-        return r.directional_mediator_prob;
+        return mediation_probability * r.direction_consistency_prob;
     }
-    return r.prob_M1;
+    return mediation_probability;
 }
 
 inline double alpha_weight(const ProteinData& prot, int idx) {
@@ -184,15 +265,18 @@ inline bool scenario_correlated_pleiotropy(int scenario) {
 }
 
 inline bool scenario_delta_free(int scenario) {
-    return scenario_beta1_free(scenario);
+    (void)scenario;
+    return true;
 }
 
 inline bool scenario_phi_free(int scenario) {
-    return scenario_beta2_free(scenario);
+    (void)scenario;
+    return true;
 }
 
 inline bool scenario_psi_free(int scenario) {
-    return scenario_beta3_free(scenario) || scenario_correlated_pleiotropy(scenario);
+    (void)scenario;
+    return true;
 }
 
 inline double stabilized_scale_update(double current,
@@ -211,7 +295,15 @@ inline double stabilized_scale_update(double current,
 inline SoftPriors build_soft_priors(const Hyperparams& hyp,
                                     const IvwSummary& rf_ivw,
                                     const IvwSummary& out_ivw,
-                                    const IvwSummary& direct_ivw) {
+                                    const IvwSummary& direct_ivw,
+                                    bool adaptive) {
+    if (!adaptive) {
+        double total = hyp.p0 + hyp.p1 + hyp.p2 + hyp.p3 + hyp.p4 + hyp.p5;
+        return {
+            hyp.p0 / total, hyp.p1 / total, hyp.p2 / total,
+            hyp.p3 / total, hyp.p4 / total, hyp.p5 / total
+        };
+    }
     double z_rf = (std::isfinite(rf_ivw.beta) && std::isfinite(rf_ivw.se) && rf_ivw.se > 0.0)
                     ? std::fabs(rf_ivw.beta / rf_ivw.se) : 0.0;
     double z_out = (std::isfinite(out_ivw.beta) && std::isfinite(out_ivw.se) && out_ivw.se > 0.0)
@@ -239,7 +331,11 @@ inline SoftPriors build_soft_priors(const Hyperparams& hyp,
 
 inline LocalScales build_local_scales(const Hyperparams& hyp,
                                       const IvwSummary& rf_ivw,
-                                      const IvwSummary& out_ivw) {
+                                      const IvwSummary& out_ivw,
+                                      bool adaptive) {
+    if (!adaptive) {
+        return {hyp.sigma2_beta1, hyp.sigma2_beta2, hyp.sigma2_beta3};
+    }
     double z_rf = (std::isfinite(rf_ivw.beta) && std::isfinite(rf_ivw.se) && rf_ivw.se > 0.0)
                     ? std::fabs(rf_ivw.beta / rf_ivw.se) : 0.0;
     double z_out = (std::isfinite(out_ivw.beta) && std::isfinite(out_ivw.se) && out_ivw.se > 0.0)
@@ -423,6 +519,7 @@ VarParams init_var_params(const ProteinData& prot, int scenario,
 // ============================================================================
 void update_beta1(const ProteinData& prot, VarParams& vp,
                   const Hyperparams& hyp) {
+    (void)hyp;
     double prec = 1.0 / shrink_prior_variance(vp.prior_sigma2_beta1, 1e-4);  // prior precision
     double weighted_sum = 0.0;
 
@@ -464,6 +561,7 @@ void update_beta1(const ProteinData& prot, VarParams& vp,
 // ============================================================================
 void update_beta2(const ProteinData& prot, VarParams& vp,
                   const Hyperparams& hyp) {
+    (void)hyp;
     double prec = 1.0 / shrink_prior_variance(vp.prior_sigma2_beta2, 1e-4);
     double weighted_sum = 0.0;
 
@@ -504,6 +602,7 @@ void update_beta2(const ProteinData& prot, VarParams& vp,
 // ============================================================================
 void update_beta3(const ProteinData& prot, VarParams& vp,
                   const Hyperparams& hyp) {
+    (void)hyp;
     double prec = 1.0 / shrink_prior_variance(vp.prior_sigma2_beta3, 1e-4);
     double weighted_sum = 0.0;
 
@@ -627,7 +726,7 @@ void update_spike_slab_phi(const ProteinData& prot, int l,
 // ============================================================================
 void update_spike_slab_psi(const ProteinData& prot, int idx,
                            VarParams& vp, const Hyperparams& hyp) {
-    double Gamma_obs, se_Gamma, residual;
+    double se_Gamma, residual;
 
     double E_beta2 = vp.mu_beta2;
     double E_beta3 = vp.mu_beta3;
@@ -666,7 +765,7 @@ void update_spike_slab_psi(const ProteinData& prot, int idx,
 }
 
 // ============================================================================
-// Scenario 3: Bivariate spike-and-slab update for (delta_k, psi_k)
+// Scenario M5: Bivariate spike-and-slab update for (delta_k, psi_k)
 //
 // Under M=3, beta2=0. The two observation equations for Set A instrument k:
 //
@@ -1118,7 +1217,7 @@ double run_cavi(const ProteinData& prot, int scenario,
                 }
             }
         }
-        // phi (cis pleiotropy on cancer): update when protein->disease is active.
+        // phi is a nuisance cis-to-outcome path and is available in every state.
         for (int l = 0; l < prot.nB(); l++) {
             if (scenario_phi_free(scenario)) {
                 update_spike_slab_phi(prot, l, vp, hyp);
@@ -1199,6 +1298,36 @@ ProteinResult analyze_protein(const ProteinData& prot,
     int n_rf_to_pp = observed_rf_to_pp_count(prot);
     res.n_rf_to_pp_obs = n_rf_to_pp;
     res.rf_to_pp_identifiable = n_rf_to_pp > 0;
+    RegionalEvidence regional = compute_regional_evidence(prot, opts);
+    res.regional_n_variants = regional.n_variants;
+    res.regional_pp_shared = regional.pp_shared;
+    res.regional_pp_distinct = regional.pp_distinct;
+    res.regional_shared_given_both = regional.shared_given_both;
+    if (!prot.ld_reference_used) {
+        res.mediation_identifiability = "UNRESOLVED_NO_LD_REFERENCE";
+    } else if (!prot.regional_data_complete || regional.n_variants < 2) {
+        res.mediation_identifiability = "UNRESOLVED_NO_REGIONAL_DATA";
+    } else if (regional.pp_shared + regional.pp_distinct < opts.regional_min_both) {
+        res.mediation_identifiability = "UNRESOLVED_WEAK_REGIONAL_EVIDENCE";
+    } else if (regional.shared_given_both >= opts.regional_min_shared) {
+        if (n_rf_to_pp >= 2 && prot.nB() >= 1) {
+            res.mediation_identifiability =
+                "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
+        } else if (n_rf_to_pp < 2 && prot.nB() < 1) {
+            res.mediation_identifiability =
+                "UNRESOLVED_INSUFFICIENT_RF_AND_CIS_INSTRUMENTS";
+        } else if (n_rf_to_pp < 2) {
+            res.mediation_identifiability =
+                "UNRESOLVED_INSUFFICIENT_RF_INSTRUMENTS";
+        } else {
+            res.mediation_identifiability =
+                "UNRESOLVED_INSUFFICIENT_CIS_INSTRUMENTS";
+        }
+    } else if (regional.shared_given_both <= 1.0 - opts.regional_min_shared) {
+        res.mediation_identifiability = "LD_DISTINCT_SUPPORTED";
+    } else {
+        res.mediation_identifiability = "LD_CONFIGURATION_AMBIGUOUS";
+    }
     bool has_first_stage = n_rf_to_pp > 0;
     bool has_second_stage = (prot.nB() + prot.nC()) > 0;
     bool has_rf_outcome = (prot.nA() + prot.nC()) > 0;
@@ -1279,6 +1408,8 @@ ProteinResult analyze_protein(const ProteinData& prot,
         res.prob_M2 = 0.0; res.prob_M3 = 0.0;
         res.prob_M4 = 0.0; res.prob_M5 = 0.0;
         res.prob_mediator = 0.0;
+        res.prob_mediator_ld_resolved = 0.0;
+        res.prob_mediator_identified = 0.0;
         res.prob_protein_disease = 0.0;
         res.prob_rf_responsive = 0.0;
         res.prob_rf_direct = 0.0;
@@ -1305,7 +1436,8 @@ ProteinResult analyze_protein(const ProteinData& prot,
     double m1_resid_corr = 0.0;
     LocalScales local_scales = build_local_scales(hyp,
                                                   {res.ivw_rf_to_pp_beta, res.ivw_rf_to_pp_se, res.ivw_rf_to_pp_p},
-                                                  {res.ivw_pp_to_outcome_beta, res.ivw_pp_to_outcome_se, res.ivw_pp_to_outcome_p});
+                                                  {res.ivw_pp_to_outcome_beta, res.ivw_pp_to_outcome_se, res.ivw_pp_to_outcome_p},
+                                                  opts.legacy_adaptive_priors);
 
     for (int m = 0; m < N_SCENARIOS; m++) {
         VarParams vp = init_var_params(prot, m, hyp);
@@ -1361,7 +1493,8 @@ ProteinResult analyze_protein(const ProteinData& prot,
     SoftPriors soft_priors = build_soft_priors(hyp,
                                                {res.ivw_rf_to_pp_beta, res.ivw_rf_to_pp_se, res.ivw_rf_to_pp_p},
                                                {res.ivw_pp_to_outcome_beta, res.ivw_pp_to_outcome_se, res.ivw_pp_to_outcome_p},
-                                               {res.ivw_rf_to_outcome_beta, res.ivw_rf_to_outcome_se, res.ivw_rf_to_outcome_p});
+                                               {res.ivw_rf_to_outcome_beta, res.ivw_rf_to_outcome_se, res.ivw_rf_to_outcome_p},
+                                               opts.legacy_adaptive_priors);
     double log_priors[N_SCENARIOS] = {
         std::log(soft_priors.p0 + TINY),
         std::log(soft_priors.p1 + TINY),
@@ -1447,13 +1580,19 @@ ProteinResult analyze_protein(const ProteinData& prot,
     res.posterior_local_fdr = 1.0 - res.prob_M1;
     res.target_local_fdr = 1.0 - res.prob_protein_disease;
     finalize_direction_metrics(res);
+    bool ld_resolved = res.mediation_identifiability ==
+                       "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
+    res.prob_mediator_ld_resolved = ld_resolved ? res.prob_M1 : 0.0;
+    res.prob_mediator_identified = res.prob_mediator_ld_resolved;
     res.selection_probability = selection_probability_for_mode(res, opts);
     res.selection_local_fdr = 1.0 - res.selection_probability;
 
     bool strong_rf = std::isfinite(res.ivw_rf_to_pp_p) && res.ivw_rf_to_pp_p < 0.05;
     bool strong_out = std::isfinite(res.ivw_pp_to_outcome_p) && res.ivw_pp_to_outcome_p < 0.05;
-    if (res.prob_M1 >= 0.5 && strong_rf && strong_out) {
+    if (res.prob_mediator_ld_resolved >= 0.5 && strong_rf && strong_out) {
         res.evidence_tier = "high";
+    } else if (res.prob_M1 >= 0.5 && !ld_resolved) {
+        res.evidence_tier = "unresolved";
     } else if (res.prob_M1 >= 0.1 || (strong_rf && strong_out)) {
         res.evidence_tier = "moderate";
     } else if (res.prob_M1 >= 0.01 || strong_rf || strong_out) {
@@ -1508,11 +1647,15 @@ void run_empirical_bayes(std::vector<ProteinData>& proteins,
 
         // E-step: run CAVI for each protein
         // (could be parallelized with OpenMP here)
+#ifdef _OPENMP
         #pragma omp parallel for num_threads(opts.threads) schedule(dynamic)
+#endif
         for (int j = 0; j < J; j++) {
             results[j] = analyze_protein(proteins[j], hyp, opts);
             if (opts.verbose) {
+#ifdef _OPENMP
                 #pragma omp critical
+#endif
                 {
                     if ((j + 1) % 100 == 0 || j + 1 == J) {
                         std::cout << "      analyzed " << (j + 1) << " / " << J
@@ -1520,6 +1663,11 @@ void run_empirical_bayes(std::vector<ProteinData>& proteins,
                     }
                 }
             }
+        }
+
+        if (opts.fixed_priors) {
+            std::cout << " fixed hyperparameters\n";
+            break;
         }
 
         // M-step: update prior mixture weights
@@ -1532,22 +1680,13 @@ void run_empirical_bayes(std::vector<ProteinData>& proteins,
             sum_p4 += results[j].prob_M4;
             sum_p5 += results[j].prob_M5;
         }
-        if (opts.fixed_priors) {
-            hyp.p0 = init_p0;
-            hyp.p1 = init_p1;
-            hyp.p2 = init_p2;
-            hyp.p3 = init_p3;
-            hyp.p4 = init_p4;
-            hyp.p5 = init_p5;
-        } else {
-            double den = static_cast<double>(J) + opts.eb_prior_strength;
-            hyp.p0 = (sum_p0 + opts.eb_prior_strength * init_p0) / den;
-            hyp.p1 = (sum_p1 + opts.eb_prior_strength * init_p1) / den;
-            hyp.p2 = (sum_p2 + opts.eb_prior_strength * init_p2) / den;
-            hyp.p3 = (sum_p3 + opts.eb_prior_strength * init_p3) / den;
-            hyp.p4 = (sum_p4 + opts.eb_prior_strength * init_p4) / den;
-            hyp.p5 = (sum_p5 + opts.eb_prior_strength * init_p5) / den;
-        }
+        double den = static_cast<double>(J) + opts.eb_prior_strength;
+        hyp.p0 = (sum_p0 + opts.eb_prior_strength * init_p0) / den;
+        hyp.p1 = (sum_p1 + opts.eb_prior_strength * init_p1) / den;
+        hyp.p2 = (sum_p2 + opts.eb_prior_strength * init_p2) / den;
+        hyp.p3 = (sum_p3 + opts.eb_prior_strength * init_p3) / den;
+        hyp.p4 = (sum_p4 + opts.eb_prior_strength * init_p4) / den;
+        hyp.p5 = (sum_p5 + opts.eb_prior_strength * init_p5) / den;
 
         // Ensure minimum probability
         double pmin = 1e-4;

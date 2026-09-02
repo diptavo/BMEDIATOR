@@ -1,0 +1,110 @@
+{
+  "global": {
+    "seed": 20260419,
+    "rf_p_threshold": 5e-6,
+    "cis_p_threshold": 5e-6,
+    "max_cavi_iter": 120,
+    "max_eb_iter": 10,
+    "threads": 1,
+    "cis_window_bp": 1000000
+  },
+  "classification": {
+    "replicates": 8,
+    "proteins_per_scenario": 24,
+    "scenarios": ["M0", "M1", "M2", "M3"],
+    "scenario_aliases": {
+      "M3": "M2"
+    },
+    "cells": [
+      {
+        "name": "balanced_main3",
+        "set_counts": { "A": 3, "B": 3, "C": 3 },
+        "gamma_range": [0.28, 0.38],
+        "cis_effect_range": [0.22, 0.34],
+        "beta1": 0.32,
+        "beta2": 0.32,
+        "beta3": 0.00,
+        "rho_m3": 0.88,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.04,
+        "psi_sd": 0.05,
+        "phi_sd": 0.02,
+        "scenario_overrides": {
+          "M0": { "delta_sd": 0.0, "psi_sd": 0.0, "phi_sd": 0.0, "beta3": 0.0 },
+          "M1": { "beta1": 0.34, "beta2": 0.36, "beta3": 0.0, "delta_sd": 0.015, "psi_sd": 0.02, "phi_sd": 0.01 },
+          "M2": { "beta1": 0.30, "beta2": 0.0, "beta3": 0.0, "delta_sd": 0.01, "psi_sd": 0.01, "phi_sd": 0.005 },
+          "M3": { "beta1": 0.24, "beta2": 0.0, "beta3": 0.0, "rho_m3": 0.94, "delta_sd": 0.10, "psi_sd": 0.12, "phi_sd": 0.005 }
+        }
+      },
+      {
+        "name": "overlap_main3",
+        "set_counts": { "A": 2, "B": 2, "C": 4 },
+        "gamma_range": [0.28, 0.38],
+        "cis_effect_range": [0.22, 0.34],
+        "beta1": 0.32,
+        "beta2": 0.28,
+        "beta3": 0.00,
+        "rho_m3": 0.90,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.05,
+        "psi_sd": 0.06,
+        "phi_sd": 0.02,
+        "scenario_overrides": {
+          "M0": { "delta_sd": 0.0, "psi_sd": 0.0, "phi_sd": 0.0, "beta3": 0.0 },
+          "M1": { "beta1": 0.32, "beta2": 0.32, "beta3": 0.0, "delta_sd": 0.015, "psi_sd": 0.02, "phi_sd": 0.01 },
+          "M2": { "beta1": 0.28, "beta2": 0.0, "beta3": 0.0, "delta_sd": 0.01, "psi_sd": 0.01, "phi_sd": 0.005 },
+          "M3": { "beta1": 0.22, "beta2": 0.0, "beta3": 0.0, "rho_m3": 0.96, "delta_sd": 0.12, "psi_sd": 0.14, "phi_sd": 0.005 }
+        },
+        "scenario_set_counts": {
+          "M3": { "A": 2, "B": 1, "C": 5 }
+        }
+      }
+    ]
+  },
+  "calibration": {
+    "replicates": 10,
+    "proteins_per_replicate": 240,
+    "scenarios": ["M0", "M1", "M2", "M3"],
+    "scenario_aliases": {
+      "M3": "M2"
+    },
+    "scenario_mix": {
+      "M0": 0.70,
+      "M1": 0.15,
+      "M2": 0.10,
+      "M3": 0.05
+    },
+    "cells": [
+      {
+        "name": "calibration_main3_medium",
+        "set_count_distribution": {
+          "A": [2, 3, 4],
+          "B": [2, 3, 4],
+          "C": [1, 2, 3]
+        },
+        "gamma_range": [0.28, 0.38],
+        "cis_effect_range": [0.22, 0.34],
+        "beta1": 0.30,
+        "beta2": 0.28,
+        "beta3": 0.00,
+        "rho_m3": 0.90,
+        "rf_se": 0.042,
+        "pqtl_se": 0.045,
+        "outcome_se": 0.05,
+        "delta_sd": 0.035,
+        "psi_sd": 0.045,
+        "phi_sd": 0.015,
+        "scenario_overrides": {
+          "M0": { "delta_sd": 0.0, "psi_sd": 0.0, "phi_sd": 0.0, "beta3": 0.0 },
+          "M1": { "beta1": 0.32, "beta2": 0.30, "beta3": 0.0, "delta_sd": 0.015, "psi_sd": 0.02, "phi_sd": 0.01 },
+          "M2": { "beta1": 0.28, "beta2": 0.0, "beta3": 0.0, "delta_sd": 0.01, "psi_sd": 0.01, "phi_sd": 0.005 },
+          "M3": { "beta1": 0.22, "beta2": 0.0, "beta3": 0.0, "rho_m3": 0.95, "delta_sd": 0.10, "psi_sd": 0.12, "phi_sd": 0.005 }
+        }
+      }
+    ]
+  }
+}

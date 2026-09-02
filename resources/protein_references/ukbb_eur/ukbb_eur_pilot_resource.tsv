@@ -1,0 +1,11 @@
+protein	gene	sumstat_dir	chr	tss
+OID30771	A1BG	/data/Dutta_lab/decode/ukb_ppp/EUR/A1BG_P04217_OID30771_v1_Inflammation_II	19	58353499
+OID20921	ABHD14B	/data/Dutta_lab/decode/ukb_ppp/EUR/ABHD14B_Q96IU4_OID20921_v1_Neurology	3	51983409
+OID21280	ABL1	/data/Dutta_lab/decode/ukb_ppp/EUR/ABL1_P00519_OID21280_v1_Oncology	9	130713946
+OID30675	ABO	/data/Dutta_lab/decode/ukb_ppp/EUR/ABO_P16442_OID30675_v1_Inflammation_II	9	133275214
+OID30130	ABRAXAS2	/data/Dutta_lab/decode/ukb_ppp/EUR/ABRAXAS2_Q15018_OID30130_v1_Cardiometabolic_II	NA	NA
+OID21269	ACAA1	/data/Dutta_lab/decode/ukb_ppp/EUR/ACAA1_P09110_OID21269_v1_Oncology	3	38137242
+OID31277	ACADM	/data/Dutta_lab/decode/ukb_ppp/EUR/ACADM_P11310_OID31277_v1_Oncology_II	1	75724347
+OID30356	ACADSB	/data/Dutta_lab/decode/ukb_ppp/EUR/ACADSB_P45954_OID30356_v1_Cardiometabolic_II	10	123008913
+OID20159	ACAN	/data/Dutta_lab/decode/ukb_ppp/EUR/ACAN_P16112_OID20159_v1_Cardiometabolic	15	88803443
+OID20105	ACE2	/data/Dutta_lab/decode/ukb_ppp/EUR/ACE2_Q9BYF1_OID20105_v1_Cardiometabolic	X	15602148

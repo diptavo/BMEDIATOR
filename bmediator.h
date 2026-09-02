@@ -102,6 +102,15 @@ struct ProteinData {
     std::vector<double> setC_Gamma;
     std::vector<double> setC_se_Gamma;
 
+    // Unpruned cis-region statistics used for shared-vs-distinct causal evidence.
+    std::vector<std::string> regional_cis_rsid;
+    std::vector<double> regional_pp_beta;
+    std::vector<double> regional_pp_se;
+    std::vector<double> regional_outcome_beta;
+    std::vector<double> regional_outcome_se;
+    bool regional_data_complete = false;
+    bool ld_reference_used = false;
+
     int nC_exact = 0;
     int nC_proxy = 0;
     int nA_proxy = 0;
@@ -134,8 +143,8 @@ struct VarParams {
     // Set A + C: psi_k (cancer pleiotropy)
     std::vector<double> mu_psi, s2_psi, omega_psi;
 
-    // Scenario 3: bivariate (delta_k, psi_k) posterior
-    // Joint inclusion probability (replaces independent omega_delta, omega_psi under M=3)
+    // Scenario M5: bivariate (delta_k, psi_k) posterior
+    // Joint inclusion probability (replaces independent omega_delta, omega_psi under M5)
     std::vector<double> omega_joint;     // P(z_k = 1) for the bivariate pair
     std::vector<double> cov_delta_psi;   // posterior covariance between delta_k and psi_k
     double rho_delta_psi;                // correlation parameter (prior or estimated)
@@ -163,7 +172,7 @@ struct Hyperparams {
     double pi3;          // proportion of pleiotropic RF instruments (psi)
     double tau2_3;       // slab variance for psi
 
-    // Scenario 3: correlated pleiotropy prior
+    // Scenario M5: correlated pleiotropy prior
     double rho_prior;    // prior on delta-psi correlation
 
     Hyperparams() :
@@ -192,6 +201,18 @@ struct ProteinResult {
     double prob_protein_disease;
     double prob_rf_responsive;
     double prob_rf_direct;
+    double prob_mediator_ld_resolved;
+    // Deprecated compatibility alias for prob_mediator_ld_resolved.
+    double prob_mediator_identified;
+
+    // Regional single-causal-variant shared-versus-distinct evidence.
+    // This resolves LD-confounded distinct signals, but shared signal is evidence
+    // for mediation only conditional on exclusion/valid-instrument assumptions.
+    int regional_n_variants;
+    double regional_pp_shared;
+    double regional_pp_distinct;
+    double regional_shared_given_both;
+    std::string mediation_identifiability;
 
     // Estimates under M=1 (true mediation)
     double beta1_est, beta1_se;
@@ -282,6 +303,7 @@ struct Options {
     int    max_eb_iter;        // empirical Bayes outer iterations
     double eb_tol;
     bool   fixed_priors;       // keep input scenario priors fixed during EB
+    bool   legacy_adaptive_priors; // opt in to data-reused soft priors/scales
     double eb_prior_strength;  // pseudo-count strength for EB scenario priors
 
     // Priors (can override defaults)
@@ -298,6 +320,14 @@ struct Options {
     double m1_min_second_stage_z; // minimum absolute PP->outcome IVW z for M1
     double m1_resid_corr_threshold; // residual corr threshold for M1 penalty
     double m1_resid_corr_penalty;   // residual corr penalty strength for M1
+    double regional_prior_pp;       // per-variant protein association prior
+    double regional_prior_outcome;  // per-variant outcome association prior
+    double regional_prior_shared;   // per-variant shared-causal prior
+    double regional_prior_var_pp;   // Wakefield effect prior variance
+    double regional_prior_var_outcome;
+    double regional_min_both;       // minimum P(shared or distinct)
+    double regional_min_shared;     // minimum P(shared | both associated)
+    bool allow_unresolved_selection;
 
     // Output
     std::string out_prefix;
@@ -312,7 +342,8 @@ struct Options {
         heidi_thresh(0.01), ld_fdr_thresh(0.05), min_instruments(5),
         heidi_flag(true), heidi_global(true), steiger_flag(true), remove_palindromic(true),
         max_cavi_iter(MAX_CAVI_ITER), elbo_tol(ELBO_TOL),
-        max_eb_iter(20), eb_tol(1e-4), fixed_priors(false), eb_prior_strength(0.0),
+        max_eb_iter(20), eb_tol(1e-4), fixed_priors(true), legacy_adaptive_priors(false),
+        eb_prior_strength(0.0),
         prior_p0(0.85), prior_p1(0.03), prior_p2(0.05),
         prior_p3(0.03), prior_p4(0.02), prior_p5(0.02),
         prior_sigma2_beta1(0.1), prior_sigma2_beta2(0.1), prior_sigma2_beta3(0.1),
@@ -320,6 +351,11 @@ struct Options {
         direction_mode("report"), direction_weight(1.0), direction_min_prob(0.80),
         m1_min_cis_only(0), m1_min_first_stage_z(0.0), m1_min_second_stage_z(0.0),
         m1_resid_corr_threshold(1.1), m1_resid_corr_penalty(0.0),
+        regional_prior_pp(1e-4), regional_prior_outcome(1e-4),
+        regional_prior_shared(1e-8), regional_prior_var_pp(0.04),
+        regional_prior_var_outcome(0.04), regional_min_both(0.80),
+        regional_min_shared(0.80),
+        allow_unresolved_selection(false),
         out_prefix("bmediator"), threads(1), verbose(false) {}
 };
 
@@ -370,7 +406,7 @@ void update_spike_slab_phi(const ProteinData& prot, int l,
                            VarParams& vp, const Hyperparams& hyp);
 void update_spike_slab_psi(const ProteinData& prot, int k,
                            VarParams& vp, const Hyperparams& hyp);
-// Scenario 3: joint bivariate update for (delta_k, psi_k) with correlation
+// Scenario M5: joint bivariate update for (delta_k, psi_k) with correlation
 void update_bivariate_delta_psi(const ProteinData& prot, int k,
                                 VarParams& vp, const Hyperparams& hyp);
 double compute_elbo(const ProteinData& prot, int scenario,

@@ -23,7 +23,7 @@ OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/pipeline.o \
             $(BUILD_DIR)/gsmr_qc.o
 
-.PHONY: all clean test help
+.PHONY: all clean test test-regional-stress help
 
 all: $(BIN)
 
@@ -42,10 +42,14 @@ clean:
 test: $(BIN)
 	bash test/run_test.sh
 
+test-regional-stress: $(BIN)
+	python3 sim/run_regional_ld_stress.py --binary ./$(BIN) --outdir build/regional_ld_stress --replicates 3
+
 help:
 	@echo "Targets:"
 	@echo "  make              Build bmediator"
 	@echo "  make test         Run the smoke test"
+	@echo "  make test-regional-stress  Run the stochastic genotype/LD smoke stress"
 	@echo "  make clean        Remove build artifacts"
 	@echo ""
 	@echo "Variables:"

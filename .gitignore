@@ -1,0 +1,48 @@
+# Build artifacts
+/bmediator
+/build/
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# BMEDIATOR outputs
+*.mediation
+*.hyp
+*.instruments
+*.joint.tsv
+*.corr.tsv
+
+# Large analysis data and generated resources
+/generated/
+/analysis/
+/outputs/
+/output/
+/tmp/
+*.bgz
+*.bgen
+*.bed
+*.bim
+*.fam
+*.pgen
+*.pvar
+*.psam
+*.vcf
+*.vcf.gz
+*.sumstats.gz
+
+# Local dependency/cache directories
+/.deps/
+__pycache__/
+*.py[cod]
+.Rhistory
+.RData
+.Rproj.user/
+
+# OS/editor metadata
+.DS_Store
+._*
+*.swp
+*.swo
+

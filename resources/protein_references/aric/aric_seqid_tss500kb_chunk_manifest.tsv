@@ -1,0 +1,6 @@
+chunk_id	chunk_label	resource_subset	n_rows
+1	aric_seqid_tss500kb_chunk_001	/data/Dutta_lab/BMEDIATOR/generated/ARIC_resource/chunks/aric_seqid_tss500kb_chunk_001.tsv	1000
+2	aric_seqid_tss500kb_chunk_002	/data/Dutta_lab/BMEDIATOR/generated/ARIC_resource/chunks/aric_seqid_tss500kb_chunk_002.tsv	1000
+3	aric_seqid_tss500kb_chunk_003	/data/Dutta_lab/BMEDIATOR/generated/ARIC_resource/chunks/aric_seqid_tss500kb_chunk_003.tsv	1000
+4	aric_seqid_tss500kb_chunk_004	/data/Dutta_lab/BMEDIATOR/generated/ARIC_resource/chunks/aric_seqid_tss500kb_chunk_004.tsv	1000
+5	aric_seqid_tss500kb_chunk_005	/data/Dutta_lab/BMEDIATOR/generated/ARIC_resource/chunks/aric_seqid_tss500kb_chunk_005.tsv	657

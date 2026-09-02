@@ -1,0 +1,21 @@
+* text=auto
+
+*.cpp text
+*.h text
+*.py text
+*.R text
+*.sh text eol=lf
+*.md text
+*.yml text
+*.yaml text
+*.json text
+*.txt text
+*.tsv text
+
+*.gz binary
+*.bgz binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+

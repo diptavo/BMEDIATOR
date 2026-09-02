@@ -9,7 +9,7 @@ namespace bmediator {
 static void print_banner() {
     std::cout << "*******************************************************************\n";
     std::cout << "* BMEDIATOR (Bayesian Mediation MR)\n";
-    std::cout << "* Version 1.1.0-dev\n";
+    std::cout << "* Version 1.2.0-dev\n";
     std::cout << "* Bayesian framework for identifying mediating plasma proteins\n";
     std::cout << "* between risk factors and disease outcomes using summary statistics\n";
     std::cout << "*\n";
@@ -39,6 +39,7 @@ static void print_usage() {
     std::cout << "  --p-thresh-cis  <val>    p-value threshold for cis-pQTL instruments (default 5e-6)\n";
     std::cout << "  --cis-window    <kb>     cis window in kb (default 1000, i.e. +/-1Mb)\n";
     std::cout << "  --clump-kb      <kb>     LD clumping window in kb (default 10000)\n";
+    std::cout << "  --clump-r2      <val>    LD r-squared clumping threshold (default 0.1)\n";
     std::cout << "\nPrior specification:\n";
     std::cout << "  --prior-p0      <val>    Prior probability of null scenario (default 0.85)\n";
     std::cout << "  --prior-p1      <val>    Prior probability of mediation (default 0.03)\n";
@@ -52,14 +53,22 @@ static void print_usage() {
     std::cout << "\nInference:\n";
     std::cout << "  --max-cavi-iter <int>    Max CAVI iterations per scenario (default 200)\n";
     std::cout << "  --elbo-tol      <val>    ELBO convergence tolerance (default 1e-6)\n";
-    std::cout << "  --max-eb-iter   <int>    Max empirical Bayes iterations (default 20)\n";
+    std::cout << "  --max-eb-iter   <int>    Max empirical Bayes iterations when enabled (default 20)\n";
     std::cout << "  --eb-tol        <val>    EB convergence tolerance (default 1e-4)\n";
-    std::cout << "  --fixed-priors           Keep scenario priors fixed during EB\n";
+    std::cout << "  --fixed-priors           Keep all inference hyperparameters fixed (default)\n";
+    std::cout << "  --empirical-bayes        Estimate priors/scales from the analyzed proteins\n";
+    std::cout << "  --legacy-adaptive-priors Reuse IVW evidence in local priors (not recommended)\n";
     std::cout << "  --eb-prior-strength <val> Scenario-prior pseudo-count strength for EB (default 0)\n";
     std::cout << "  --m1-min-cis-only <int> Minimum Set B instruments required for M1 (default 0)\n";
     std::cout << "  --m1-min-second-stage-z <val> Minimum absolute PP->outcome IVW z for M1 (default 0)\n";
     std::cout << "  --m1-resid-corr-threshold <val> Residual corr threshold for M1 penalty (default disabled)\n";
     std::cout << "  --m1-resid-corr-penalty <val> M1 residual corr penalty strength (default 0)\n";
+    std::cout << "  --regional-prior-pp <val> Per-variant protein association prior (default 1e-4)\n";
+    std::cout << "  --regional-prior-outcome <val> Per-variant outcome association prior (default 1e-4)\n";
+    std::cout << "  --regional-prior-shared <val> Per-variant shared prior (default 1e-8 = product)\n";
+    std::cout << "  --regional-min-both <val> Minimum P(shared or distinct regional signal) (default 0.80)\n";
+    std::cout << "  --regional-min-shared <val> Minimum P(shared|both) for LD-resolved mediation (default 0.80)\n";
+    std::cout << "  --allow-unresolved-selection Allow confirmatory selection without regional LD resolution\n";
     std::cout << "\nDirection consistency:\n";
     std::cout << "  --direction-mode <mode>  Direction policy: report, prioritize, soft, hard (default report)\n";
     std::cout << "  --direction-weight <val> Soft-mode M1 log-prior penalty weight (default 1.0)\n";
@@ -113,6 +122,8 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.cis_window_kb = std::atoi(argv[++i]);
         else if (flag == "--clump-kb" && i + 1 < argc)
             opts.clump_window_kb = std::atoi(argv[++i]);
+        else if (flag == "--clump-r2" && i + 1 < argc)
+            opts.r2_thresh = std::atof(argv[++i]);
         // Priors
         else if (flag == "--prior-p0" && i + 1 < argc)
             opts.prior_p0 = std::atof(argv[++i]);
@@ -143,6 +154,10 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.eb_tol = std::atof(argv[++i]);
         else if (flag == "--fixed-priors")
             opts.fixed_priors = true;
+        else if (flag == "--empirical-bayes")
+            opts.fixed_priors = false;
+        else if (flag == "--legacy-adaptive-priors")
+            opts.legacy_adaptive_priors = true;
         else if (flag == "--eb-prior-strength" && i + 1 < argc)
             opts.eb_prior_strength = std::atof(argv[++i]);
         else if (flag == "--m1-min-cis-only" && i + 1 < argc)
@@ -155,6 +170,22 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.m1_resid_corr_threshold = std::atof(argv[++i]);
         else if (flag == "--m1-resid-corr-penalty" && i + 1 < argc)
             opts.m1_resid_corr_penalty = std::atof(argv[++i]);
+        else if (flag == "--regional-prior-pp" && i + 1 < argc)
+            opts.regional_prior_pp = std::atof(argv[++i]);
+        else if (flag == "--regional-prior-outcome" && i + 1 < argc)
+            opts.regional_prior_outcome = std::atof(argv[++i]);
+        else if (flag == "--regional-prior-shared" && i + 1 < argc)
+            opts.regional_prior_shared = std::atof(argv[++i]);
+        else if (flag == "--regional-prior-var-pp" && i + 1 < argc)
+            opts.regional_prior_var_pp = std::atof(argv[++i]);
+        else if (flag == "--regional-prior-var-outcome" && i + 1 < argc)
+            opts.regional_prior_var_outcome = std::atof(argv[++i]);
+        else if (flag == "--regional-min-both" && i + 1 < argc)
+            opts.regional_min_both = std::atof(argv[++i]);
+        else if (flag == "--regional-min-shared" && i + 1 < argc)
+            opts.regional_min_shared = std::atof(argv[++i]);
+        else if (flag == "--allow-unresolved-selection")
+            opts.allow_unresolved_selection = true;
         // Direction consistency
         else if (flag == "--direction-mode" && i + 1 < argc)
             opts.direction_mode = argv[++i];
@@ -211,6 +242,47 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: use either --pqtl-sumstat or --protein-gwas-list, not both\n";
         ok = false;
     }
+    if (!(opts.p_thresh_rf > 0.0 && opts.p_thresh_rf <= 1.0) ||
+        !(opts.p_thresh_cis > 0.0 && opts.p_thresh_cis <= 1.0)) {
+        std::cerr << "Error: instrument p-value thresholds must be in (0, 1]\n";
+        ok = false;
+    }
+    if (opts.cis_window_kb < 0 || opts.clump_window_kb < 0) {
+        std::cerr << "Error: cis and clumping windows must be non-negative\n";
+        ok = false;
+    }
+    if (!(opts.r2_thresh > 0.0 && opts.r2_thresh <= 1.0) ||
+        !std::isfinite(opts.r2_thresh)) {
+        std::cerr << "Error: --clump-r2 must be finite and in (0, 1]\n";
+        ok = false;
+    }
+    const double scenario_priors[] = {
+        opts.prior_p0, opts.prior_p1, opts.prior_p2,
+        opts.prior_p3, opts.prior_p4, opts.prior_p5
+    };
+    double scenario_prior_sum = 0.0;
+    for (double prior : scenario_priors) {
+        if (!std::isfinite(prior) || prior < 0.0) {
+            std::cerr << "Error: scenario priors must be finite and non-negative\n";
+            ok = false;
+            break;
+        }
+        scenario_prior_sum += prior;
+    }
+    if (!(scenario_prior_sum > 0.0) || !std::isfinite(scenario_prior_sum)) {
+        std::cerr << "Error: scenario priors must have a positive finite sum\n";
+        ok = false;
+    }
+    if (!(opts.prior_sigma2_beta1 > 0.0) || !std::isfinite(opts.prior_sigma2_beta1) ||
+        !(opts.prior_sigma2_beta2 > 0.0) || !std::isfinite(opts.prior_sigma2_beta2) ||
+        !(opts.prior_sigma2_beta3 > 0.0) || !std::isfinite(opts.prior_sigma2_beta3)) {
+        std::cerr << "Error: effect prior variances must be finite and positive\n";
+        ok = false;
+    }
+    if (opts.max_cavi_iter < 1 || opts.max_eb_iter < 1 || opts.threads < 1) {
+        std::cerr << "Error: CAVI iterations, EB iterations, and threads must be positive\n";
+        ok = false;
+    }
     if (opts.direction_mode != "report" &&
         opts.direction_mode != "prioritize" &&
         opts.direction_mode != "soft" &&
@@ -251,6 +323,32 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: --m1-resid-corr-penalty must be a finite non-negative value\n";
         ok = false;
     }
+    if (!(opts.regional_prior_pp > 0.0 && opts.regional_prior_pp < 1.0) ||
+        !(opts.regional_prior_outcome > 0.0 && opts.regional_prior_outcome < 1.0) ||
+        !(opts.regional_prior_shared > 0.0 && opts.regional_prior_shared < 1.0)) {
+        std::cerr << "Error: regional configuration priors must be between 0 and 1\n";
+        ok = false;
+    }
+    if (opts.regional_prior_shared > opts.regional_prior_pp ||
+        opts.regional_prior_shared > opts.regional_prior_outcome) {
+        std::cerr << "Error: --regional-prior-shared cannot exceed either "
+                  << "trait-specific regional prior\n";
+        ok = false;
+    }
+    if (!(opts.regional_prior_var_pp > 0.0) || !std::isfinite(opts.regional_prior_var_pp) ||
+        !(opts.regional_prior_var_outcome > 0.0) ||
+        !std::isfinite(opts.regional_prior_var_outcome)) {
+        std::cerr << "Error: regional effect prior variances must be finite and positive\n";
+        ok = false;
+    }
+    if (!(opts.regional_min_shared >= 0.0 && opts.regional_min_shared <= 1.0)) {
+        std::cerr << "Error: --regional-min-shared must be between 0 and 1\n";
+        ok = false;
+    }
+    if (!(opts.regional_min_both >= 0.0 && opts.regional_min_both <= 1.0)) {
+        std::cerr << "Error: --regional-min-both must be between 0 and 1\n";
+        ok = false;
+    }
     if (!ok) std::exit(1);
 
     // Normalize priors
@@ -279,6 +377,7 @@ void parse_args(int argc, char* argv[], Options& opts) {
     std::cout << "  p-value threshold (cis):     " << opts.p_thresh_cis << "\n";
     std::cout << "  cis window (kb):             " << opts.cis_window_kb << "\n";
     std::cout << "  clump window (kb):           " << opts.clump_window_kb << "\n";
+    std::cout << "  LD clumping r2:              " << opts.r2_thresh << "\n";
     std::cout << "  Prior (p0,p1,p2,p3,p4,p5):   ("
               << opts.prior_p0 << ", " << opts.prior_p1 << ", "
               << opts.prior_p2 << ", " << opts.prior_p3 << ", "
@@ -287,6 +386,8 @@ void parse_args(int argc, char* argv[], Options& opts) {
     std::cout << "  ELBO tolerance:              " << opts.elbo_tol << "\n";
     std::cout << "  Max EB iterations:           " << opts.max_eb_iter << "\n";
     std::cout << "  Fixed scenario priors:       " << (opts.fixed_priors ? "YES" : "NO") << "\n";
+    std::cout << "  Legacy adaptive priors:      "
+              << (opts.legacy_adaptive_priors ? "ON" : "OFF") << "\n";
     std::cout << "  EB prior strength:           " << opts.eb_prior_strength << "\n";
     std::cout << "  M1 min Set B instruments:    " << opts.m1_min_cis_only << "\n";
     std::cout << "  M1 min first-stage z:        " << opts.m1_min_first_stage_z << "\n";
@@ -294,6 +395,10 @@ void parse_args(int argc, char* argv[], Options& opts) {
     std::cout << "  M1 residual corr penalty:    threshold="
               << opts.m1_resid_corr_threshold
               << ", weight=" << opts.m1_resid_corr_penalty << "\n";
+    std::cout << "  Regional min both:           " << opts.regional_min_both << "\n";
+    std::cout << "  Regional min shared:         " << opts.regional_min_shared << "\n";
+    std::cout << "  Allow unresolved selection:  "
+              << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
     std::cout << "  Direction weight:            " << opts.direction_weight << "\n";
     std::cout << "  Direction min probability:   " << opts.direction_min_prob << "\n";
@@ -313,7 +418,6 @@ void read_sumstats(const std::string& file, std::map<std::string, SumStat>& ss) 
         std::cerr << "Error: cannot open file " << file << "\n";
         std::exit(1);
     }
-
     std::string line;
     // Read and skip header
     std::getline(fin, line);
@@ -680,7 +784,10 @@ void write_results(const std::vector<ProteinResult>& results,
     fout << std::fixed << std::setprecision(6);
     fout << "Protein\tGene\tnA\tnB\tnC\tnC_exact\tnC_proxy\tn_rf_to_pp_obs\trf_to_pp_identifiable\t"
          << "P_M0\tP_M1\tP_M2\tP_M3\tP_M4\tP_M5\t"
-         << "P_mediator\tP_protein_disease\tP_rf_responsive\tP_rf_direct\t"
+         << "P_mediator\tP_mediator_ld_resolved\tP_mediator_identified\t"
+         << "P_protein_disease\tP_rf_responsive\tP_rf_direct\t"
+         << "regional_n_variants\tregional_PP_shared\tregional_PP_distinct\t"
+         << "regional_shared_given_both\tmediation_identifiability\t"
          << "beta1\tse_beta1\tbeta2\tse_beta2\tbeta3\tse_beta3\t"
          << "ivw_rf_to_pp_beta\tivw_rf_to_pp_se\tivw_rf_to_pp_p\t"
          << "ivw_pp_to_outcome_beta\tivw_pp_to_outcome_se\tivw_pp_to_outcome_p\t"
@@ -703,8 +810,14 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.prob_M0 << "\t" << r.prob_M1 << "\t"
              << r.prob_M2 << "\t" << r.prob_M3 << "\t"
              << r.prob_M4 << "\t" << r.prob_M5 << "\t"
-             << r.prob_mediator << "\t" << r.prob_protein_disease << "\t"
+             << r.prob_mediator << "\t" << r.prob_mediator_ld_resolved << "\t"
+             << r.prob_mediator_identified << "\t"
+             << r.prob_protein_disease << "\t"
              << r.prob_rf_responsive << "\t" << r.prob_rf_direct << "\t"
+             << r.regional_n_variants << "\t"
+             << r.regional_pp_shared << "\t" << r.regional_pp_distinct << "\t"
+             << r.regional_shared_given_both << "\t"
+             << r.mediation_identifiability << "\t"
              << r.beta1_est << "\t" << r.beta1_se << "\t"
              << r.beta2_est << "\t" << r.beta2_se << "\t"
              << r.beta3_est << "\t" << r.beta3_se << "\t"
@@ -742,8 +855,8 @@ void write_results(const std::vector<ProteinResult>& results,
     // Hyperparameter file: .hyp
     std::string hfname = opts.out_prefix + ".hyp";
     std::ofstream hout(hfname);
-    hout << std::fixed << std::setprecision(6);
-    hout << "# Empirical Bayes estimated hyperparameters\n";
+    hout << std::fixed << std::setprecision(12);
+    hout << "# BMEDIATOR priors and final inference hyperparameters\n";
     hout << "p0\t" << hyp.p0 << "\n";
     hout << "p1\t" << hyp.p1 << "\n";
     hout << "p2\t" << hyp.p2 << "\n";
@@ -760,12 +873,24 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "pi3\t" << hyp.pi3 << "\n";
     hout << "tau2_3\t" << hyp.tau2_3 << "\n";
     hout << "fixed_priors\t" << (opts.fixed_priors ? "YES" : "NO") << "\n";
+    hout << "legacy_adaptive_priors\t"
+         << (opts.legacy_adaptive_priors ? "YES" : "NO") << "\n";
     hout << "eb_prior_strength\t" << opts.eb_prior_strength << "\n";
     hout << "m1_min_cis_only\t" << opts.m1_min_cis_only << "\n";
     hout << "m1_min_first_stage_z\t" << opts.m1_min_first_stage_z << "\n";
     hout << "m1_min_second_stage_z\t" << opts.m1_min_second_stage_z << "\n";
     hout << "m1_resid_corr_threshold\t" << opts.m1_resid_corr_threshold << "\n";
     hout << "m1_resid_corr_penalty\t" << opts.m1_resid_corr_penalty << "\n";
+    hout << "clump_r2\t" << opts.r2_thresh << "\n";
+    hout << "regional_prior_pp\t" << opts.regional_prior_pp << "\n";
+    hout << "regional_prior_outcome\t" << opts.regional_prior_outcome << "\n";
+    hout << "regional_prior_shared\t" << opts.regional_prior_shared << "\n";
+    hout << "regional_prior_var_pp\t" << opts.regional_prior_var_pp << "\n";
+    hout << "regional_prior_var_outcome\t" << opts.regional_prior_var_outcome << "\n";
+    hout << "regional_min_both\t" << opts.regional_min_both << "\n";
+    hout << "regional_min_shared\t" << opts.regional_min_shared << "\n";
+    hout << "allow_unresolved_selection\t"
+         << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     hout << "direction_mode\t" << opts.direction_mode << "\n";
     hout << "direction_weight\t" << opts.direction_weight << "\n";
     hout << "direction_min_prob\t" << opts.direction_min_prob << "\n";
@@ -774,10 +899,12 @@ void write_results(const std::vector<ProteinResult>& results,
 
     // Summary to log
     int n_mediators = 0;
+    int n_conditionally_identified = 0;
     int n_targets = 0;
     int n_fdr10 = 0, n_fdr5 = 0;
     for (auto& r : results) {
         if (r.prob_M1 > 0.5) n_mediators++;
+        if (r.prob_mediator_ld_resolved > 0.5) n_conditionally_identified++;
         if (r.prob_protein_disease > 0.5) n_targets++;
         if (r.selected_fdr_10) n_fdr10++;
         if (r.selected_fdr_5) n_fdr5++;
@@ -785,11 +912,13 @@ void write_results(const std::vector<ProteinResult>& results,
     std::cout << "\nSummary:\n";
     std::cout << "  Total proteins analyzed:     " << results.size() << "\n";
     std::cout << "  Proteins with P(M1) > 0.5:   " << n_mediators << "\n";
+    std::cout << "  LD-resolved conditional P(M1) > 0.5: "
+              << n_conditionally_identified << "\n";
     std::cout << "  Proteins with P(M1+M4) > 0.5:" << n_targets << "\n";
     std::cout << "  Proteins selected at 5% mode-specific FDR:  " << n_fdr5 << "\n";
     std::cout << "  Proteins selected at 10% mode-specific FDR: " << n_fdr10 << "\n";
     std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
-    std::cout << "  EB-estimated prior (p0,p1,p2,p3,p4,p5): ("
+    std::cout << "  Final prior (p0,p1,p2,p3,p4,p5): ("
               << hyp.p0 << ", " << hyp.p1 << ", "
               << hyp.p2 << ", " << hyp.p3 << ", "
               << hyp.p4 << ", " << hyp.p5 << ")\n";

@@ -1,0 +1,117 @@
+{
+  "global": {
+    "seed": 20260418,
+    "rf_p_threshold": 5e-6,
+    "cis_p_threshold": 5e-6,
+    "max_cavi_iter": 120,
+    "max_eb_iter": 10,
+    "threads": 1,
+    "cis_window_bp": 1000000
+  },
+  "classification": {
+    "replicates": 8,
+    "proteins_per_scenario": 24,
+    "cells": [
+      {
+        "name": "balanced_medium",
+        "set_counts": { "A": 3, "B": 3, "C": 3 },
+        "gamma_range": [0.26, 0.36],
+        "cis_effect_range": [0.20, 0.32],
+        "beta1": 0.28,
+        "beta2": 0.24,
+        "beta3": 0.04,
+        "rho_m3": 0.65,
+        "rf_se": 0.04,
+        "pqtl_se": 0.045,
+        "outcome_se": 0.05,
+        "delta_sd": 0.025,
+        "psi_sd": 0.03,
+        "phi_sd": 0.02
+      },
+      {
+        "name": "overlap_heavy",
+        "set_counts": { "A": 2, "B": 1, "C": 5 },
+        "gamma_range": [0.26, 0.36],
+        "cis_effect_range": [0.18, 0.28],
+        "beta1": 0.26,
+        "beta2": 0.18,
+        "beta3": 0.04,
+        "rho_m3": 0.75,
+        "rf_se": 0.04,
+        "pqtl_se": 0.05,
+        "outcome_se": 0.05,
+        "delta_sd": 0.03,
+        "psi_sd": 0.04,
+        "phi_sd": 0.02
+      },
+      {
+        "name": "weak_signal",
+        "set_counts": { "A": 3, "B": 3, "C": 2 },
+        "gamma_range": [0.22, 0.30],
+        "cis_effect_range": [0.18, 0.26],
+        "beta1": 0.18,
+        "beta2": 0.12,
+        "beta3": 0.03,
+        "rho_m3": 0.60,
+        "rf_se": 0.05,
+        "pqtl_se": 0.055,
+        "outcome_se": 0.06,
+        "delta_sd": 0.03,
+        "psi_sd": 0.035,
+        "phi_sd": 0.025
+      }
+    ]
+  },
+  "calibration": {
+    "replicates": 10,
+    "proteins_per_replicate": 240,
+    "scenario_mix": {
+      "M0": 0.84,
+      "M1": 0.05,
+      "M2": 0.07,
+      "M3": 0.04
+    },
+    "cells": [
+      {
+        "name": "medium_power_sparse_mediators",
+        "set_count_distribution": {
+          "A": [2, 3, 4],
+          "B": [1, 2, 3, 4],
+          "C": [1, 2, 3]
+        },
+        "gamma_range": [0.24, 0.35],
+        "cis_effect_range": [0.20, 0.32],
+        "beta1": 0.24,
+        "beta2": 0.18,
+        "beta3": 0.03,
+        "rho_m3": 0.65,
+        "rf_se": 0.045,
+        "pqtl_se": 0.05,
+        "outcome_se": 0.055,
+        "delta_sd": 0.028,
+        "psi_sd": 0.035,
+        "phi_sd": 0.02
+      },
+      {
+        "name": "low_power_sparse_mediators",
+        "set_count_distribution": {
+          "A": [1, 2, 3],
+          "B": [1, 2, 3],
+          "C": [0, 1, 2]
+        },
+        "gamma_range": [0.20, 0.28],
+        "cis_effect_range": [0.16, 0.24],
+        "beta1": 0.18,
+        "beta2": 0.12,
+        "beta3": 0.02,
+        "rho_m3": 0.60,
+        "rf_se": 0.055,
+        "pqtl_se": 0.06,
+        "outcome_se": 0.065,
+        "delta_sd": 0.03,
+        "psi_sd": 0.04,
+        "phi_sd": 0.025
+      }
+    ]
+  }
+}
