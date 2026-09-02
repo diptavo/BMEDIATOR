@@ -12,10 +12,6 @@ static void print_banner() {
     std::cout << "* Version 1.2.0-dev\n";
     std::cout << "* Bayesian framework for identifying mediating plasma proteins\n";
     std::cout << "* between risk factors and disease outcomes using summary statistics\n";
-    std::cout << "*\n";
-    std::cout << "* Diptavo Dey (2026)\n";
-    std::cout << "*\n";
-    std::cout << "* GNU General Public License v3\n";
     std::cout << "*******************************************************************\n";
 }
 
