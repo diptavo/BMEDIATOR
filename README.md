@@ -331,29 +331,115 @@ diagnostics but do not change posterior scenario probabilities.
 
 ## Example Workflow
 
-```bash
-# 1. Prepare harmonized regional protein/outcome statistics and an ancestry-matched LD panel
+The curated GRCh38 example data use BMI as the RF, CHD and RCC as outcomes,
+and the same five proteins from UKB-PPP COMBINED and deCODE:
 
-# 2. Run BMEDIATOR
-bmediator \
-    --rf-sumstat         bmi_instruments.txt \
-    --protein-gwas-list  ukb_ppp_manifest.txt \
-    --cancer-sumstat     breast_cancer_overall.txt \
-    --protein-info       protein_gene_map.txt \
-    --bfile              eur_ld_reference \
-    --p-thresh-rf        5e-6 \
-    --p-thresh-cis       5e-6 \
-    --cis-window         1000 \
-    --threads            8 \
-    --out                bmi_brca
+| Gene | UKB-PPP COMBINED ID | deCODE ID |
+|------|----------------------|-----------|
+| ANGPTL3 | OID20407 | SeqId_10391_1 |
+| IL6R | OID20385 | SeqId_15602_43 |
+| NPPB | OID20049 | SeqId_16751_15 |
+| PCSK9 | OID20235 | SeqId_5231_79 |
+| VEGFA | OID20650 | SeqId_2597_8 |
 
-# 3. Select conditionally identified mediators
-awk -F'\t' 'NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; print; next} $(h["P_mediator_ld_resolved"]) > 0.5' bmi_brca.mediation
+The GWAS and pQTL files are not stored in Git. After obtaining the example data,
+its root directory should contain `rf/`, `outcome/`, and `protein_panels/`.
+All files, including the LD reference, must use the same genome build. These
+examples require an ancestry-matched GRCh38 PLINK reference panel.
 
-# 4. Bayesian FDR control
-# Select proteins with P(M1) > threshold t such that:
-#   sum(1-P_mediator_ld_resolved) / count(selected) < 0.05
+### Protein manifests
+
+Full mode requires one manifest row per protein:
+
+```text
+<protein ID>    <path to that protein's unpruned GWAS file>
 ```
+
+Ready-to-use five-protein manifests are provided for
+[UKB-PPP COMBINED](examples/full_protein_chd_rcc_grch38/manifests/ukb_ppp_combined.protein_gwas_manifest.txt)
+and [deCODE](examples/full_protein_chd_rcc_grch38/manifests/decode.protein_gwas_manifest.txt).
+Their file paths are relative to the example data root. The supplied pipeline
+changes to that directory before invoking BMEDIATOR.
+
+### Configure the example
+
+```bash
+git clone git@github.com:diptavo/BMEDIATOR.git
+cd BMEDIATOR
+make
+
+export DATA_ROOT=/path/to/full_protein_chd_rcc_grch38
+export LD_PREFIX=/path/to/grch38_eur_ld_reference
+export BMEDIATOR_BIN="$PWD/bmediator"
+export THREADS=8
+```
+
+`LD_PREFIX` denotes three files named `${LD_PREFIX}.bed`, `${LD_PREFIX}.bim`,
+and `${LD_PREFIX}.fam`. Do not use a GRCh37 LD panel with these GRCh38 examples.
+
+### Analyze each protein separately
+
+The runner constructs a one-row manifest for each of the five proteins and runs
+each protein independently. For example, this runs the five UKB-PPP proteins for
+BMI to CHD:
+
+```bash
+bash examples/full_protein_chd_rcc_grch38/run_example_pipeline.sh \
+    ukb_ppp_combined chd
+```
+
+The per-protein results are written under:
+
+```text
+$DATA_ROOT/results/ukb_ppp_combined/chd/per_protein/<protein ID>/
+```
+
+Set `DRY_RUN=1` to validate all manifest targets and print the commands without
+starting BMEDIATOR.
+
+### Analyze the complete manifest
+
+After the five individual analyses, the same runner performs one analysis with
+all five rows in the platform manifest. This is the preferred analysis because
+the resulting `.mediation` file contains a common ranking and the
+`selection_local_fdr` and `selection_cum_fdr` columns across all five proteins:
+
+```text
+$DATA_ROOT/results/ukb_ppp_combined/chd/manifest/
+    bmi_chd_ukb_ppp_combined_all5.mediation
+```
+
+Run both outcomes and both protein platforms with:
+
+```bash
+for platform in ukb_ppp_combined decode; do
+    for outcome in chd rcc; do
+        bash examples/full_protein_chd_rcc_grch38/run_example_pipeline.sh \
+            "$platform" "$outcome"
+    done
+done
+```
+
+UKB-PPP COMBINED and deCODE are analyzed separately because their assay IDs,
+effect estimates, allele frequencies, and samples differ. The RCC summary
+statistics are multi-ancestry; an EUR LD reference is suitable only for an
+illustrative run and is not sufficient for confirmatory ancestry-aware RCC
+inference.
+
+### Select identified mediators
+
+```bash
+result="$DATA_ROOT/results/ukb_ppp_combined/chd/manifest/bmi_chd_ukb_ppp_combined_all5.mediation"
+
+awk -F'\t' 'NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; print; next} \
+    $(h["P_mediator_ld_resolved"]) > 0.5 && \
+    $(h["selection_cum_fdr"]) <= 0.05' "$result"
+```
+
+Protein-by-protein and five-protein manifest runs use fixed priors by default.
+The structural estimate for a protein should therefore agree between the two;
+the across-protein ranking and cumulative FDR are meaningful only in the
+manifest analysis.
 
 ---
 
@@ -368,4 +454,3 @@ awk -F'\t' 'NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; print; next} $(h["P_mediator_l
 - **P(M0) dominant**: No evidence for protein involvement
 
 Check `beta2` and `se_beta2` under M=1 for the estimated causal effect of the protein on cancer. The `mediated_effect` (β₁×β₂) quantifies how much of the RF→Cancer effect flows through this protein.
-

@@ -1,0 +1,5 @@
+OID20407	protein_panels/ukb_ppp_combined/proteins/ANGPTL3__OID20407.tsv
+OID20385	protein_panels/ukb_ppp_combined/proteins/IL6R__OID20385.tsv
+OID20049	protein_panels/ukb_ppp_combined/proteins/NPPB__OID20049.tsv
+OID20235	protein_panels/ukb_ppp_combined/proteins/PCSK9__OID20235.tsv
+OID20650	protein_panels/ukb_ppp_combined/proteins/VEGFA__OID20650.tsv

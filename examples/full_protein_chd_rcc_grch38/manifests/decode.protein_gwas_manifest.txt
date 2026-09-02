@@ -1,0 +1,5 @@
+SeqId_10391_1	protein_panels/decode/proteins/ANGPTL3__SeqId_10391_1.tsv
+SeqId_15602_43	protein_panels/decode/proteins/IL6R__SeqId_15602_43.tsv
+SeqId_16751_15	protein_panels/decode/proteins/NPPB__SeqId_16751_15.tsv
+SeqId_5231_79	protein_panels/decode/proteins/PCSK9__SeqId_5231_79.tsv
+SeqId_2597_8	protein_panels/decode/proteins/VEGFA__SeqId_2597_8.tsv
