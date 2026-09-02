@@ -7,10 +7,10 @@ Usage: run_example_pipeline.sh <ukb_ppp_combined|decode> <chd|rcc>
 
 Required environment variables:
   DATA_ROOT       Root of the full_protein_chd_rcc_grch38 example data
-  LD_PREFIX       Ancestry-matched GRCh38 PLINK .bed/.bim/.fam prefix
 
 Optional environment variables:
   BMEDIATOR_BIN   BMEDIATOR executable (default: repository/bmediator)
+  LD_PREFIX       GRCh38 PLINK prefix (default: DATA_ROOT/ld_reference/G1000plink)
   OUT_ROOT        Output directory (default: DATA_ROOT/results)
   THREADS         Number of BMEDIATOR threads (default: 1)
   DRY_RUN         Set to 1 to print commands without running BMEDIATOR
@@ -32,11 +32,7 @@ BMEDIATOR_BIN=${BMEDIATOR_BIN:-$repo_root/bmediator}
 OUT_ROOT=${OUT_ROOT:-$DATA_ROOT/results}
 THREADS=${THREADS:-1}
 DRY_RUN=${DRY_RUN:-0}
-LD_PREFIX=${LD_PREFIX:-}
-
-if [[ "$DRY_RUN" == 1 && -z "$LD_PREFIX" ]]; then
-    LD_PREFIX=/path/to/grch38_eur_ld_reference
-fi
+LD_PREFIX=${LD_PREFIX:-$DATA_ROOT/ld_reference/G1000plink}
 
 case "$platform" in
     ukb_ppp_combined)
@@ -95,17 +91,14 @@ if [[ "$DRY_RUN" != 1 ]]; then
         echo "BMEDIATOR executable not found: $BMEDIATOR_BIN" >&2
         exit 1
     fi
-    if [[ -z "$LD_PREFIX" ]]; then
-        echo "Set LD_PREFIX to an ancestry-matched GRCh38 PLINK reference prefix" >&2
+fi
+
+for extension in bed bim fam; do
+    if [[ ! -s "${LD_PREFIX}.${extension}" ]]; then
+        echo "Missing LD reference file: ${LD_PREFIX}.${extension}" >&2
         exit 1
     fi
-    for extension in bed bim fam; do
-        if [[ ! -s "${LD_PREFIX}.${extension}" ]]; then
-            echo "Missing LD reference file: ${LD_PREFIX}.${extension}" >&2
-            exit 1
-        fi
-    done
-fi
+done
 
 run_root="$OUT_ROOT/$platform/$outcome_name"
 single_manifest_dir="$run_root/single_protein_manifests"

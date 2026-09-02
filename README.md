@@ -342,10 +342,11 @@ and the same five proteins from UKB-PPP COMBINED and deCODE:
 | PCSK9 | OID20235 | SeqId_5231_79 |
 | VEGFA | OID20650 | SeqId_2597_8 |
 
-The GWAS and pQTL files are not stored in Git. After obtaining the example data,
-its root directory should contain `rf/`, `outcome/`, and `protein_panels/`.
-All files, including the LD reference, must use the same genome build. These
-examples require an ancestry-matched GRCh38 PLINK reference panel.
+The GWAS, pQTL, and LD files are not stored in Git. After obtaining the example
+data, its root directory should contain `rf/`, `outcome/`, `protein_panels/`,
+and `ld_reference/`. The bundled European reference prefix is
+`ld_reference/G1000plink`; it contains 498 samples and 4,544,834 variants. All
+inputs use GRCh38.
 
 ### Protein manifests
 
@@ -369,13 +370,14 @@ cd BMEDIATOR
 make
 
 export DATA_ROOT=/path/to/full_protein_chd_rcc_grch38
-export LD_PREFIX=/path/to/grch38_eur_ld_reference
+export LD_PREFIX="$DATA_ROOT/ld_reference/G1000plink"
 export BMEDIATOR_BIN="$PWD/bmediator"
 export THREADS=8
 ```
 
 `LD_PREFIX` denotes three files named `${LD_PREFIX}.bed`, `${LD_PREFIX}.bim`,
-and `${LD_PREFIX}.fam`. Do not use a GRCh37 LD panel with these GRCh38 examples.
+and `${LD_PREFIX}.fam`. The example runner uses the bundled prefix above when
+`LD_PREFIX` is unset. Do not use a GRCh37 LD panel with these GRCh38 examples.
 
 ### Analyze each protein separately
 
