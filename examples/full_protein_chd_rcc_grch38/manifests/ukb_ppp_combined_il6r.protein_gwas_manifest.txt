@@ -1,0 +1,1 @@
+OID20385	protein_panels/ukb_ppp_combined/proteins/IL6R__OID20385.tsv

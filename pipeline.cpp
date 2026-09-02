@@ -11,6 +11,7 @@ namespace {
 struct PqtlData {
     std::map<std::string, std::map<std::string, SumStat>> ss_by_protein;
     std::map<std::string, std::map<std::string, double>> pval_by_protein;
+    std::set<std::string> manifest_protein_ids;
 };
 
 struct ProteinFileSpec {
@@ -214,6 +215,11 @@ static PqtlData read_protein_gwas_manifest(const std::string& manifest_file,
     std::cout << "  Reading protein GWAS manifest with " << specs.size() << " entries\n";
     int done = 0;
     for (const auto& spec : specs) {
+        if (!data.manifest_protein_ids.insert(spec.protein_id).second) {
+            std::cerr << "Error: duplicate protein ID in manifest: "
+                      << spec.protein_id << "\n";
+            std::exit(1);
+        }
         read_single_protein_gwas_file(spec, data, opts);
         done++;
         if (opts.verbose && done % 100 == 0) {
@@ -222,6 +228,28 @@ static PqtlData read_protein_gwas_manifest(const std::string& manifest_file,
         }
     }
     return data;
+}
+
+static void restrict_proteins_to_manifest(std::vector<ProteinData>& proteins,
+                                          const PqtlData& pqtl) {
+    std::set<std::string> annotated_ids;
+    proteins.erase(
+        std::remove_if(proteins.begin(), proteins.end(), [&](const ProteinData& protein) {
+            if (!pqtl.manifest_protein_ids.count(protein.protein_id)) return true;
+            annotated_ids.insert(protein.protein_id);
+            return false;
+        }),
+        proteins.end());
+
+    for (const auto& protein_id : pqtl.manifest_protein_ids) {
+        if (!annotated_ids.count(protein_id)) {
+            std::cerr << "Error: protein " << protein_id
+                      << " is present in the manifest but absent from --protein-info\n";
+            std::exit(1);
+        }
+    }
+    std::cout << "  Retained " << proteins.size()
+              << " protein annotations requested by the manifest\n";
 }
 
 static void harmonize_map_against_reference(std::map<std::string, SumStat>& ss,
@@ -1195,6 +1223,7 @@ void run_full_pipeline(const Options& opts) {
 
     std::vector<ProteinData> proteins;
     read_protein_info(opts.protein_info_file, proteins);
+    restrict_proteins_to_manifest(proteins, pqtl);
 
     auto needed_outcome_rsids = collect_needed_outcome_rsids(rf_pval, pqtl, opts.p_thresh_rf);
     std::map<std::string, SumStat> cancer_ss;

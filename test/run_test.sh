@@ -78,6 +78,7 @@ fi
 
 FULL_DIR="$OUT_DIR/full_mode_fixture"
 FULL_PREFIX="$OUT_DIR/full_mode_run"
+FULL_SINGLE_PREFIX="$OUT_DIR/full_mode_single_run"
 rm -rf "$FULL_DIR"
 python3 "$ROOT/test/generate_full_mode_fixture.py" "$FULL_DIR"
 
@@ -127,6 +128,28 @@ if ! awk -F '\t' '
   END {if (!found) exit 1}
 ' "${FULL_PREFIX}.mediation"; then
   echo "error: distinct LD-confounded fixture was not rejected" >&2
+  exit 1
+fi
+
+"$BIN" \
+  --rf-sumstat "$FULL_DIR/rf.txt" \
+  --protein-gwas-list "$FULL_DIR/manifest_single.txt" \
+  --cancer-sumstat "$FULL_DIR/outcome.txt" \
+  --protein-info "$FULL_DIR/protein_info.txt" \
+  --bfile "$FULL_DIR/ldref" \
+  --out "$FULL_SINGLE_PREFIX" \
+  --p-thresh-rf 5e-6 \
+  --p-thresh-cis 1e-4 \
+  --cis-window 50 \
+  --clump-r2 0.05 \
+  --min-instruments 1 \
+  --heidi-off \
+  --no-steiger \
+  --max-cavi-iter 80
+
+if ! awk -F '\t' 'NR==2 {if ($1 != "P_SHARED") exit 1; found=1} NR>2 {exit 1} END {if (!found) exit 1}' \
+  "${FULL_SINGLE_PREFIX}.mediation"; then
+  echo "error: one-row manifest did not produce exactly one protein result" >&2
   exit 1
 fi
 

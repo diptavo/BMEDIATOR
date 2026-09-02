@@ -179,6 +179,8 @@ def main() -> None:
     with (output / "manifest.txt").open("w", encoding="ascii") as handle:
         handle.write(f"P_SHARED {output / 'shared.glm.linear'}\n")
         handle.write(f"P_DISTINCT {output / 'distinct.glm.linear'}\n")
+    with (output / "manifest_single.txt").open("w", encoding="ascii") as handle:
+        handle.write(f"P_SHARED {output / 'shared.glm.linear'}\n")
     with (output / "protein_info.txt").open("w", encoding="ascii") as handle:
         handle.write("PROTEIN GENE CHR START END\n")
         handle.write("P_SHARED G_SHARED 1 100000 110000\n")
