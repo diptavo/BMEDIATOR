@@ -161,6 +161,7 @@ if ! awk -F '\t' '
   $1=="P_SHARED" {
     found=1
     if ($(h["regional_shared_given_both"]) < 0.80 ||
+        $(h["P_M1"]) <= $(h["P_M5"]) ||
         $(h["regional_method"]) != "ld-multisignal" ||
         $(h["regional_protein_signals"]) != 2 ||
         $(h["regional_outcome_signals"]) != 2 ||
@@ -170,7 +171,7 @@ if ! awk -F '\t' '
   }
   END {if (!found) exit 1}
 ' "${FULL_PREFIX}.mediation"; then
-  echo "error: shared-signal fixture was not conditionally identified" >&2
+  echo "error: shared-signal M1 fixture was not distinguished from M5 and conditionally identified" >&2
   exit 1
 fi
 
@@ -184,6 +185,22 @@ if "$BIN" \
   --regional-method unsupported \
   >/dev/null 2>&1; then
   echo "error: invalid regional method was accepted" >&2
+  exit 1
+fi
+
+# A regional model that gives M5 unrestricted protein/outcome effect
+# covariance is observationally confounded with beta2 under M1. The withdrawn
+# joint-ld implementation must not become accessible through the production CLI.
+if "$BIN" \
+  --rf-sumstat "$FULL_DIR/rf.txt" \
+  --protein-gwas-list "$FULL_DIR/manifest.txt" \
+  --cancer-sumstat "$FULL_DIR/outcome.txt" \
+  --protein-info "$FULL_DIR/protein_info.txt" \
+  --bfile "$FULL_DIR/ldref" \
+  --out "$OUT_DIR/invalid_joint_ld" \
+  --regional-method joint-ld \
+  >/dev/null 2>&1; then
+  echo "error: nonidentified joint-ld M1/M5 model was accepted" >&2
   exit 1
 fi
 

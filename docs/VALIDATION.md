@@ -38,6 +38,15 @@ that can be repaired by another data-independent cutoff: discrimination
 requires an exclusion assumption, multiple independent cis signals with a
 multi-signal model, or external functional or interventional evidence.
 
+An experimental joint regional random-effects model was withdrawn on
+2026-09-03 because it assigned M5 unrestricted covariance between
+protein-direct and outcome-direct component effects. That covariance duplicates
+the observable implication of `beta2` under M1, so the resulting M1-versus-M5
+weights were prior-driven and are invalid. In particular, the experimental
+PCSK9 results that shifted support from M1 to M5 must not be used. The
+production model remains the Set A/B/C CAVI model plus the separate
+`ld-multisignal` H3/H4 regional diagnostic.
+
 ## Native multi-signal checks
 
 The default `ld-multisignal` implementation is covered by a deterministic

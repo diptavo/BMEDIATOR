@@ -19,6 +19,49 @@ not exact marginal-likelihood posterior probabilities. Their operating
 characteristics must be reported from validation studies separately from the
 analytical H3/H4 calculation.
 
+## How M1 and M5 are separated
+
+M1 and M5 are distinguishable only because their nuisance structures are
+restricted differently across the instrument sets. For a protein-specific
+Set B instrument `l`, the outcome equation is
+
+```text
+Gamma_l = beta2 * alpha_l + phi_l + error_l.
+```
+
+Under M1, `beta2` is common across Set B instruments and `phi_l` is a sparse,
+mean-zero direct effect independent of `alpha_l`. Under M5, `beta2 = 0`.
+Correlated pleiotropy in M5 is represented by correlation between the
+RF-to-protein residual `delta_k` and RF-to-outcome residual `psi_k` at
+RF-associated Set A/C instruments. It is not allowed to create unrestricted
+correlation between protein effects and outcome-direct effects at Set B
+instruments. Thus multiple independent Set B signals can support a common
+protein-to-outcome slope under M1 while the RF-instrument residual pattern can
+support M5.
+
+This restriction is essential. Suppose a proposed M5 model instead allowed a
+protein-direct component `d` and an outcome-direct component `h` to have
+arbitrary covariance. At a protein-specific component,
+
+```text
+M1: M = d,  Y = beta2 * d + h,  Cov(d,h) = 0
+M5: M = d,  Y = h,              Cov(d,h) != 0.
+```
+
+M1 implies `Cov(M,Y) = beta2 Var(d)`. M5 implies
+`Cov(M,Y) = Cov(d,h)`. Choosing the latter covariance to equal the former makes
+the models observationally equivalent; their marginal variances can likewise
+be matched. A Bayes factor between those formulations would therefore be
+determined by prior scale and parameter-count choices, not by identified
+mediation evidence. BMEDIATOR does not use that formulation.
+
+The remaining identification claim is explicitly conditional. It requires at
+least two independent RF-to-protein observations, at least one protein-specific
+cis instrument, and the exclusion/independence assumptions above. A locus with
+only a shared variant, or a model that permits outcome-direct effects
+proportional to every protein effect, cannot distinguish M1 from M5 using these
+summary statistics and must remain unresolved.
+
 ## Regional configuration model
 
 Full mode retains all harmonized cis-region variants shared by the protein GWAS,
@@ -71,8 +114,10 @@ M1 and H4 under all of these assumptions:
   negligible.
 - The exclusion restriction holds: cis instruments affect the outcome through
   the measured protein, apart from modeled sparse pleiotropy.
-- Same-variant horizontal pleiotropy is absent or adequately represented by M5
-  and the nuisance terms. H4 alone cannot distinguish this from mediation.
+- Same-variant horizontal pleiotropy at a protein-specific instrument is absent
+  or sparse and independent of instrument strength. M5 represents correlated
+  RF-instrument residuals; H4 alone cannot distinguish same-variant horizontal
+  pleiotropy from mediation.
 - GWAS alleles and genome builds are aligned, and the LD panel matches the study
   ancestry.
 - Correlated estimation error from participant overlap between the protein and

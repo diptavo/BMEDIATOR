@@ -47,7 +47,16 @@ For each protein, instruments are partitioned into:
 - **Set B** (cis-only): Significant cis-pQTL for the protein, NOT genome-wide significant for RF
 - **Set C** (overlap): Both RF-significant AND in the cis-region
 
-Set C instruments are the most informative for mediation and are handled with a dedicated likelihood that avoids double-counting. β₂ is identified by triangulating across Set B (clean cis instruments) and Set C (powerful but contaminated overlap instruments).
+Set C instruments are handled with a dedicated likelihood that avoids
+double-counting, but they cannot by themselves distinguish mediation from
+correlated pleiotropy. The identifying evidence for β₂ comes primarily from
+multiple independent Set B instruments under the assumption that their sparse
+outcome-direct effects are independent of their protein effects. M5 permits
+correlated RF-to-protein and RF-to-outcome residuals at RF-associated Set A/C
+instruments; it does not permit unrestricted protein-effect/outcome-direct
+covariance at Set B instruments. Without this restriction, M1 and M5 are
+observationally equivalent. See
+[Identification and LD Resolution](docs/IDENTIFICATION.md).
 
 ### Inference
 
@@ -63,6 +72,9 @@ cis-only signal is available. This remains conditional on exclusion and
 valid-instrument assumptions; see
 [Identification and LD Resolution](docs/IDENTIFICATION.md) and
 [Validation Status](docs/VALIDATION.md).
+
+A manuscript-style description is available in
+[Introduction and Methods](manuscript/BMEDIATOR_METHODS_DRAFT.md).
 
 ---
 

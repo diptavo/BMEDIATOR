@@ -2,6 +2,11 @@
 
 ## 1.2.0-dev
 
+- Withdraw the experimental joint regional structural likelihood because its
+  unrestricted M5 protein/outcome direct-effect covariance is nonidentified
+  from the M1 protein-to-outcome path. Retain the Set A/B/C structural model and
+  separate LD-aware H3/H4 regional diagnostic as the production analysis.
+
 - Freeze scenario and effect priors by default; retain empirical-Bayes and
   data-adaptive local priors as explicit exploratory options.
 - Make nuisance pleiotropy terms available in all six states so model evidence
