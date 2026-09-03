@@ -261,6 +261,24 @@ def simulate_effects(
         gamma_out_b = phi_b
         gamma_out_c = beta3 * gamma_c + psi_c
 
+        # Nonidentifiable boundary: direct outcome effects are exactly aligned
+        # with the protein effects. This has the same observable equations as
+        # M1 with beta2=aligned_beta and must not be scored as an identifiable
+        # M5 classification problem.
+        aligned_beta = float(cell.get("m5_aligned_pleiotropy_beta", 0.0))
+        if aligned_beta != 0.0:
+            gamma_out_a = (
+                (aligned_beta * beta1 + beta3) * gamma_a
+                + aligned_beta * delta_a
+                + psi_a
+            )
+            gamma_out_b = aligned_beta * cis_b + phi_b
+            gamma_out_c = (
+                (aligned_beta * beta1 + beta3) * gamma_c
+                + aligned_beta * (cis_c + delta_c)
+                + psi_c
+            )
+
     return {
         "true_beta1": beta1,
         "true_beta2": beta2,
@@ -317,6 +335,8 @@ def write_dataset(
                 "true_beta3": protein["true_beta3"],
                 "true_mediated_effect": protein["true_beta1"] * protein["true_beta2"],
                 "direction_flipped": int(bool(protein.get("direction_flipped", False))),
+                "identification_class": protein.get("identification_class", "identified"),
+                "data_generating_mechanism": protein.get("data_generating_mechanism", protein["scenario"]),
             }
         )
 
@@ -376,7 +396,7 @@ def write_dataset(
     write_table(
         truth,
         truth_rows,
-        ["protein_id", "gene_name", "true_scenario", "nA_true", "nB_true", "nC_true", "true_beta1", "true_beta2", "true_beta3", "true_mediated_effect", "direction_flipped"],
+        ["protein_id", "gene_name", "true_scenario", "nA_true", "nB_true", "nC_true", "true_beta1", "true_beta2", "true_beta3", "true_mediated_effect", "direction_flipped", "identification_class", "data_generating_mechanism"],
         "\t",
     )
     return BenchmarkFiles(rf=rf, pqtl=pqtl, cancer=cancer, protein_info=protein_info, truth=truth)
@@ -471,6 +491,12 @@ def generate_proteins(
                 "true_beta2": effects["true_beta2"],
                 "true_beta3": effects["true_beta3"],
                 "direction_flipped": effects["direction_flipped"],
+                "identification_class": str(cell.get("identification_class", "identified")),
+                "data_generating_mechanism": (
+                    "M5_ALIGNED_PLEIOTROPY"
+                    if scenario == "M5" and float(cell.get("m5_aligned_pleiotropy_beta", 0.0)) != 0.0
+                    else scenario
+                ),
                 "set_counts": {"A": n_a, "B": n_b, "C": n_c},
                 "snps": snps,
             }
@@ -561,7 +587,15 @@ def run_bmediator(binary: Path, files: BenchmarkFiles, out_prefix: Path, global_
                 cmd.extend([flag, str(value)])
     env = os.environ.copy()
     env.setdefault("MPLCONFIGDIR", str(out_prefix.parent / ".mplconfig"))
-    subprocess.run(cmd, check=True, env=env)
+    run_kwargs = {}
+    if bool(global_cfg.get("quiet", False)):
+        run_kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.PIPE, "text": True}
+    try:
+        subprocess.run(cmd, check=True, env=env, **run_kwargs)
+    except subprocess.CalledProcessError as exc:
+        if exc.stderr:
+            raise RuntimeError(exc.stderr.strip()) from exc
+        raise
     return Path(f"{out_prefix}.mediation"), Path(f"{out_prefix}.hyp")
 
 

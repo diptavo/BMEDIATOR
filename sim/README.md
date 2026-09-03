@@ -29,6 +29,44 @@ of producing a misleading LD benchmark. The old framework also runs legacy
 pre-clumped mode and therefore validates `P_M1`, not
 `P_mediator_ld_resolved`.
 
+## Dedicated M1-versus-M5 study
+
+The M1/M5 validation uses one independent generated dataset and one BMEDIATOR
+invocation per protein. This is required because the outcome effects attached
+to RF instruments differ between the M1 and M5 data-generating mechanisms;
+placing several such proteins in one synthetic outcome GWAS would mix their RF
+instruments and invalidate the comparison.
+
+The study varies the number of protein-specific Set B instruments, second-stage
+strength, M5 residual correlation, sample overlap, and Set C burden. Two cells
+are labeled `nonidentifiable` and are not scored for classification accuracy:
+one omits Set B, and one gives M5 outcome-direct effects exactly proportional
+to protein effects. The latter has the same observable distribution as M1 and
+is included to verify the theoretical identification boundary.
+
+Local smoke run:
+
+```bash
+python3 sim/run_m1_m5_task.py \
+  --config sim/configs/m1_m5_identification_smoke.json \
+  --cell identified_setb4 \
+  --replicate 1 \
+  --outdir build/m1_m5_smoke \
+  --binary ./bmediator
+python3 sim/summarize_m1_m5.py --outdir build/m1_m5_smoke
+```
+
+Biowulf study:
+
+```bash
+bash scripts/submit_m1_m5_validation.sh
+```
+
+The primary outputs are `summary/m1_m5/discrimination.tsv` and
+`summary/m1_m5/pair_calibration.tsv`. Pairwise scores normalize M1 and M5
+support as `P_M1/(P_M1+P_M5)`; all-state accuracy additionally requires M1 or
+M5 to beat the other four structural states.
+
 This directory contains a config-driven simulation harness for BMEDIATOR method
 benchmarks:
 

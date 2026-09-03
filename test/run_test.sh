@@ -240,4 +240,25 @@ if ! awk -F '\t' 'NR==2 {if ($1 != "P_SHARED") exit 1; found=1} NR>2 {exit 1} EN
   exit 1
 fi
 
+M1_M5_PREFIX="$OUT_DIR/m1_m5_independent"
+python3 "$ROOT/sim/run_m1_m5_task.py" \
+  --config "$ROOT/sim/configs/m1_m5_identification_smoke.json" \
+  --cell identified_setb2 \
+  --replicate 1 \
+  --outdir "$M1_M5_PREFIX" \
+  --binary "$BIN"
+
+if ! awk -F '\t' '
+  NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
+  {
+    rows++
+    if ($(h["true_scenario"]) != "M1" && $(h["true_scenario"]) != "M5") exit 1
+    if ($(h["nA"]) > 6 || $(h["nB"]) > 2 || $(h["nC"]) != 0) exit 1
+  }
+  END {if (rows != 16) exit 1}
+' "$M1_M5_PREFIX/classification/identified_setb2/rep_0001/task_metrics.tsv"; then
+  echo "error: independent M1/M5 simulation runner mixed instrument sets across proteins" >&2
+  exit 1
+fi
+
 echo "BMEDIATOR smoke test passed."
