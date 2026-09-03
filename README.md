@@ -4,6 +4,12 @@
 
 Version 1.2.0-dev 
 
+> **Development status:** The dedicated 36,000-run M1/M5 study found useful
+> pairwise ranking but inadequate six-state classification (M5 recall 32.3%)
+> and probability miscalibration. This version is for research evaluation, not
+> production-calibrated mediation claims. See
+> [Validation Status](docs/VALIDATION.md).
+
 ---
 
 ## Overview

@@ -66,6 +66,51 @@ set, while the native method retained a weak pair but also reported it as
 ambiguous. This is an implementation cross-check, not proof of calibration or
 numerical equivalence to SuSiE.
 
+## Dedicated M1-versus-M5 validation
+
+On 2026-09-03, the production Set A/B/C structural model was evaluated in
+36,000 independent protein simulations. Each protein used a separate synthetic
+RF, protein, and outcome dataset; this avoids the invalid practice of mixing
+protein-specific RF-outcome effects in one outcome GWAS. The grid contained 50
+replicates and 2,000 observations per truth state per cell.
+
+| Cell | Pair AUC | Pair accuracy | M1 sensitivity | M5 specificity | Six-state accuracy | Six-state M1 recall | Six-state M5 recall |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Set B = 2 | 0.908 | 0.824 | 0.845 | 0.804 | 0.530 | 0.668 | 0.391 |
+| Set B = 4 | 0.976 | 0.901 | 0.956 | 0.847 | 0.626 | 0.852 | 0.400 |
+| Set B = 8 | 0.999 | 0.914 | 0.999 | 0.828 | 0.658 | 0.924 | 0.391 |
+| Weak second stage, Set B = 4 | 0.797 | 0.721 | 0.688 | 0.755 | 0.263 | 0.359 | 0.167 |
+| M5 residual correlation = 0.5 | 0.956 | 0.842 | 0.948 | 0.737 | 0.612 | 0.847 | 0.377 |
+| 50% sampling-error correlation | 0.985 | 0.933 | 0.966 | 0.899 | 0.696 | 0.893 | 0.500 |
+| Set C-heavy | 0.661 | 0.622 | 0.639 | 0.600 | 0.062 | 0.089 | 0.036 |
+| All seven cells | 0.911 | 0.834 | 0.873 | 0.794 | 0.492 | 0.662 | 0.323 |
+
+Pair metrics condition on M1 versus M5 using
+`P_M1/(P_M1+P_M5)`. Six-state metrics use the actual M0-M5 argmax. The strong
+difference between these columns matters: the model often ranks the true M5
+above M1 but assigns still greater support to M2 or M0. More Set B instruments
+improve M1/M5 ranking but do not repair M5 identification against all six
+states. Pair scores were defined for 94.6% of observations overall but only
+62.1% in the Set C-heavy cell; six-state metrics include every observation.
+
+The exactly aligned-pleiotropy boundary generated M5 direct effects
+proportional to protein effects and was called M1 in 96.7% of pairwise
+comparisons (95% Wilson interval 95.8%-97.4%). This is the expected
+nonidentifiability result, not a false-positive rate that can be calibrated
+away. The no-Set-B boundary also remained unstable.
+
+The pairwise score was not calibrated as a probability. Its aggregate ten-bin
+expected calibration error was 0.089, and several middle and upper bins were
+overconfident. Full tables are retained in
+`sim/results/m1_m5_identification_20260903/`.
+
+This study therefore fails a production release criterion for M1/M5 inference.
+The current model contains useful ranking information in favorable Set B
+architectures, but `P_M1` and `P_M5` must not be described as calibrated
+probabilities, and M5 is not reliably recovered against the complete six-state
+model. Further likelihood development is required before a non-development
+release or a strong methodological claim.
+
 ## Release interpretation
 
 - The historical single-signal gate controls the tested distinct-LD failure well
@@ -80,8 +125,8 @@ numerical equivalence to SuSiE.
 - These simulations validate implementation behavior against known truth;
   they do not calibrate real-data results from labels.
 
-Accordingly, 1.2.0-dev is suitable for research evaluation and transparent
-GitHub distribution, but the `-dev` suffix should remain until the new
-multi-signal method has a full simulation operating-characteristic study and
-sample-overlap, ancestry-mismatch, and real-data replication checks are
-complete.
+Accordingly, 1.2.0-dev is suitable only for research evaluation and transparent
+GitHub development. It is not a production-calibrated release. The `-dev`
+suffix should remain until the structural likelihood is revised and passes
+M1/M5 discrimination and probability-calibration criteria, followed by
+ancestry-mismatch and real-data replication checks.
