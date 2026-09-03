@@ -62,21 +62,13 @@ static void print_usage() {
     std::cout << "  --regional-prior-pp <val> Per-variant protein association prior (default 1e-4)\n";
     std::cout << "  --regional-prior-outcome <val> Per-variant outcome association prior (default 1e-4)\n";
     std::cout << "  --regional-prior-shared <val> Per-variant shared prior (default 1e-8 = product)\n";
-    std::cout << "  --regional-prior-var-rf <val> RF component-effect prior variance (default 0.04)\n";
-    std::cout << "  --regional-prior-var-pp <val> Protein component-effect prior variance (default 0.04)\n";
-    std::cout << "  --regional-prior-var-outcome <val> Outcome component-effect prior variance (default 0.04)\n";
     std::cout << "  --regional-min-both <val> Minimum P(shared or distinct regional signal) (default 0.80)\n";
     std::cout << "  --regional-min-shared <val> Minimum P(shared|both) for LD-resolved mediation (default 0.80)\n";
-    std::cout << "  --regional-method <mode> Regional model: joint-ld, ld-multisignal, or single (default joint-ld)\n";
+    std::cout << "  --regional-method <mode> Regional model: ld-multisignal or single (default ld-multisignal)\n";
     std::cout << "  --regional-max-signals <int> Maximum conditional signals per trait (default 10)\n";
     std::cout << "  --regional-signal-p <val> Conditional signal inclusion threshold (default 5e-6)\n";
     std::cout << "  --regional-coverage <val> Credible-set coverage (default 0.95)\n";
     std::cout << "  --regional-high-ld-r2 <val> High-LD label threshold (default 0.80)\n";
-    std::cout << "  --regional-ld-shrinkage <val> LD regularization toward identity (default 0.05)\n";
-    std::cout << "  --overlap-rf-protein <val> RF-protein summary-error correlation (default 0)\n";
-    std::cout << "  --overlap-rf-outcome <val> RF-outcome summary-error correlation (default 0)\n";
-    std::cout << "  --overlap-protein-outcome <val> Protein-outcome summary-error correlation (default 0)\n";
-    std::cout << "  --regional-pleiotropy-rho <val> M5 direct-effect correlation (default 0.5)\n";
     std::cout << "  --allow-unresolved-selection Allow confirmatory selection without regional LD resolution\n";
     std::cout << "\nDirection consistency:\n";
     std::cout << "  --direction-mode <mode>  Direction policy: report, prioritize, soft, hard (default report)\n";
@@ -189,8 +181,6 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.regional_prior_var_pp = std::atof(argv[++i]);
         else if (flag == "--regional-prior-var-outcome" && i + 1 < argc)
             opts.regional_prior_var_outcome = std::atof(argv[++i]);
-        else if (flag == "--regional-prior-var-rf" && i + 1 < argc)
-            opts.regional_prior_var_rf = std::atof(argv[++i]);
         else if (flag == "--regional-min-both" && i + 1 < argc)
             opts.regional_min_both = std::atof(argv[++i]);
         else if (flag == "--regional-min-shared" && i + 1 < argc)
@@ -205,16 +195,6 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.regional_coverage = std::atof(argv[++i]);
         else if (flag == "--regional-high-ld-r2" && i + 1 < argc)
             opts.regional_high_ld_r2 = std::atof(argv[++i]);
-        else if (flag == "--regional-ld-shrinkage" && i + 1 < argc)
-            opts.regional_ld_shrinkage = std::atof(argv[++i]);
-        else if (flag == "--overlap-rf-protein" && i + 1 < argc)
-            opts.overlap_rf_protein = std::atof(argv[++i]);
-        else if (flag == "--overlap-rf-outcome" && i + 1 < argc)
-            opts.overlap_rf_outcome = std::atof(argv[++i]);
-        else if (flag == "--overlap-protein-outcome" && i + 1 < argc)
-            opts.overlap_protein_outcome = std::atof(argv[++i]);
-        else if (flag == "--regional-pleiotropy-rho" && i + 1 < argc)
-            opts.regional_pleiotropy_rho = std::atof(argv[++i]);
         else if (flag == "--allow-unresolved-selection")
             opts.allow_unresolved_selection = true;
         // Direction consistency
@@ -366,8 +346,7 @@ void parse_args(int argc, char* argv[], Options& opts) {
                   << "trait-specific regional prior\n";
         ok = false;
     }
-    if (!(opts.regional_prior_var_rf > 0.0) || !std::isfinite(opts.regional_prior_var_rf) ||
-        !(opts.regional_prior_var_pp > 0.0) || !std::isfinite(opts.regional_prior_var_pp) ||
+    if (!(opts.regional_prior_var_pp > 0.0) || !std::isfinite(opts.regional_prior_var_pp) ||
         !(opts.regional_prior_var_outcome > 0.0) ||
         !std::isfinite(opts.regional_prior_var_outcome)) {
         std::cerr << "Error: regional effect prior variances must be finite and positive\n";
@@ -381,9 +360,8 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: --regional-min-both must be between 0 and 1\n";
         ok = false;
     }
-    if (opts.regional_method != "joint-ld" && opts.regional_method != "ld-multisignal" &&
-        opts.regional_method != "single") {
-        std::cerr << "Error: --regional-method must be joint-ld, ld-multisignal, or single\n";
+    if (opts.regional_method != "ld-multisignal" && opts.regional_method != "single") {
+        std::cerr << "Error: --regional-method must be ld-multisignal or single\n";
         ok = false;
     }
     if (opts.regional_max_signals < 1) {
@@ -403,28 +381,6 @@ void parse_args(int argc, char* argv[], Options& opts) {
     if (!(opts.regional_high_ld_r2 >= 0.0 && opts.regional_high_ld_r2 <= 1.0) ||
         !std::isfinite(opts.regional_high_ld_r2)) {
         std::cerr << "Error: --regional-high-ld-r2 must be finite and between 0 and 1\n";
-        ok = false;
-    }
-    if (!(opts.regional_ld_shrinkage >= 0.0 && opts.regional_ld_shrinkage < 1.0) ||
-        !std::isfinite(opts.regional_ld_shrinkage)) {
-        std::cerr << "Error: --regional-ld-shrinkage must be finite and in [0, 1)\n";
-        ok = false;
-    }
-    const double overlap_det = 1.0 + 2.0 * opts.overlap_rf_protein *
-        opts.overlap_rf_outcome * opts.overlap_protein_outcome -
-        opts.overlap_rf_protein * opts.overlap_rf_protein -
-        opts.overlap_rf_outcome * opts.overlap_rf_outcome -
-        opts.overlap_protein_outcome * opts.overlap_protein_outcome;
-    if (!(std::fabs(opts.overlap_rf_protein) < 0.99) ||
-        !(std::fabs(opts.overlap_rf_outcome) < 0.99) ||
-        !(std::fabs(opts.overlap_protein_outcome) < 0.99) ||
-        !(overlap_det > 1e-6)) {
-        std::cerr << "Error: overlap correlations must define a positive-definite 3x3 matrix\n";
-        ok = false;
-    }
-    if (!(std::fabs(opts.regional_pleiotropy_rho) < 0.99) ||
-        !std::isfinite(opts.regional_pleiotropy_rho)) {
-        std::cerr << "Error: --regional-pleiotropy-rho must be finite and in (-0.99, 0.99)\n";
         ok = false;
     }
     if (!ok) std::exit(1);
@@ -480,10 +436,6 @@ void parse_args(int argc, char* argv[], Options& opts) {
     std::cout << "  Regional signal p:           " << opts.regional_signal_p << "\n";
     std::cout << "  Regional credible coverage:  " << opts.regional_coverage << "\n";
     std::cout << "  Regional high-LD r2:         " << opts.regional_high_ld_r2 << "\n";
-    std::cout << "  Regional LD shrinkage:       " << opts.regional_ld_shrinkage << "\n";
-    std::cout << "  Summary-error overlap:       " << opts.overlap_rf_protein << ", "
-              << opts.overlap_rf_outcome << ", " << opts.overlap_protein_outcome << "\n";
-    std::cout << "  Regional M5 correlation:     " << opts.regional_pleiotropy_rho << "\n";
     std::cout << "  Allow unresolved selection:  "
               << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
@@ -875,14 +827,8 @@ void write_results(const std::vector<ProteinResult>& results,
          << "P_protein_disease\tP_rf_responsive\tP_rf_direct\t"
          << "regional_n_variants\tregional_PP_shared\tregional_PP_distinct\t"
          << "regional_shared_given_both\tregional_method\t"
-         << "regional_rf_signals\tregional_protein_signals\tregional_outcome_signals\t"
+         << "regional_protein_signals\tregional_outcome_signals\t"
          << "regional_signal_pairs\tregional_max_credible_set_pair_r2\t"
-         << "regional_joint_n_variants\tregional_joint_components\t"
-         << "regional_joint_condition_number\t"
-         << "regional_joint_status\t"
-         << "regional_joint_log_bf_M0\tregional_joint_log_bf_M1\t"
-         << "regional_joint_log_bf_M2\tregional_joint_log_bf_M3\t"
-         << "regional_joint_log_bf_M4\tregional_joint_log_bf_M5\t"
          << "mediation_identifiability\t"
          << "beta1\tse_beta1\tbeta2\tse_beta2\tbeta3\tse_beta3\t"
          << "ivw_rf_to_pp_beta\tivw_rf_to_pp_se\tivw_rf_to_pp_p\t"
@@ -914,21 +860,10 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.regional_pp_shared << "\t" << r.regional_pp_distinct << "\t"
              << r.regional_shared_given_both << "\t"
              << r.regional_method << "\t"
-             << r.regional_rf_signals << "\t"
              << r.regional_protein_signals << "\t"
              << r.regional_outcome_signals << "\t"
              << r.regional_signal_pair_count << "\t"
              << r.regional_max_credible_set_pair_r2 << "\t"
-             << r.regional_joint_n_variants << "\t"
-             << r.regional_joint_components << "\t"
-             << r.regional_joint_condition_number << "\t"
-             << r.regional_joint_status << "\t"
-             << r.regional_joint_log_bf_M0 << "\t"
-             << r.regional_joint_log_bf_M1 << "\t"
-             << r.regional_joint_log_bf_M2 << "\t"
-             << r.regional_joint_log_bf_M3 << "\t"
-             << r.regional_joint_log_bf_M4 << "\t"
-             << r.regional_joint_log_bf_M5 << "\t"
              << r.mediation_identifiability << "\t"
              << r.beta1_est << "\t" << r.beta1_se << "\t"
              << r.beta2_est << "\t" << r.beta2_se << "\t"
@@ -1021,7 +956,6 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "regional_prior_shared\t" << opts.regional_prior_shared << "\n";
     hout << "regional_prior_var_pp\t" << opts.regional_prior_var_pp << "\n";
     hout << "regional_prior_var_outcome\t" << opts.regional_prior_var_outcome << "\n";
-    hout << "regional_prior_var_rf\t" << opts.regional_prior_var_rf << "\n";
     hout << "regional_min_both\t" << opts.regional_min_both << "\n";
     hout << "regional_min_shared\t" << opts.regional_min_shared << "\n";
     hout << "regional_method\t" << opts.regional_method << "\n";
@@ -1029,11 +963,6 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "regional_signal_p\t" << opts.regional_signal_p << "\n";
     hout << "regional_coverage\t" << opts.regional_coverage << "\n";
     hout << "regional_high_ld_r2\t" << opts.regional_high_ld_r2 << "\n";
-    hout << "regional_ld_shrinkage\t" << opts.regional_ld_shrinkage << "\n";
-    hout << "overlap_rf_protein\t" << opts.overlap_rf_protein << "\n";
-    hout << "overlap_rf_outcome\t" << opts.overlap_rf_outcome << "\n";
-    hout << "overlap_protein_outcome\t" << opts.overlap_protein_outcome << "\n";
-    hout << "regional_pleiotropy_rho\t" << opts.regional_pleiotropy_rho << "\n";
     hout << "allow_unresolved_selection\t"
          << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     hout << "direction_mode\t" << opts.direction_mode << "\n";

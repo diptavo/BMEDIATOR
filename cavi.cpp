@@ -1,7 +1,5 @@
 #include "bmediator.h"
 
-#include <array>
-
 namespace bmediator {
 
 namespace {
@@ -469,107 +467,6 @@ inline int observed_rf_to_pp_count(const ProteinData& prot) {
         if (has_setA_alpha(prot, k)) n++;
     }
     return n;
-}
-
-inline bool joint_regional_available(const ProteinData& prot) {
-    return prot.regional_joint_evaluated &&
-           prot.regional_joint_status == "EVALUATED" &&
-           prot.regional_joint_log_bf.size() == 6 &&
-           prot.regional_joint_scenario_beta.size() == 18 &&
-           prot.regional_joint_scenario_beta_se.size() == 18;
-}
-
-ProteinData outside_cis_block(const ProteinData& source) {
-    ProteinData result = source;
-    result.setB_rsid.clear();
-    result.setB_alpha_cis.clear();
-    result.setB_se_alpha_cis.clear();
-    result.setB_Gamma_cis.clear();
-    result.setB_se_Gamma_cis.clear();
-    result.setC_rsid.clear();
-    result.setC_gamma.clear();
-    result.setC_se_gamma.clear();
-    result.setC_alpha.clear();
-    result.setC_se_alpha.clear();
-    result.setC_alpha_reliability.clear();
-    result.setC_Gamma.clear();
-    result.setC_se_Gamma.clear();
-    result.nC_exact = 0;
-    result.nC_proxy = 0;
-    if (result.ld_weight_alpha_ac.size() > static_cast<size_t>(result.nA())) {
-        result.ld_weight_alpha_ac.resize(result.nA());
-    }
-    if (result.ld_weight_cancer_union.size() > static_cast<size_t>(result.nA())) {
-        result.ld_weight_cancer_union.resize(result.nA());
-    }
-    return result;
-}
-
-double normal_posterior_overlap(double mean_left,
-                                double variance_left,
-                                double mean_right,
-                                double variance_right,
-                                double prior_variance) {
-    if (!(variance_left > 0.0) || !(variance_right > 0.0) ||
-        !(prior_variance > 0.0) || !std::isfinite(mean_left) ||
-        !std::isfinite(mean_right)) {
-        return 0.0;
-    }
-    const double precision = 1.0 / variance_left + 1.0 / variance_right -
-                             1.0 / prior_variance;
-    if (!(precision > 1e-10) || !std::isfinite(precision)) return 0.0;
-    const double linear = mean_left / variance_left + mean_right / variance_right;
-    const double log_normalizer = 0.5 * (
-        std::log(prior_variance) - std::log(variance_left) -
-        std::log(variance_right) - std::log(precision)
-    );
-    const double exponent = 0.5 * linear * linear / precision -
-        0.5 * (mean_left * mean_left / variance_left +
-               mean_right * mean_right / variance_right);
-    const double result = log_normalizer + exponent;
-    return std::isfinite(result) ? result : 0.0;
-}
-
-double joint_prior_overlap_correction(const ProteinData& prot,
-                                      int scenario,
-                                      const VarParams& vp) {
-    if (!joint_regional_available(prot)) return 0.0;
-    const std::array<bool, 3> active{{
-        scenario_beta1_free(scenario),
-        scenario_beta2_free(scenario),
-        scenario_beta3_free(scenario)
-    }};
-    const std::array<double, 3> means{{vp.mu_beta1, vp.mu_beta2, vp.mu_beta3}};
-    const std::array<double, 3> variances{{vp.s2_beta1, vp.s2_beta2, vp.s2_beta3}};
-    const std::array<double, 3> priors{{
-        vp.prior_sigma2_beta1, vp.prior_sigma2_beta2, vp.prior_sigma2_beta3
-    }};
-    double correction = 0.0;
-    for (int index = 0; index < 3; ++index) {
-        if (!active[index]) continue;
-        const int offset = scenario * 3 + index;
-        const double regional_se = prot.regional_joint_scenario_beta_se[offset];
-        correction += normal_posterior_overlap(
-            means[index], variances[index],
-            prot.regional_joint_scenario_beta[offset], regional_se * regional_se,
-            priors[index]
-        );
-    }
-    return correction;
-}
-
-void combine_normal_posteriors(double mean_left,
-                               double variance_left,
-                               double mean_right,
-                               double variance_right,
-                               double prior_variance,
-                               double& mean,
-                               double& variance) {
-    const double precision = 1.0 / variance_left + 1.0 / variance_right -
-                             1.0 / prior_variance;
-    if (!(precision > 1e-10) || !std::isfinite(precision)) return;
-    variance = 1.0 / precision;
-    mean = variance * (mean_left / variance_left + mean_right / variance_right);
 }
 
 } // namespace
@@ -1414,36 +1311,14 @@ ProteinResult analyze_protein(const ProteinData& prot,
     res.regional_pp_distinct = regional.pp_distinct;
     res.regional_shared_given_both = regional.shared_given_both;
     res.regional_method = prot.regional_multisignal_evaluated
-        ? prot.regional_method : "single";
-    res.regional_rf_signals = prot.regional_rf_signals;
+        ? "ld-multisignal" : "single";
     res.regional_protein_signals = prot.regional_protein_signals;
     res.regional_outcome_signals = prot.regional_outcome_signals;
     res.regional_signal_pair_count = static_cast<int>(prot.regional_signal_pairs.size());
     res.regional_max_credible_set_pair_r2 = prot.regional_best_cs_pair_r2;
     res.regional_signal_pairs = prot.regional_signal_pairs;
-    res.regional_joint_n_variants = prot.regional_joint_n_variants;
-    res.regional_joint_components = prot.regional_joint_components;
-    res.regional_joint_condition_number = prot.regional_joint_condition_number;
-    res.regional_joint_status = prot.regional_joint_evaluated
-        ? prot.regional_joint_status : "NOT_EVALUATED";
-    res.regional_joint_log_bf_M0 = prot.regional_joint_log_bf[0];
-    res.regional_joint_log_bf_M1 = prot.regional_joint_log_bf[1];
-    res.regional_joint_log_bf_M2 = prot.regional_joint_log_bf[2];
-    res.regional_joint_log_bf_M3 = prot.regional_joint_log_bf[3];
-    res.regional_joint_log_bf_M4 = prot.regional_joint_log_bf[4];
-    res.regional_joint_log_bf_M5 = prot.regional_joint_log_bf[5];
     if (!prot.ld_reference_used) {
         res.mediation_identifiability = "UNRESOLVED_NO_LD_REFERENCE";
-    } else if (prot.regional_joint_evaluated &&
-               prot.regional_joint_status == "UNRESOLVED_SINGLE_COMPONENT") {
-        res.mediation_identifiability = "UNRESOLVED_SINGLE_COMPONENT";
-    } else if (prot.regional_joint_evaluated &&
-               prot.regional_joint_status == "NO_JOINT_REGIONAL_DATA") {
-        res.mediation_identifiability = "UNRESOLVED_NO_JOINT_REGIONAL_DATA";
-    } else if (prot.regional_joint_evaluated &&
-               (prot.regional_joint_status == "NUMERICAL_FAILURE" ||
-                prot.regional_joint_status == "SINGULAR_COMPONENT_LD")) {
-        res.mediation_identifiability = "UNRESOLVED_JOINT_MODEL_FAILURE";
     } else if (prot.regional_multisignal_evaluated) {
         const std::string& interpretation = prot.regional_multisignal_interpretation;
         if (interpretation == "SHARED_SIGNAL_SUPPORTED") {
@@ -1601,87 +1476,50 @@ ProteinResult analyze_protein(const ProteinData& prot,
     constexpr int N_SCENARIOS = 6;
     double elbos[N_SCENARIOS];
     double m1_resid_corr = 0.0;
-    const bool use_joint_regional = joint_regional_available(prot);
-    ProteinData inference_prot = use_joint_regional ? outside_cis_block(prot) : prot;
     LocalScales local_scales = build_local_scales(hyp,
                                                   {res.ivw_rf_to_pp_beta, res.ivw_rf_to_pp_se, res.ivw_rf_to_pp_p},
                                                   {res.ivw_pp_to_outcome_beta, res.ivw_pp_to_outcome_se, res.ivw_pp_to_outcome_p},
                                                   opts.legacy_adaptive_priors);
 
     for (int m = 0; m < N_SCENARIOS; m++) {
-        VarParams vp = init_var_params(inference_prot, m, hyp);
+        VarParams vp = init_var_params(prot, m, hyp);
         vp.prior_sigma2_beta1 = local_scales.sigma2_beta1;
         vp.prior_sigma2_beta2 = local_scales.sigma2_beta2;
         vp.prior_sigma2_beta3 = local_scales.sigma2_beta3;
         vp.s2_beta1 = scenario_beta1_free(m) ? vp.prior_sigma2_beta1 : 0.0;
         vp.s2_beta2 = scenario_beta2_free(m) ? vp.prior_sigma2_beta2 : 0.0;
         vp.s2_beta3 = scenario_beta3_free(m) ? vp.prior_sigma2_beta3 : 0.0;
-        elbos[m] = run_cavi(inference_prot, m, vp, hyp, opts);
-        if (use_joint_regional) {
-            elbos[m] += prot.regional_joint_log_bf[m] +
-                        joint_prior_overlap_correction(prot, m, vp);
-        }
+        elbos[m] = run_cavi(prot, m, vp, hyp, opts);
 
         // Store M=1 estimates
         if (m == 1) {
             res.beta1_est = vp.mu_beta1;
-            double beta1_variance = vp.s2_beta1;
+            res.beta1_se  = std::sqrt(vp.s2_beta1);
             res.beta2_est = vp.mu_beta2;
-            double beta2_variance = vp.s2_beta2;
+            res.beta2_se  = std::sqrt(vp.s2_beta2);
             res.beta3_est = vp.mu_beta3;
-            double beta3_variance = vp.s2_beta3;
-            if (use_joint_regional) {
-                const std::array<double*, 3> means{{
-                    &res.beta1_est, &res.beta2_est, &res.beta3_est
-                }};
-                const std::array<double*, 3> variances{{
-                    &beta1_variance, &beta2_variance, &beta3_variance
-                }};
-                const std::array<double, 3> global_means{{
-                    vp.mu_beta1, vp.mu_beta2, vp.mu_beta3
-                }};
-                const std::array<double, 3> global_variances{{
-                    vp.s2_beta1, vp.s2_beta2, vp.s2_beta3
-                }};
-                const std::array<double, 3> prior_variances{{
-                    vp.prior_sigma2_beta1,
-                    vp.prior_sigma2_beta2,
-                    vp.prior_sigma2_beta3
-                }};
-                for (int index = 0; index < 3; ++index) {
-                    const double regional_se = prot.regional_joint_beta_se[index];
-                    if (!(regional_se > 0.0)) continue;
-                    combine_normal_posteriors(
-                        global_means[index], global_variances[index],
-                        prot.regional_joint_beta[index], regional_se * regional_se,
-                        prior_variances[index], *means[index], *variances[index]
-                    );
-                }
-            }
-            res.beta1_se = std::sqrt(beta1_variance);
-            res.beta2_se = std::sqrt(beta2_variance);
-            res.beta3_se = std::sqrt(beta3_variance);
+            res.beta3_se  = std::sqrt(vp.s2_beta3);
 
             // Mediated effect: beta1 * beta2
-            res.mediated_effect = res.beta1_est * res.beta2_est;
+            res.mediated_effect = vp.mu_beta1 * vp.mu_beta2;
             // Delta method SE: sqrt(beta2^2*var_beta1 + beta1^2*var_beta2)
             res.mediated_effect_se = std::sqrt(
-                res.beta2_est * res.beta2_est * beta1_variance +
-                res.beta1_est * res.beta1_est * beta2_variance
+                vp.mu_beta2 * vp.mu_beta2 * vp.s2_beta1 +
+                vp.mu_beta1 * vp.mu_beta1 * vp.s2_beta2
             );
-            res.eb_beta1_second_moment = res.beta1_est * res.beta1_est + beta1_variance;
-            res.eb_beta2_second_moment = res.beta2_est * res.beta2_est + beta2_variance;
-            res.eb_beta3_second_moment = res.beta3_est * res.beta3_est + beta3_variance;
+            res.eb_beta1_second_moment = vp.mu_beta1 * vp.mu_beta1 + vp.s2_beta1;
+            res.eb_beta2_second_moment = vp.mu_beta2 * vp.mu_beta2 + vp.s2_beta2;
+            res.eb_beta3_second_moment = vp.mu_beta3 * vp.mu_beta3 + vp.s2_beta3;
             summarize_spike_slab(vp.omega_delta, vp.mu_delta, vp.s2_delta,
                                  res.eb_delta_pi, res.eb_delta_second_moment);
             summarize_spike_slab(vp.omega_phi, vp.mu_phi, vp.s2_phi,
                                  res.eb_phi_pi, res.eb_phi_second_moment);
             summarize_spike_slab(vp.omega_psi, vp.mu_psi, vp.s2_psi,
                                  res.eb_psi_pi, res.eb_psi_second_moment);
-            m1_resid_corr = std::fabs(compute_m3_residual_corr(inference_prot, vp));
+            m1_resid_corr = std::fabs(compute_m3_residual_corr(prot, vp));
         }
         if (m == 3) {
-            res.eb_m3_resid_corr = std::fabs(compute_m3_residual_corr(inference_prot, vp));
+            res.eb_m3_resid_corr = std::fabs(compute_m3_residual_corr(prot, vp));
         }
     }
 

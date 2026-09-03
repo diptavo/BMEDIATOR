@@ -996,20 +996,6 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
                 prot.regional_outcome_beta.push_back(outcome_it->second.beta);
                 prot.regional_outcome_se.push_back(outcome_it->second.se);
                 prot.regional_bim_index.push_back(ref_it->second);
-
-                auto rf_it = rf_ss.find(rsid);
-                if (rf_it != rf_ss.end() &&
-                    std::isfinite(rf_it->second.beta) &&
-                    std::isfinite(rf_it->second.se) && rf_it->second.se > 0.0) {
-                    prot.regional_joint_rsid.push_back(rsid);
-                    prot.regional_joint_rf_beta.push_back(rf_it->second.beta);
-                    prot.regional_joint_rf_se.push_back(rf_it->second.se);
-                    prot.regional_joint_pp_beta.push_back(s.beta);
-                    prot.regional_joint_pp_se.push_back(s.se);
-                    prot.regional_joint_outcome_beta.push_back(outcome_it->second.beta);
-                    prot.regional_joint_outcome_se.push_back(outcome_it->second.se);
-                    prot.regional_joint_bim_index.push_back(ref_it->second);
-                }
             }
             if (pval_it->second >= opts.p_thresh_cis) continue;
             cis_candidate_bim.push_back(ref_it->second);
@@ -1127,8 +1113,7 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
                      total_heidi_removed, opts);
         assign_ld_weights(prot, plink, ld_r2_cache, opts.ld_block_max_size);
         prot.regional_data_complete = prot.regional_cis_rsid.size() >= 2;
-        if (opts.regional_method == "joint-ld" ||
-            opts.regional_method == "ld-multisignal") {
+        if (opts.regional_method == "ld-multisignal") {
             compute_multisignal_regional_evidence(prot, plink, opts);
         }
 

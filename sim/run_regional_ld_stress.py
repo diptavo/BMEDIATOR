@@ -39,12 +39,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--regional-prior-pp", type=float, default=1e-4)
     parser.add_argument("--regional-prior-outcome", type=float, default=1e-4)
     parser.add_argument("--regional-prior-shared", type=float, default=1e-8)
-    parser.add_argument(
-        "--regional-method",
-        choices=("single", "ld-multisignal", "joint-ld"),
-        default="single",
-        help="Regional method to test; single preserves the historical stress design.",
-    )
     parser.add_argument("--keep-inputs", action="store_true")
     return parser.parse_args()
 
@@ -183,7 +177,6 @@ def run_one(
     directory: Path,
     ld_prefix: Path,
     regional_priors: tuple[float, float, float],
-    regional_method: str,
 ) -> dict[str, str]:
     output = directory / "bmediator"
     cmd = [
@@ -204,7 +197,6 @@ def run_one(
         "--regional-prior-pp", str(regional_priors[0]),
         "--regional-prior-outcome", str(regional_priors[1]),
         "--regional-prior-shared", str(regional_priors[2]),
-        "--regional-method", regional_method,
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
     return read_result(output.with_suffix(".mediation"))
@@ -282,7 +274,6 @@ def main() -> None:
         "regional_prior_pp": args.regional_prior_pp,
         "regional_prior_outcome": args.regional_prior_outcome,
         "regional_prior_shared": args.regional_prior_shared,
-        "regional_method": args.regional_method,
         "python": sys.version,
         "platform": platform.platform(),
         "numpy": np.__version__,
@@ -311,7 +302,6 @@ def main() -> None:
                         args.regional_prior_outcome,
                         args.regional_prior_shared,
                     ),
-                    args.regional_method,
                 )
                 rows.append(
                     {

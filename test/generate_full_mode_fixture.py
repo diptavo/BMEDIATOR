@@ -95,18 +95,11 @@ def write_plink(prefix: Path) -> dict[tuple[str, str], float]:
     }
 
 
-def write_standard_sumstats(
-    path: Path,
-    effects: dict[str, tuple[float, float]],
-    excluded: set[str] | None = None,
-) -> None:
+def write_standard_sumstats(path: Path, effects: dict[str, tuple[float, float]]) -> None:
     lookup = {rsid: (chrom, bp) for chrom, rsid, bp in VARIANTS}
-    excluded = excluded or set()
     with path.open("w", encoding="ascii") as handle:
         handle.write("SNP A1 A2 FREQ BETA SE P CHR BP\n")
         for _, rsid, _ in VARIANTS:
-            if rsid in excluded:
-                continue
             beta, se = effects.get(rsid, (0.0, 0.02))
             chrom, bp = lookup[rsid]
             handle.write(
@@ -158,12 +151,6 @@ def main() -> None:
         "r1": (0.05, 0.015), "r2": (0.04, 0.015),
     })
     write_standard_sumstats(output / "rf.txt", rf_effects)
-    write_standard_sumstats(output / "rf_missing_s3.txt", rf_effects, {"s3"})
-    write_standard_sumstats(
-        output / "rf_no_cis.txt",
-        rf_effects,
-        {"s1", "s2", "s3", "s4", "d1", "d2", "d3", "d4"},
-    )
     write_standard_sumstats(output / "outcome.txt", outcome_effects)
 
     shared_effects = {
