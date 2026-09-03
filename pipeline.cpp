@@ -464,6 +464,8 @@ static void assign_ld_weights(ProteinData& prot,
     int nU = nAC + prot.nB();
     prot.ld_weight_alpha_ac.assign(nAC, 1.0);
     prot.ld_weight_cancer_union.assign(nU, 1.0);
+    prot.setA_ld.clear();
+    prot.setB_ld.clear();
 
     struct UnionSnp { int chr; int bp; int bim_idx; };
     std::vector<UnionSnp> ac_snps;
@@ -567,6 +569,19 @@ static void assign_ld_weights(ProteinData& prot,
     };
     refine_with_local_inverse(ac_snps, prot.ld_weight_alpha_ac);
     refine_with_local_inverse(union_snps, prot.ld_weight_cancer_union);
+
+    auto ld_for = [&](const std::vector<std::string>& rsids) {
+        std::vector<int> indices;
+        indices.reserve(rsids.size());
+        for (const auto& rsid : rsids) {
+            auto it = plink.rsid_to_idx.find(rsid);
+            if (it == plink.rsid_to_idx.end()) return std::vector<std::vector<double>>{};
+            indices.push_back(it->second);
+        }
+        return plink.compute_ld_matrix(indices);
+    };
+    prot.setA_ld = ld_for(prot.setA_rsid);
+    prot.setB_ld = ld_for(prot.setB_rsid);
 }
 
 static std::set<std::string> select_rf_instruments(const std::map<std::string, SumStat>& rf_ss,
@@ -672,7 +687,15 @@ static void copy_mediation_outputs(const Options& opts,
     run_empirical_bayes(proteins, hyp, results, opts);
 
     std::sort(results.begin(), results.end(),
-              [](const ProteinResult& a, const ProteinResult& b) {
+              [&](const ProteinResult& a, const ProteinResult& b) {
+                  if (opts.structural_method == "factorized") {
+                      const bool a_ok = std::isfinite(a.factor_conjunction_q_by);
+                      const bool b_ok = std::isfinite(b.factor_conjunction_q_by);
+                      if (a_ok != b_ok) return a_ok;
+                      if (a_ok && a.factor_conjunction_q_by != b.factor_conjunction_q_by) {
+                          return a.factor_conjunction_q_by < b.factor_conjunction_q_by;
+                      }
+                  }
                   if (a.selection_probability != b.selection_probability) {
                       return a.selection_probability > b.selection_probability;
                   }

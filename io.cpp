@@ -47,6 +47,14 @@ static void print_usage() {
     std::cout << "  --sigma2-beta2  <val>    Prior variance for beta2 (PP->Cancer, default 0.1)\n";
     std::cout << "  --sigma2-beta3  <val>    Prior variance for beta3 (RF->Cancer direct, default 0.1)\n";
     std::cout << "\nInference:\n";
+    std::cout << "  --structural-method <mode> legacy-six-state or factorized (default legacy-six-state)\n";
+    std::cout << "  --sampling-corr-rf-pqtl <val> Correlation of RF/pQTL estimation errors (default 0)\n";
+    std::cout << "  --sampling-corr-rf-outcome <val> Correlation of RF/outcome estimation errors (default 0)\n";
+    std::cout << "  --sampling-corr-pqtl-outcome <val> Correlation of pQTL/outcome estimation errors (default 0)\n";
+    std::cout << "  --factor-min-set-a <int> Minimum observed Set A instruments (default 2)\n";
+    std::cout << "  --factor-min-set-b <int> Minimum independent Set B instruments (default 2)\n";
+    std::cout << "  --factor-alpha <val> Per-analysis and BY-FDR threshold (default 0.05)\n";
+    std::cout << "  --factor-bf-threshold <val> Minimum BF required for each mediation leg (default 10)\n";
     std::cout << "  --max-cavi-iter <int>    Max CAVI iterations per scenario (default 200)\n";
     std::cout << "  --elbo-tol      <val>    ELBO convergence tolerance (default 1e-6)\n";
     std::cout << "  --max-eb-iter   <int>    Max empirical Bayes iterations when enabled (default 20)\n";
@@ -145,6 +153,24 @@ void parse_args(int argc, char* argv[], Options& opts) {
         else if (flag == "--sigma2-beta3" && i + 1 < argc)
             opts.prior_sigma2_beta3 = std::atof(argv[++i]);
         // Inference
+        else if (flag == "--structural-method" && i + 1 < argc)
+            opts.structural_method = argv[++i];
+        else if (flag == "--sampling-corr-rf-pqtl" && i + 1 < argc)
+            opts.sampling_corr_rf_pqtl = std::atof(argv[++i]);
+        else if (flag == "--sampling-corr-rf-outcome" && i + 1 < argc)
+            opts.sampling_corr_rf_outcome = std::atof(argv[++i]);
+        else if (flag == "--sampling-corr-pqtl-outcome" && i + 1 < argc)
+            opts.sampling_corr_pqtl_outcome = std::atof(argv[++i]);
+        else if (flag == "--factor-min-set-a" && i + 1 < argc)
+            opts.factor_min_set_a = std::atoi(argv[++i]);
+        else if (flag == "--factor-min-set-b" && i + 1 < argc)
+            opts.factor_min_set_b = std::atoi(argv[++i]);
+        else if (flag == "--factor-alpha" && i + 1 < argc)
+            opts.factor_alpha = std::atof(argv[++i]);
+        else if (flag == "--factor-bf-threshold" && i + 1 < argc)
+            opts.factor_bf_threshold = std::atof(argv[++i]);
+        else if (flag == "--factor-quadrature-points" && i + 1 < argc)
+            opts.factor_quadrature_points = std::atoi(argv[++i]);
         else if (flag == "--max-cavi-iter" && i + 1 < argc)
             opts.max_cavi_iter = std::atoi(argv[++i]);
         else if (flag == "--elbo-tol" && i + 1 < argc)
@@ -294,6 +320,44 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: CAVI iterations, EB iterations, and threads must be positive\n";
         ok = false;
     }
+    if (opts.structural_method != "legacy-six-state" &&
+        opts.structural_method != "factorized") {
+        std::cerr << "Error: --structural-method must be legacy-six-state or factorized\n";
+        ok = false;
+    }
+    if (opts.structural_method == "factorized" && !opts.fixed_priors) {
+        std::cerr << "Error: factorized inference requires fixed priors; "
+                  << "--empirical-bayes is only available for legacy-six-state\n";
+        ok = false;
+    }
+    const double sampling_corrs[] = {
+        opts.sampling_corr_rf_pqtl, opts.sampling_corr_rf_outcome,
+        opts.sampling_corr_pqtl_outcome
+    };
+    for (double corr : sampling_corrs) {
+        if (!std::isfinite(corr) || corr <= -1.0 || corr >= 1.0) {
+            std::cerr << "Error: sampling error correlations must be finite and in (-1, 1)\n";
+            ok = false;
+            break;
+        }
+    }
+    if (opts.factor_min_set_a < 1 || opts.factor_min_set_b < 1) {
+        std::cerr << "Error: factorized minimum instrument counts must be positive\n";
+        ok = false;
+    }
+    if (!(opts.factor_alpha > 0.0 && opts.factor_alpha < 1.0) ||
+        !std::isfinite(opts.factor_alpha)) {
+        std::cerr << "Error: --factor-alpha must be finite and in (0, 1)\n";
+        ok = false;
+    }
+    if (!(opts.factor_bf_threshold > 0.0) || !std::isfinite(opts.factor_bf_threshold)) {
+        std::cerr << "Error: --factor-bf-threshold must be finite and positive\n";
+        ok = false;
+    }
+    if (opts.factor_quadrature_points < 41) {
+        std::cerr << "Error: --factor-quadrature-points must be at least 41\n";
+        ok = false;
+    }
     if (opts.direction_mode != "report" &&
         opts.direction_mode != "prioritize" &&
         opts.direction_mode != "soft" &&
@@ -412,6 +476,17 @@ void parse_args(int argc, char* argv[], Options& opts) {
     std::cout << "  cis window (kb):             " << opts.cis_window_kb << "\n";
     std::cout << "  clump window (kb):           " << opts.clump_window_kb << "\n";
     std::cout << "  LD clumping r2:              " << opts.r2_thresh << "\n";
+    std::cout << "  Structural method:           " << opts.structural_method << "\n";
+    if (opts.structural_method == "factorized") {
+        std::cout << "  Factorized min Set A/B:      " << opts.factor_min_set_a
+                  << "/" << opts.factor_min_set_b << "\n";
+        std::cout << "  Factorized alpha:            " << opts.factor_alpha << "\n";
+        std::cout << "  Factorized BF threshold:     " << opts.factor_bf_threshold << "\n";
+        std::cout << "  Sampling error corr (XM/XY/MY): ("
+                  << opts.sampling_corr_rf_pqtl << ", "
+                  << opts.sampling_corr_rf_outcome << ", "
+                  << opts.sampling_corr_pqtl_outcome << ")\n";
+    }
     std::cout << "  Prior (p0,p1,p2,p3,p4,p5):   ("
               << opts.prior_p0 << ", " << opts.prior_p1 << ", "
               << opts.prior_p2 << ", " << opts.prior_p3 << ", "
@@ -838,6 +913,14 @@ void write_results(const std::vector<ProteinResult>& results,
          << "direction_consistency_prob\tproportion_mediated\tdirectional_mediator_prob\t"
          << "selection_probability\tselection_local_fdr\tselection_cum_fdr\tselection_rank\t"
          << "posterior_local_fdr\ttarget_local_fdr\tposterior_cum_fdr\tposterior_cum_fdr5\tmediation_rank\tselected_fdr10\tselected_fdr5\tevidence_tier\t"
+         << "factor_beta1\tfactor_beta1_se\tfactor_p_XM\tfactor_log_BF_XM\t"
+         << "factor_beta2\tfactor_beta2_se\tfactor_p_MY\tfactor_log_BF_MY\t"
+         << "factor_beta3\tfactor_beta3_se\tfactor_p_XY\tfactor_log_BF_XY\t"
+         << "factor_indirect\tfactor_indirect_se\tfactor_conjunction_p\t"
+         << "factor_conjunction_q_BY\tfactor_min_log_BF\t"
+         << "factor_pleiotropy_rho\tfactor_pleiotropy_p\t"
+         << "factor_nA\tfactor_nB\tfactor_ld_source\tfactor_pattern\tfactor_mediation_status\t"
+         << "factor_frequentist_status\t"
          << "mediated_effect\tse_mediated\t"
          << "ELBO_M0\tELBO_M1\tELBO_M2\tELBO_M3\tELBO_M4\tELBO_M5\t"
          << "converged\n";
@@ -890,6 +973,19 @@ void write_results(const std::vector<ProteinResult>& results,
              << (r.selected_fdr_10 ? "YES" : "NO") << "\t"
              << (r.selected_fdr_5 ? "YES" : "NO") << "\t"
              << r.evidence_tier << "\t"
+             << r.factor_beta1 << "\t" << r.factor_beta1_se << "\t"
+             << r.factor_p_xm << "\t" << r.factor_log_bf_xm << "\t"
+             << r.factor_beta2 << "\t" << r.factor_beta2_se << "\t"
+             << r.factor_p_my << "\t" << r.factor_log_bf_my << "\t"
+             << r.factor_beta3 << "\t" << r.factor_beta3_se << "\t"
+             << r.factor_p_xy << "\t" << r.factor_log_bf_xy << "\t"
+             << r.factor_indirect << "\t" << r.factor_indirect_se << "\t"
+             << r.factor_conjunction_p << "\t" << r.factor_conjunction_q_by << "\t"
+             << r.factor_min_log_bf << "\t"
+             << r.factor_pleiotropy_rho << "\t" << r.factor_pleiotropy_p << "\t"
+             << r.factor_nA << "\t" << r.factor_nB << "\t"
+             << r.factor_ld_source << "\t" << r.factor_pattern << "\t"
+             << r.factor_mediation_status << "\t" << r.factor_frequentist_status << "\t"
              << r.mediated_effect << "\t" << r.mediated_effect_se << "\t"
              << r.elbo_M0 << "\t" << r.elbo_M1 << "\t"
              << r.elbo_M2 << "\t" << r.elbo_M3 << "\t"
@@ -965,6 +1061,15 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "regional_high_ld_r2\t" << opts.regional_high_ld_r2 << "\n";
     hout << "allow_unresolved_selection\t"
          << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
+    hout << "structural_method\t" << opts.structural_method << "\n";
+    hout << "sampling_corr_rf_pqtl\t" << opts.sampling_corr_rf_pqtl << "\n";
+    hout << "sampling_corr_rf_outcome\t" << opts.sampling_corr_rf_outcome << "\n";
+    hout << "sampling_corr_pqtl_outcome\t" << opts.sampling_corr_pqtl_outcome << "\n";
+    hout << "factor_min_set_a\t" << opts.factor_min_set_a << "\n";
+    hout << "factor_min_set_b\t" << opts.factor_min_set_b << "\n";
+    hout << "factor_alpha\t" << opts.factor_alpha << "\n";
+    hout << "factor_bf_threshold\t" << opts.factor_bf_threshold << "\n";
+    hout << "factor_quadrature_points\t" << opts.factor_quadrature_points << "\n";
     hout << "direction_mode\t" << opts.direction_mode << "\n";
     hout << "direction_weight\t" << opts.direction_weight << "\n";
     hout << "direction_min_prob\t" << opts.direction_min_prob << "\n";
@@ -976,12 +1081,14 @@ void write_results(const std::vector<ProteinResult>& results,
     int n_conditionally_identified = 0;
     int n_targets = 0;
     int n_fdr10 = 0, n_fdr5 = 0;
+    int n_factor_supported = 0;
     for (auto& r : results) {
         if (r.prob_M1 > 0.5) n_mediators++;
         if (r.prob_mediator_ld_resolved > 0.5) n_conditionally_identified++;
         if (r.prob_protein_disease > 0.5) n_targets++;
         if (r.selected_fdr_10) n_fdr10++;
         if (r.selected_fdr_5) n_fdr5++;
+        if (r.factor_mediation_status == "SUPPORTED_CONDITIONAL") n_factor_supported++;
     }
     std::cout << "\nSummary:\n";
     std::cout << "  Total proteins analyzed:     " << results.size() << "\n";
@@ -992,6 +1099,10 @@ void write_results(const std::vector<ProteinResult>& results,
     std::cout << "  Proteins selected at 5% mode-specific FDR:  " << n_fdr5 << "\n";
     std::cout << "  Proteins selected at 10% mode-specific FDR: " << n_fdr10 << "\n";
     std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
+    if (opts.structural_method == "factorized") {
+        std::cout << "  Factorized conditional mediators with both BFs >= "
+                  << opts.factor_bf_threshold << ": " << n_factor_supported << "\n";
+    }
     std::cout << "  Final prior (p0,p1,p2,p3,p4,p5): ("
               << hyp.p0 << ", " << hyp.p1 << ", "
               << hyp.p2 << ", " << hyp.p3 << ", "

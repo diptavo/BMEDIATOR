@@ -146,6 +146,11 @@ struct ProteinData {
     std::vector<double> ld_weight_alpha_ac;    // weights for A/C alpha equations
     std::vector<double> ld_weight_cancer_union; // weights for A/C/B cancer equations
 
+    // Signed LD correlation matrices for factorized structural inference.
+    // Empty matrices imply identity LD (legacy input without a reference).
+    std::vector<std::vector<double>> setA_ld;
+    std::vector<std::vector<double>> setB_ld;
+
     int nA() const { return (int)setA_rsid.size(); }
     int nB() const { return (int)setB_rsid.size(); }
     int nC() const { return (int)setC_rsid.size(); }
@@ -280,6 +285,21 @@ struct ProteinResult {
     bool selected_fdr_5;
     std::string evidence_tier;
 
+    // Factorized effects are allowed to coexist. They are not normalized over
+    // the legacy mutually exclusive M0-M5 scenario list.
+    double factor_beta1, factor_beta1_se, factor_p_xm, factor_log_bf_xm;
+    double factor_beta2, factor_beta2_se, factor_p_my, factor_log_bf_my;
+    double factor_beta3, factor_beta3_se, factor_p_xy, factor_log_bf_xy;
+    double factor_indirect, factor_indirect_se;
+    double factor_conjunction_p, factor_conjunction_q_by;
+    double factor_min_log_bf;
+    double factor_pleiotropy_rho, factor_pleiotropy_p;
+    int factor_nA, factor_nB;
+    std::string factor_ld_source;
+    std::string factor_pattern;
+    std::string factor_mediation_status;
+    std::string factor_frequentist_status;
+
     // EB sufficient-stat approximations from the M1 fit
     double eb_beta1_second_moment;
     double eb_beta2_second_moment;
@@ -365,6 +385,15 @@ struct Options {
     double regional_coverage;
     double regional_high_ld_r2;
     bool allow_unresolved_selection;
+    std::string structural_method; // legacy-six-state or factorized
+    double sampling_corr_rf_pqtl;
+    double sampling_corr_rf_outcome;
+    double sampling_corr_pqtl_outcome;
+    int factor_min_set_a;
+    int factor_min_set_b;
+    double factor_alpha;
+    double factor_bf_threshold;
+    int factor_quadrature_points;
 
     // Output
     std::string out_prefix;
@@ -395,6 +424,12 @@ struct Options {
         regional_max_signals(10), regional_signal_p(5e-6),
         regional_coverage(0.95), regional_high_ld_r2(0.80),
         allow_unresolved_selection(false),
+        structural_method("legacy-six-state"),
+        sampling_corr_rf_pqtl(0.0), sampling_corr_rf_outcome(0.0),
+        sampling_corr_pqtl_outcome(0.0),
+        factor_min_set_a(2), factor_min_set_b(2), factor_alpha(0.05),
+        factor_bf_threshold(10.0),
+        factor_quadrature_points(161),
         out_prefix("bmediator"), threads(1), verbose(false) {}
 };
 
@@ -455,6 +490,11 @@ double compute_elbo(const ProteinData& prot, int scenario,
 ProteinResult analyze_protein(const ProteinData& prot,
                               const Hyperparams& hyp,
                               const Options& opts);
+void run_factorized_inference(const ProteinData& prot,
+                              ProteinResult& result,
+                              const Options& opts);
+void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
+                                          const Options& opts);
 void run_empirical_bayes(std::vector<ProteinData>& proteins,
                          Hyperparams& hyp,
                          std::vector<ProteinResult>& results,

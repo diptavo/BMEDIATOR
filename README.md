@@ -10,6 +10,13 @@ Version 1.2.0-dev
 > production-calibrated mediation claims. See
 > [Validation Status](docs/VALIDATION.md).
 
+> **Experimental repair:** `--structural-method factorized` separates the two
+> causal legs, residual RF effect, and pleiotropy instead of forcing them into
+> mutually exclusive M1-M5 states. It reports fixed-prior Bayes factors,
+> analytically calibrated conjunction p-values, BY q-values, and a separate
+> regional H3/H4 identification gate. It is not yet the default. See
+> [Factorized two-stage method](docs/FACTORIZED_METHOD.md).
+
 ---
 
 ## Overview
@@ -78,6 +85,23 @@ cis-only signal is available. This remains conditional on exclusion and
 valid-instrument assumptions; see
 [Identification and LD Resolution](docs/IDENTIFICATION.md) and
 [Validation Status](docs/VALIDATION.md).
+
+The experimental factorized analysis is enabled with:
+
+```bash
+./bmediator [the usual input options] --structural-method factorized
+```
+
+It requires at least two exact observed Set A instruments and two independent Set B
+instruments for a confirmatory call by default. The key new output columns are
+`factor_log_BF_XM`, `factor_log_BF_MY`, `factor_conjunction_p`,
+`factor_conjunction_q_BY`, `factor_mediation_status`, and
+`factor_frequentist_status`. These must not be interpreted as M1/M5 posterior
+probabilities.
+
+Factorized mode skips six-state CAVI for efficiency. The legacy `P_M0`-`P_M5`,
+ELBO, and legacy selection columns are therefore `nan` in a factorized run;
+they are not silently reused as factorized evidence.
 
 A manuscript-style description is available in
 [Introduction and Methods](manuscript/BMEDIATOR_METHODS_DRAFT.md).
@@ -246,8 +270,9 @@ TNF      TNF    6    31543344   31546112
 
 ### `.mediation` — Main Results
 
-Tab-delimited, one row per protein, sorted by the configured
-`selection_probability` descending (LD-resolved probability by default):
+Tab-delimited, one row per protein. Legacy mode sorts by
+`selection_probability`; factorized mode sorts by finite
+`factor_conjunction_q_BY` ascending.
 
 | Column | Description |
 |--------|-------------|
@@ -280,6 +305,16 @@ Tab-delimited, one row per protein, sorted by the configured
 | regional_signal_pairs | Number of protein-outcome signal pairs tested |
 | regional_max_credible_set_pair_r2 | Maximum cross-trait credible-set LD for the selected signal pair |
 | mediation_identifiability | Explicit LD-resolution and conditional-identification state |
+| factor_beta1, factor_beta1_se, factor_p_XM, factor_log_BF_XM | Factorized RF-to-protein estimate and evidence |
+| factor_beta2, factor_beta2_se, factor_p_MY, factor_log_BF_MY | Factorized protein-to-outcome estimate and evidence from Set B only |
+| factor_beta3, factor_beta3_se, factor_p_XY, factor_log_BF_XY | Factorized residual RF-to-outcome estimate and evidence |
+| factor_indirect, factor_indirect_se | Factorized mediated effect and delta-method SE |
+| factor_conjunction_p, factor_conjunction_q_BY | Intersection-union p-value and proteome-wide BY q-value |
+| factor_min_log_BF | Smaller of the two causal-leg log Bayes factors; not a joint BF |
+| factor_nA, factor_nB, factor_ld_source | Instruments and LD source used by factor inference |
+| factor_pattern | Descriptive nominal evidence pattern; not a biological state posterior |
+| factor_mediation_status | Bayesian two-leg evidence plus instrument and regional identification gates |
+| factor_frequentist_status | Conjunction/BY evidence plus the same identification gates |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |
 | ELBO_M0 ... ELBO_M5 | Evidence lower bounds per scenario |
@@ -349,6 +384,14 @@ calibration.
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--structural-method <mode>` | legacy-six-state | Use `factorized` for the experimental analytical engine |
+| `--sampling-corr-rf-pqtl <val>` | 0 | RF/pQTL estimation-error correlation |
+| `--sampling-corr-rf-outcome <val>` | 0 | RF/outcome estimation-error correlation |
+| `--sampling-corr-pqtl-outcome <val>` | 0 | pQTL/outcome estimation-error correlation |
+| `--factor-min-set-a <int>` | 2 | Minimum exact Set A associations for confirmatory factor inference |
+| `--factor-min-set-b <int>` | 2 | Minimum independent Set B instruments |
+| `--factor-alpha <val>` | 0.05 | Leg-test and BY decision threshold |
+| `--factor-bf-threshold <val>` | 10 | Minimum BF required for each causal leg |
 | `--max-cavi-iter <int>` | 200 | Max CAVI iterations per scenario |
 | `--elbo-tol <val>` | 1e-6 | ELBO convergence tolerance |
 | `--max-eb-iter <int>` | 20 | Max empirical Bayes iterations when enabled |

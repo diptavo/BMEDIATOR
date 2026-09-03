@@ -32,10 +32,11 @@ LDFLAGS  ?= $(BASE_LDFLAGS)
 BIN       = bmediator
 BUILD_DIR = build
 HDRS      = bmediator.h plink_ld.h gsmr_qc.h regional_ld.h
-SRCS      = main.cpp io.cpp cavi.cpp plink_ld.cpp pipeline.cpp gsmr_qc.cpp regional_ld.cpp
+SRCS      = main.cpp io.cpp cavi.cpp factor_model.cpp plink_ld.cpp pipeline.cpp gsmr_qc.cpp regional_ld.cpp
 OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/io.o \
             $(BUILD_DIR)/cavi.o \
+            $(BUILD_DIR)/factor_model.o \
             $(BUILD_DIR)/plink_ld.o \
             $(BUILD_DIR)/pipeline.o \
             $(BUILD_DIR)/gsmr_qc.o \

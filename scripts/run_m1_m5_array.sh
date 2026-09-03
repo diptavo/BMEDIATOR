@@ -8,6 +8,7 @@ source /etc/profile.d/modules.sh || true
 : "${BMEDIATOR_DIR:?}"
 : "${OUT_ROOT:?}"
 : "${BLOCK_SIZE:?}"
+STRUCTURAL_METHOD="${STRUCTURAL_METHOD:-legacy-six-state}"
 
 start=$(( (SLURM_ARRAY_TASK_ID - 1) * BLOCK_SIZE + 1 ))
 end=$(( SLURM_ARRAY_TASK_ID * BLOCK_SIZE ))
@@ -25,6 +26,6 @@ for idx in $(seq "$start" "$end"); do
     --cell "$cell" \
     --replicate "$replicate" \
     --outdir "$OUT_ROOT" \
-    --binary "$BMEDIATOR_DIR/bmediator"
+    --binary "$BMEDIATOR_DIR/bmediator" \
+    --structural-method "$STRUCTURAL_METHOD"
 done
-

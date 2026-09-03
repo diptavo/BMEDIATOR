@@ -111,6 +111,32 @@ probabilities, and M5 is not reliably recovered against the complete six-state
 model. Further likelihood development is required before a non-development
 release or a strong methodological claim.
 
+## Experimental factorized pilot
+
+The replacement factorized engine was subjected to a frozen 2,400-analysis
+pilot on 2026-09-03: 10 replicates, 20 independent datasets per truth state,
+four states (M1, M2, M4, M5), and three cells. Unlike the six-state model, the
+target was the composite two-stage null rather than forced state
+classification.
+
+| Cell | M1 conjunction power at 0.05 | Largest non-M1 rejection at 0.05 | M1 both-BF>10 | Largest non-M1 both-BF>10 |
+|---|---:|---:|---:|---:|
+| Identified, Set B=4 | 38.5% | 0.5% | 81.5% | 0.5% |
+| Balanced Set B pleiotropy | 68.0% | 2.5% | 85.5% | 4.0% |
+| Weak second stage | 1.3% | 0.7% | 0.0% | 0.7% |
+
+The frequentist leg tests use a conservative small-instrument t reference;
+the fixed-prior Bayes factors retain materially more power in the two
+well-identified cells. The full frozen table is in
+`sim/results/factorized_pilot_20260903/summary.tsv`.
+
+This pilot establishes that separating Set A and Set B repairs the specific
+M1/M5 conflation in these independent-instrument simulations. It does not
+validate the complete method. Realistic LD, sample overlap, winner's curse,
+directional pleiotropy, ancestry mismatch, regional H3/H4 error, and
+proteome-wide FDR remain open validation requirements. The factorized mode is
+therefore experimental and the development release warning still applies.
+
 ## Release interpretation
 
 - The historical single-signal gate controls the tested distinct-LD failure well

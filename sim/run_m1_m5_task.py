@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import copy
 import shutil
 from pathlib import Path
 
@@ -31,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outdir", type=Path, required=True)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--seed", type=int)
+    parser.add_argument("--structural-method", choices=("legacy-six-state", "factorized"))
     parser.add_argument("--keep-intermediate", action="store_true")
     return parser.parse_args()
 
@@ -38,13 +40,28 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
-    global_cfg = config["global"]
+    global_cfg = copy.deepcopy(config["global"])
     benchmark_cfg = config["classification"]
     cell_index, cell = next(
         (index, value)
         for index, value in enumerate(benchmark_cfg["cells"])
         if value["name"] == args.cell
     )
+    if args.structural_method:
+        binary_options = dict(global_cfg.get("binary_options", {}))
+        binary_options["structural_method"] = args.structural_method
+        overlap = cell.get("sample_overlap", cell.get("sampling_error_correlation", {}))
+        if isinstance(overlap, (int, float)):
+            overlap = {"rf_pqtl": overlap, "rf_outcome": overlap, "pqtl_outcome": overlap}
+        if isinstance(overlap, dict):
+            binary_options["sampling_corr_rf_pqtl"] = overlap.get("rf_pqtl", 0.0)
+            binary_options["sampling_corr_rf_outcome"] = overlap.get(
+                "rf_outcome", overlap.get("rf_cancer", 0.0)
+            )
+            binary_options["sampling_corr_pqtl_outcome"] = overlap.get(
+                "pqtl_outcome", overlap.get("pqtl_cancer", 0.0)
+            )
+        global_cfg["binary_options"] = binary_options
     base_seed = int(global_cfg["seed"] if args.seed is None else args.seed)
     rng = np.random.default_rng(base_seed + cell_index * 10000 + args.replicate)
     scenarios = tuple(str(value) for value in benchmark_cfg["scenarios"])
@@ -86,4 +103,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

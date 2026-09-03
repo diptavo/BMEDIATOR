@@ -2,6 +2,18 @@
 
 ## 1.2.0-dev
 
+- Add an experimental factorized structural engine that estimates RF-to-protein,
+  protein-to-outcome, residual RF-to-outcome, and pleiotropy components without
+  forcing mutually exclusive M1/M5 labels.
+- Add signed-LD errors-in-variables likelihoods, deterministic fixed-prior Bayes
+  factors, conservative intersection-union tests, and BY correction across
+  proteins for factorized analyses.
+- Require separate Set A and Set B evidence and retain regional H3/H4 as an
+  independent identification gate; sample-overlap analyses remain unresolved.
+- Skip six-state CAVI in factorized mode and add a frozen 2,400-analysis pilot.
+- Correct `.regional` row serialization so H3, H4, and downstream columns align
+  with the header.
+
 - Withdraw the experimental joint regional structural likelihood because its
   unrestricted M5 protein/outcome direct-effect covariance is nonidentified
   from the M1 protein-to-outcome path. Retain the Set A/B/C structural model and

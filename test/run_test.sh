@@ -79,6 +79,7 @@ fi
 
 FULL_DIR="$OUT_DIR/full_mode_fixture"
 FULL_PREFIX="$OUT_DIR/full_mode_run"
+FULL_FACTOR_PREFIX="$OUT_DIR/full_mode_factorized_run"
 FULL_SINGLE_PREFIX="$OUT_DIR/full_mode_single_run"
 FULL_LEGACY_REGIONAL_PREFIX="$OUT_DIR/full_mode_legacy_regional_run"
 rm -rf "$FULL_DIR"
@@ -127,6 +128,56 @@ if ! awk -F '\t' '
   END {exit !(diagonal_shared == 2 && off_diagonal_distinct == 2 && distinct)}
 ' "${FULL_PREFIX}.regional"; then
   echo "error: signal-pair output did not resolve the shared and distinct fixtures" >&2
+  exit 1
+fi
+
+"$BIN" \
+  --rf-sumstat "$FULL_DIR/rf.txt" \
+  --protein-gwas-list "$FULL_DIR/manifest.txt" \
+  --cancer-sumstat "$FULL_DIR/outcome.txt" \
+  --protein-info "$FULL_DIR/protein_info.txt" \
+  --bfile "$FULL_DIR/ldref" \
+  --out "$FULL_FACTOR_PREFIX" \
+  --structural-method factorized \
+  --p-thresh-rf 5e-6 \
+  --p-thresh-cis 1e-4 \
+  --cis-window 50 \
+  --clump-r2 0.05 \
+  --min-instruments 1 \
+  --heidi-off \
+  --no-steiger \
+  --max-cavi-iter 80
+
+if ! awk -F '\t' '
+  NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
+  $1=="P_SHARED" {
+    found=1
+    if ($(h["factor_nA"]) != 2 || $(h["factor_nB"]) != 2 ||
+        $(h["factor_log_BF_XM"]) < 2.302585 ||
+        $(h["factor_log_BF_MY"]) < 2.302585 ||
+        $(h["factor_ld_source"]) != "reference" ||
+        $(h["factor_mediation_status"]) != "SUPPORTED_CONDITIONAL") exit 1
+  }
+  END {if (!found) exit 1}
+' "${FULL_FACTOR_PREFIX}.mediation"; then
+  echo "error: factorized mode did not recover the deterministic mediation fixture" >&2
+  exit 1
+fi
+
+if ! awk -F '\t' 'NR==1 {n=NF; next} NF!=n {exit 1}' "${FULL_FACTOR_PREFIX}.regional"; then
+  echo "error: regional output rows do not match the declared columns" >&2
+  exit 1
+fi
+
+if "$BIN" \
+  --rf-sumstat "$ROOT/testdata/rf_sumstat.txt" \
+  --pqtl-sumstat "$ROOT/testdata/pqtl_sumstat.txt" \
+  --cancer-sumstat "$ROOT/testdata/cancer_sumstat.txt" \
+  --protein-info "$ROOT/testdata/protein_info.txt" \
+  --out "$OUT_DIR/invalid_sampling_corr" \
+  --sampling-corr-pqtl-outcome 1 \
+  >/dev/null 2>&1; then
+  echo "error: invalid sampling error correlation was accepted" >&2
   exit 1
 fi
 
@@ -241,6 +292,7 @@ if ! awk -F '\t' 'NR==2 {if ($1 != "P_SHARED") exit 1; found=1} NR>2 {exit 1} EN
 fi
 
 M1_M5_PREFIX="$OUT_DIR/m1_m5_independent"
+M1_M5_FACTOR_PREFIX="$OUT_DIR/m1_m5_factorized"
 python3 "$ROOT/sim/run_m1_m5_task.py" \
   --config "$ROOT/sim/configs/m1_m5_identification_smoke.json" \
   --cell identified_setb2 \
@@ -258,6 +310,32 @@ if ! awk -F '\t' '
   END {if (rows != 16) exit 1}
 ' "$M1_M5_PREFIX/classification/identified_setb2/rep_0001/task_metrics.tsv"; then
   echo "error: independent M1/M5 simulation runner mixed instrument sets across proteins" >&2
+  exit 1
+fi
+
+python3 "$ROOT/sim/run_m1_m5_task.py" \
+  --config "$ROOT/sim/configs/m1_m5_identification_smoke.json" \
+  --cell identified_setb2 \
+  --replicate 1 \
+  --outdir "$M1_M5_FACTOR_PREFIX" \
+  --binary "$BIN" \
+  --structural-method factorized
+
+if ! awk -F '\t' '
+  NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
+  {
+    both_bf = $(h["factor_log_BF_XM"]) > 2.302585 &&
+              $(h["factor_log_BF_MY"]) > 2.302585
+    if ($(h["true_scenario"]) == "M1") {m1++; m1_beta2 += $(h["factor_beta2"]); m1_bf += both_bf}
+    if ($(h["true_scenario"]) == "M5") {m5++; m5_beta2 += $(h["factor_beta2"]); m5_bf += both_bf}
+  }
+  END {
+    if (m1 != 8 || m5 != 8 || m1_beta2/m1 < 0.20 ||
+        (m5_beta2/m5 < -0.15 || m5_beta2/m5 > 0.15) ||
+        m1_bf < 3 || m5_bf > 1) exit 1
+  }
+' "$M1_M5_FACTOR_PREFIX/classification/identified_setb2/rep_0001/task_metrics.tsv"; then
+  echo "error: factorized engine did not separate the identified M1/M5 smoke fixture" >&2
   exit 1
 fi
 

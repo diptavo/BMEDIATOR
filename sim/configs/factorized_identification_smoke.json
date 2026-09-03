@@ -1,0 +1,74 @@
+{
+  "global": {
+    "seed": 20260903,
+    "rf_p_threshold": 5e-6,
+    "cis_p_threshold": 5e-6,
+    "cis_window_bp": 1000000,
+    "max_cavi_iter": 80,
+    "max_eb_iter": 1,
+    "threads": 1,
+    "fixed_priors": true,
+    "quiet": true
+  },
+  "classification": {
+    "replicates": 10,
+    "proteins_per_scenario": 20,
+    "scenarios": ["M1", "M2", "M4", "M5"],
+    "cells": [
+      {
+        "name": "identified_setb4",
+        "identification_class": "identified",
+        "set_counts": {"A": 6, "B": 4, "C": 0},
+        "gamma_range": [0.22, 0.34],
+        "cis_effect_range": [0.22, 0.34],
+        "beta1": 0.35,
+        "beta2": 0.30,
+        "beta3": 0.05,
+        "rho_m5": 0.80,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.06,
+        "psi_sd": 0.06,
+        "phi_sd": 0.01,
+        "sampling_noise": true
+      },
+      {
+        "name": "weak_second_stage",
+        "identification_class": "weak_instrument",
+        "set_counts": {"A": 8, "B": 4, "C": 0},
+        "gamma_range": [0.20, 0.30],
+        "cis_effect_range": [0.16, 0.24],
+        "beta1": 0.30,
+        "beta2": 0.16,
+        "beta3": 0.05,
+        "rho_m5": 0.80,
+        "rf_se": 0.05,
+        "pqtl_se": 0.05,
+        "outcome_se": 0.055,
+        "delta_sd": 0.06,
+        "psi_sd": 0.06,
+        "phi_sd": 0.015,
+        "sampling_noise": true
+      },
+      {
+        "name": "balanced_pleiotropy",
+        "identification_class": "assumption_stress",
+        "set_counts": {"A": 8, "B": 8, "C": 0},
+        "gamma_range": [0.22, 0.34],
+        "cis_effect_range": [0.20, 0.32],
+        "beta1": 0.35,
+        "beta2": 0.30,
+        "beta3": 0.05,
+        "rho_m5": 0.80,
+        "rf_se": 0.04,
+        "pqtl_se": 0.04,
+        "outcome_se": 0.045,
+        "delta_sd": 0.06,
+        "psi_sd": 0.06,
+        "phi_sd": 0.04,
+        "sampling_noise": true
+      }
+    ]
+  }
+}

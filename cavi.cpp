@@ -1444,6 +1444,33 @@ ProteinResult analyze_protein(const ProteinData& prot,
         res.ivw_rf_to_outcome_p = ivw.p;
     }
 
+    run_factorized_inference(prot, res, opts);
+
+    if (opts.structural_method == "factorized") {
+        res.prob_M0 = nan; res.prob_M1 = nan;
+        res.prob_M2 = nan; res.prob_M3 = nan;
+        res.prob_M4 = nan; res.prob_M5 = nan;
+        res.prob_mediator = nan;
+        res.prob_mediator_ld_resolved = nan;
+        res.prob_mediator_identified = nan;
+        res.prob_protein_disease = nan;
+        res.prob_rf_responsive = nan;
+        res.prob_rf_direct = nan;
+        res.beta1_est = nan; res.beta1_se = nan;
+        res.beta2_est = nan; res.beta2_se = nan;
+        res.beta3_est = nan; res.beta3_se = nan;
+        res.mediated_effect = nan; res.mediated_effect_se = nan;
+        res.directional_mediator_prob = nan;
+        res.selection_probability = nan;
+        res.selection_local_fdr = nan;
+        res.selection_cum_fdr = nan;
+        res.elbo_M0 = nan; res.elbo_M1 = nan;
+        res.elbo_M2 = nan; res.elbo_M3 = nan;
+        res.elbo_M4 = nan; res.elbo_M5 = nan;
+        res.converged = res.factor_mediation_status != "NUMERICAL_FAILURE";
+        return res;
+    }
+
     // Skip proteins with no instruments at all
     if (prot.nTotal() == 0) {
         res.prob_M0 = 1.0; res.prob_M1 = 0.0;
@@ -1835,6 +1862,11 @@ void run_empirical_bayes(std::vector<ProteinData>& proteins,
             std::cout << "EB converged after " << (eb_iter + 1) << " iterations.\n";
             break;
         }
+    }
+
+    if (opts.structural_method == "factorized") {
+        finalize_factorized_multiple_testing(results, opts);
+        return;
     }
 
     std::vector<int> order(results.size());
