@@ -31,14 +31,15 @@ LDFLAGS  ?= $(BASE_LDFLAGS)
 
 BIN       = bmediator
 BUILD_DIR = build
-HDRS      = bmediator.h plink_ld.h gsmr_qc.h
-SRCS      = main.cpp io.cpp cavi.cpp plink_ld.cpp pipeline.cpp gsmr_qc.cpp
+HDRS      = bmediator.h plink_ld.h gsmr_qc.h regional_ld.h
+SRCS      = main.cpp io.cpp cavi.cpp plink_ld.cpp pipeline.cpp gsmr_qc.cpp regional_ld.cpp
 OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/io.o \
             $(BUILD_DIR)/cavi.o \
             $(BUILD_DIR)/plink_ld.o \
             $(BUILD_DIR)/pipeline.o \
-            $(BUILD_DIR)/gsmr_qc.o
+            $(BUILD_DIR)/gsmr_qc.o \
+            $(BUILD_DIR)/regional_ld.o
 
 .PHONY: all clean test test-regional-stress help
 

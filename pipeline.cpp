@@ -1,6 +1,7 @@
 #include "bmediator.h"
 #include "plink_ld.h"
 #include "gsmr_qc.h"
+#include "regional_ld.h"
 
 #include <cassert>
 
@@ -994,6 +995,7 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
                 prot.regional_pp_se.push_back(s.se);
                 prot.regional_outcome_beta.push_back(outcome_it->second.beta);
                 prot.regional_outcome_se.push_back(outcome_it->second.se);
+                prot.regional_bim_index.push_back(ref_it->second);
             }
             if (pval_it->second >= opts.p_thresh_cis) continue;
             cis_candidate_bim.push_back(ref_it->second);
@@ -1111,6 +1113,9 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
                      total_heidi_removed, opts);
         assign_ld_weights(prot, plink, ld_r2_cache, opts.ld_block_max_size);
         prot.regional_data_complete = prot.regional_cis_rsid.size() >= 2;
+        if (opts.regional_method == "ld-multisignal") {
+            compute_multisignal_regional_evidence(prot, plink, opts);
+        }
 
         if (prot.nTotal() > 0) n_with_instruments++;
         processed++;

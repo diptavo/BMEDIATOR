@@ -140,26 +140,26 @@ def main() -> None:
 
     rf_effects = {"r1": (0.12, 0.015), "r2": (0.10, 0.015)}
     outcome_effects = {
-        "s1": (0.18 * ld[("s1", "s1")], 0.02),
-        "s2": (0.18 * ld[("s2", "s1")], 0.02),
-        "s3": (0.18 * ld[("s3", "s1")], 0.02),
-        "s4": (0.18 * ld[("s4", "s1")], 0.02),
+        snp: (0.18 * ld[(snp, "s1")] + 0.16 * ld[(snp, "s3")], 0.02)
+        for snp in ("s1", "s2", "s3", "s4")
+    }
+    outcome_effects.update({
         "d1": (0.18 * ld[("d1", "d3")], 0.02),
         "d2": (0.18 * ld[("d2", "d3")], 0.02),
         "d3": (0.18 * ld[("d3", "d3")], 0.02),
         "d4": (0.18 * ld[("d4", "d3")], 0.02),
         "r1": (0.05, 0.015), "r2": (0.04, 0.015),
-    }
+    })
     write_standard_sumstats(output / "rf.txt", rf_effects)
     write_standard_sumstats(output / "outcome.txt", outcome_effects)
 
     shared_effects = {
-        "s1": (0.20 * ld[("s1", "s1")], 0.02),
-        "s2": (0.20 * ld[("s2", "s1")], 0.02),
-        "s3": (0.20 * ld[("s3", "s1")], 0.02),
-        "s4": (0.20 * ld[("s4", "s1")], 0.02),
-        "r1": (0.12, 0.02), "r2": (0.10, 0.02),
+        snp: (0.20 * ld[(snp, "s1")] + 0.17 * ld[(snp, "s3")], 0.02)
+        for snp in ("s1", "s2", "s3", "s4")
     }
+    shared_effects.update({
+        "r1": (0.12, 0.02), "r2": (0.10, 0.02),
+    })
     distinct_effects = {
         "d1": (0.20 * ld[("d1", "d1")], 0.02),
         "d2": (0.20 * ld[("d2", "d1")], 0.02),

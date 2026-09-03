@@ -7,13 +7,18 @@
 - Make nuisance pleiotropy terms available in all six states so model evidence
   is compared on a common nuisance structure.
 - Add full-mode regional shared-versus-distinct causal-configuration evidence.
+- Replace the default one-causal regional calculation with native LD-aware
+  conditional multi-signal fine-mapping and per-signal-pair H0-H4 output.
+- Add `.regional` output with lead variants, signal-pair posteriors, and
+  credible-set cross-LD diagnostics; retain `--regional-method single` for
+  compatibility.
 - Use the analytical independence prior `p_shared = p_protein * p_outcome` by
   default instead of prespecifying enrichment for shared causal variants.
 - Disable confirmatory mediation selection when LD resolution, regional
   association evidence, or multiple-instrument requirements are not met.
 - Add explicit conditional-identification states and regression tests covering
   shared and distinct regional signals.
-- Document the exclusion, single-causal-signal, ancestry, and sample-overlap
+- Document the exclusion, conditional-signal, ancestry, and sample-overlap
   assumptions required for interpretation.
 
 ## 1.0.0

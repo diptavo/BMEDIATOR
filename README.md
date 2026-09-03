@@ -54,13 +54,13 @@ Set C instruments are the most informative for mediation and are handled with a 
 - **Inner loop**: Coordinate Ascent Variational Inference (CAVI) with spike-and-slab priors on pleiotropy terms
 - **Default priors**: Prespecified scenario and effect priors remain fixed, avoiding reuse of the analyzed outcomes to construct their own model priors
 - **Optional exploratory mode**: `--empirical-bayes` estimates hyperparameters across analyzed proteins
-- **Regional check**: Full mode compares shared versus distinct protein/outcome causal configurations before enabling confirmatory mediation selection
+- **Regional check**: Full mode uses the reference-panel LD matrix to identify conditionally independent protein and outcome signals, then compares H0-H4 for every signal pair
 
 `P_M1` is approximate structural support for mediation within the six-state model.
 `P_mediator_ld_resolved` is nonzero only when full regional data support a
 shared signal, at least two independent RF-to-protein instruments exist, and a
 cis-only signal is available. This remains conditional on exclusion and
-single-causal-signal assumptions; see
+valid-instrument assumptions; see
 [Identification and LD Resolution](docs/IDENTIFICATION.md) and
 [Validation Status](docs/VALIDATION.md).
 
@@ -257,11 +257,22 @@ Tab-delimited, one row per protein, sorted by the configured
 | selection_local_fdr, selection_cum_fdr, selection_rank | Mode-specific selection diagnostics |
 | regional_PP_shared, regional_PP_distinct | Posterior probabilities of shared and distinct regional causal configurations |
 | regional_shared_given_both | P(shared configuration given that both traits are regionally associated) |
+| regional_method | Regional inference method (`ld-multisignal` by default) |
+| regional_protein_signals, regional_outcome_signals | Number of conditionally independent signals detected for each trait |
+| regional_signal_pairs | Number of protein-outcome signal pairs tested |
+| regional_max_credible_set_pair_r2 | Maximum cross-trait credible-set LD for the selected signal pair |
 | mediation_identifiability | Explicit LD-resolution and conditional-identification state |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |
 | ELBO_M0 ... ELBO_M5 | Evidence lower bounds per scenario |
 | converged | Whether CAVI converged |
+
+### `.regional` — Signal-pair Results
+
+One row per conditionally independent protein-outcome signal pair. It reports
+the lead variants, H0-H4 posterior probabilities, H4/(H3+H4), lead-variant
+`r2`, maximum cross-trait credible-set `r2`, and the shared/distinct/ambiguous
+classification. The file contains only its header when no pair is testable.
 
 ### `.hyp` — Priors and Inference Settings
 
@@ -331,6 +342,11 @@ calibration.
 | `--regional-prior-shared <val>` | 1e-8 | Shared prior; default is the independence product of trait priors |
 | `--regional-min-both <val>` | 0.80 | Minimum P(shared or distinct) before regional classification |
 | `--regional-min-shared <val>` | 0.80 | Minimum P(shared given both associated) for shared classification |
+| `--regional-method <mode>` | ld-multisignal | LD-aware conditional multi-signal model; use `single` for the previous one-causal calculation |
+| `--regional-max-signals <int>` | 10 | Maximum conditionally independent signals per trait |
+| `--regional-signal-p <val>` | 5e-6 | Conditional p-value required to retain a signal |
+| `--regional-coverage <val>` | 0.95 | Credible-set posterior coverage |
+| `--regional-high-ld-r2 <val>` | 0.80 | Threshold used to label distinct signals as high LD |
 | `--allow-unresolved-selection` | off | Permit selection without regional resolution |
 | `--threads <int>` | 1 | Number of threads |
 | `--verbose` | off | Detailed logging |
@@ -395,36 +411,41 @@ This command analyzes all five UKB-PPP proteins in the supplied manifest:
 
 ### Expected results
 
-Each command creates three files:
+Each command creates four files:
 
 ```text
 <output prefix>.mediation
+<output prefix>.regional
 <output prefix>.hyp
 <output prefix>.instruments
 ```
 
 For the one-protein command, `bmi_chd_il6r.mediation` contains one protein row:
 
-| Protein | Gene | nA | nB | nC | P_M1 | P_mediator_ld_resolved | mediation_identifiability | mediated_effect |
-|---------|------|----|----|----|------|------------------------|---------------------------|-----------------|
-| OID20385 | IL6R | 112 | 88 | 0 | 0.999998 | 0.000000 | UNRESOLVED_WEAK_REGIONAL_EVIDENCE | -0.001399 |
+| Protein | Gene | nA | nB | nC | P_M1 | regional_PP_distinct | regional_PP_shared | P_mediator_ld_resolved | mediation_identifiability | mediated_effect |
+|---------|------|----|----|----|------|----------------------|--------------------|------------------------|---------------------------|-----------------|
+| OID20385 | IL6R | 112 | 87 | 0 | 0.999995 | 0.735029 | 0.064727 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | -0.001403 |
 
-The high `P_M1` indicates structural support for M1, but this example does not
-identify IL6R as an LD-resolved mediator because the regional evidence does not
-pass the required threshold.
+The high `P_M1` indicates structural support for M1, but IL6R is not identified
+as an LD-resolved mediator. The regional model finds 10 conditional protein
+signals and one outcome signal, evaluates 10 signal pairs, and does not pass the
+configured evidence threshold for either a shared or distinct protein-outcome
+configuration.
 
 For the five-protein command, `bmi_chd_ukb_ppp_all5.mediation` contains:
 
-| Protein | Gene | P_M1 | P_mediator_ld_resolved | mediation_identifiability | selected_fdr5 |
-|---------|------|------|------------------------|---------------------------|---------------|
-| OID20235 | PCSK9 | 1.000000 | 1.000000 | LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL | YES |
-| OID20385 | IL6R | 0.999998 | 0.000000 | UNRESOLVED_WEAK_REGIONAL_EVIDENCE | NO |
-| OID20407 | ANGPTL3 | 0.999944 | 0.000000 | UNRESOLVED_WEAK_REGIONAL_EVIDENCE | NO |
-| OID20049 | NPPB | 0.156211 | 0.000000 | UNRESOLVED_WEAK_REGIONAL_EVIDENCE | NO |
-| OID20650 | VEGFA | 0.006725 | 0.000000 | UNRESOLVED_WEAK_REGIONAL_EVIDENCE | NO |
+| Protein | Gene | P_M1 | regional_PP_distinct | regional_PP_shared | Protein signals | Outcome signals | P_mediator_ld_resolved | mediation_identifiability | selected_fdr5 |
+|---------|------|------|----------------------|--------------------|-----------------|-----------------|------------------------|---------------------------|---------------|
+| OID20235 | PCSK9 | 1.000000 | 0.000002 | 0.999998 | 10 | 10 | 1.000000 | LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL | YES |
+| OID20385 | IL6R | 0.999995 | 0.735029 | 0.064727 | 10 | 1 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | NO |
+| OID20407 | ANGPTL3 | 0.999935 | 0.000000 | 0.000000 | 10 | 0 | 0.000000 | UNRESOLVED_NO_OUTCOME_SIGNAL | NO |
+| OID20049 | NPPB | 0.156211 | 0.715503 | 0.000001 | 10 | 1 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | NO |
+| OID20650 | VEGFA | 0.007081 | 0.000000 | 0.000000 | 10 | 0 | 0.000000 | UNRESOLVED_NO_OUTCOME_SIGNAL | NO |
 
 With the supplied files and default settings, PCSK9 is the only protein selected
-as an LD-resolved mediator at 5% FDR.
+as an LD-resolved mediator at 5% FDR. These values were generated on Biowulf
+with the bundled production code and the GRCh38 European reference supplied in
+the example-data folder.
 
 ---
 

@@ -64,6 +64,11 @@ static void print_usage() {
     std::cout << "  --regional-prior-shared <val> Per-variant shared prior (default 1e-8 = product)\n";
     std::cout << "  --regional-min-both <val> Minimum P(shared or distinct regional signal) (default 0.80)\n";
     std::cout << "  --regional-min-shared <val> Minimum P(shared|both) for LD-resolved mediation (default 0.80)\n";
+    std::cout << "  --regional-method <mode> Regional model: ld-multisignal or single (default ld-multisignal)\n";
+    std::cout << "  --regional-max-signals <int> Maximum conditional signals per trait (default 10)\n";
+    std::cout << "  --regional-signal-p <val> Conditional signal inclusion threshold (default 5e-6)\n";
+    std::cout << "  --regional-coverage <val> Credible-set coverage (default 0.95)\n";
+    std::cout << "  --regional-high-ld-r2 <val> High-LD label threshold (default 0.80)\n";
     std::cout << "  --allow-unresolved-selection Allow confirmatory selection without regional LD resolution\n";
     std::cout << "\nDirection consistency:\n";
     std::cout << "  --direction-mode <mode>  Direction policy: report, prioritize, soft, hard (default report)\n";
@@ -180,6 +185,16 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.regional_min_both = std::atof(argv[++i]);
         else if (flag == "--regional-min-shared" && i + 1 < argc)
             opts.regional_min_shared = std::atof(argv[++i]);
+        else if (flag == "--regional-method" && i + 1 < argc)
+            opts.regional_method = argv[++i];
+        else if (flag == "--regional-max-signals" && i + 1 < argc)
+            opts.regional_max_signals = std::atoi(argv[++i]);
+        else if (flag == "--regional-signal-p" && i + 1 < argc)
+            opts.regional_signal_p = std::atof(argv[++i]);
+        else if (flag == "--regional-coverage" && i + 1 < argc)
+            opts.regional_coverage = std::atof(argv[++i]);
+        else if (flag == "--regional-high-ld-r2" && i + 1 < argc)
+            opts.regional_high_ld_r2 = std::atof(argv[++i]);
         else if (flag == "--allow-unresolved-selection")
             opts.allow_unresolved_selection = true;
         // Direction consistency
@@ -345,6 +360,29 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: --regional-min-both must be between 0 and 1\n";
         ok = false;
     }
+    if (opts.regional_method != "ld-multisignal" && opts.regional_method != "single") {
+        std::cerr << "Error: --regional-method must be ld-multisignal or single\n";
+        ok = false;
+    }
+    if (opts.regional_max_signals < 1) {
+        std::cerr << "Error: --regional-max-signals must be positive\n";
+        ok = false;
+    }
+    if (!(opts.regional_signal_p > 0.0 && opts.regional_signal_p <= 1.0) ||
+        !std::isfinite(opts.regional_signal_p)) {
+        std::cerr << "Error: --regional-signal-p must be finite and in (0, 1]\n";
+        ok = false;
+    }
+    if (!(opts.regional_coverage > 0.0 && opts.regional_coverage <= 1.0) ||
+        !std::isfinite(opts.regional_coverage)) {
+        std::cerr << "Error: --regional-coverage must be finite and in (0, 1]\n";
+        ok = false;
+    }
+    if (!(opts.regional_high_ld_r2 >= 0.0 && opts.regional_high_ld_r2 <= 1.0) ||
+        !std::isfinite(opts.regional_high_ld_r2)) {
+        std::cerr << "Error: --regional-high-ld-r2 must be finite and between 0 and 1\n";
+        ok = false;
+    }
     if (!ok) std::exit(1);
 
     // Normalize priors
@@ -393,6 +431,11 @@ void parse_args(int argc, char* argv[], Options& opts) {
               << ", weight=" << opts.m1_resid_corr_penalty << "\n";
     std::cout << "  Regional min both:           " << opts.regional_min_both << "\n";
     std::cout << "  Regional min shared:         " << opts.regional_min_shared << "\n";
+    std::cout << "  Regional method:             " << opts.regional_method << "\n";
+    std::cout << "  Regional max signals:        " << opts.regional_max_signals << "\n";
+    std::cout << "  Regional signal p:           " << opts.regional_signal_p << "\n";
+    std::cout << "  Regional credible coverage:  " << opts.regional_coverage << "\n";
+    std::cout << "  Regional high-LD r2:         " << opts.regional_high_ld_r2 << "\n";
     std::cout << "  Allow unresolved selection:  "
               << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
@@ -783,7 +826,10 @@ void write_results(const std::vector<ProteinResult>& results,
          << "P_mediator\tP_mediator_ld_resolved\tP_mediator_identified\t"
          << "P_protein_disease\tP_rf_responsive\tP_rf_direct\t"
          << "regional_n_variants\tregional_PP_shared\tregional_PP_distinct\t"
-         << "regional_shared_given_both\tmediation_identifiability\t"
+         << "regional_shared_given_both\tregional_method\t"
+         << "regional_protein_signals\tregional_outcome_signals\t"
+         << "regional_signal_pairs\tregional_max_credible_set_pair_r2\t"
+         << "mediation_identifiability\t"
          << "beta1\tse_beta1\tbeta2\tse_beta2\tbeta3\tse_beta3\t"
          << "ivw_rf_to_pp_beta\tivw_rf_to_pp_se\tivw_rf_to_pp_p\t"
          << "ivw_pp_to_outcome_beta\tivw_pp_to_outcome_se\tivw_pp_to_outcome_p\t"
@@ -813,6 +859,11 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.regional_n_variants << "\t"
              << r.regional_pp_shared << "\t" << r.regional_pp_distinct << "\t"
              << r.regional_shared_given_both << "\t"
+             << r.regional_method << "\t"
+             << r.regional_protein_signals << "\t"
+             << r.regional_outcome_signals << "\t"
+             << r.regional_signal_pair_count << "\t"
+             << r.regional_max_credible_set_pair_r2 << "\t"
              << r.mediation_identifiability << "\t"
              << r.beta1_est << "\t" << r.beta1_se << "\t"
              << r.beta2_est << "\t" << r.beta2_se << "\t"
@@ -847,6 +898,28 @@ void write_results(const std::vector<ProteinResult>& results,
     }
     fout.close();
     std::cout << "Results saved to " << fname << "\n";
+
+    std::string regional_fname = opts.out_prefix + ".regional";
+    std::ofstream regional_out(regional_fname);
+    regional_out << std::fixed << std::setprecision(6);
+    regional_out
+        << "Protein\tGene\tprotein_signal\toutcome_signal\tprotein_lead\toutcome_lead\t"
+        << "PP_H0\tPP_H1\tPP_H2\tPP_H3\tPP_H4\tshared_given_both\t"
+        << "lead_pair_r2\tmax_credible_set_pair_r2\tinterpretation\n";
+    for (const auto& result : results) {
+        for (const auto& pair : result.regional_signal_pairs) {
+            regional_out << result.protein_id << "\t" << result.gene_name << "\t"
+                         << pair.protein_signal << "\t" << pair.outcome_signal << "\t"
+                         << pair.protein_lead << "\t" << pair.outcome_lead << "\t"
+                         << pair.pp_h0 << "\t" << pair.pp_h1 << "\t" << pair.pp_h2 << "\t"
+                         << pair.pp_h3 << "\t" << pair.pp_h4 << "\t"
+                         << pair.shared_given_both << "\t" << pair.lead_pair_r2 << "\t"
+                         << pair.max_credible_set_pair_r2 << "\t"
+                         << pair.interpretation << "\n";
+        }
+    }
+    regional_out.close();
+    std::cout << "Regional signal pairs saved to " << regional_fname << "\n";
 
     // Hyperparameter file: .hyp
     std::string hfname = opts.out_prefix + ".hyp";
@@ -885,6 +958,11 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "regional_prior_var_outcome\t" << opts.regional_prior_var_outcome << "\n";
     hout << "regional_min_both\t" << opts.regional_min_both << "\n";
     hout << "regional_min_shared\t" << opts.regional_min_shared << "\n";
+    hout << "regional_method\t" << opts.regional_method << "\n";
+    hout << "regional_max_signals\t" << opts.regional_max_signals << "\n";
+    hout << "regional_signal_p\t" << opts.regional_signal_p << "\n";
+    hout << "regional_coverage\t" << opts.regional_coverage << "\n";
+    hout << "regional_high_ld_r2\t" << opts.regional_high_ld_r2 << "\n";
     hout << "allow_unresolved_selection\t"
          << (opts.allow_unresolved_selection ? "YES" : "NO") << "\n";
     hout << "direction_mode\t" << opts.direction_mode << "\n";

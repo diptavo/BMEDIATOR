@@ -13,7 +13,8 @@ if [[ ! -x "$BIN" ]]; then
 fi
 
 mkdir -p "$OUT_DIR"
-rm -f "${OUT_PREFIX}.mediation" "${OUT_PREFIX}.hyp" "${OUT_PREFIX}.instruments"
+rm -f "${OUT_PREFIX}.mediation" "${OUT_PREFIX}.hyp" \
+  "${OUT_PREFIX}.instruments" "${OUT_PREFIX}.regional"
 
 "$BIN" \
   --rf-sumstat "$ROOT/testdata/rf_sumstat.txt" \
@@ -79,6 +80,7 @@ fi
 FULL_DIR="$OUT_DIR/full_mode_fixture"
 FULL_PREFIX="$OUT_DIR/full_mode_run"
 FULL_SINGLE_PREFIX="$OUT_DIR/full_mode_single_run"
+FULL_LEGACY_REGIONAL_PREFIX="$OUT_DIR/full_mode_legacy_regional_run"
 rm -rf "$FULL_DIR"
 python3 "$ROOT/test/generate_full_mode_fixture.py" "$FULL_DIR"
 
@@ -103,17 +105,85 @@ if ! awk -F '\t' '$1=="clump_r2" {found=1; exit !($2==0.05)} END {if (!found) ex
   exit 1
 fi
 
+if ! awk -F '\t' '$1=="regional_method" {found=1; exit !($2=="ld-multisignal")} END {if (!found) exit 1}' "${FULL_PREFIX}.hyp"; then
+  echo "error: LD-aware multi-signal regional method is not the full-mode default" >&2
+  exit 1
+fi
+
+if [[ ! -f "${FULL_PREFIX}.regional" ]]; then
+  echo "error: regional signal-pair output was not created" >&2
+  exit 1
+fi
+
+if ! awk -F '\t' '
+  NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
+  $1=="P_SHARED" {
+    if ($(h["protein_lead"]) == $(h["outcome_lead"]) &&
+        $(h["interpretation"]) == "SHARED_SIGNAL_SUPPORTED") diagonal_shared++
+    if ($(h["protein_lead"]) != $(h["outcome_lead"]) &&
+        $(h["interpretation"]) ~ /^DISTINCT_SIGNALS_/) off_diagonal_distinct++
+  }
+  $1=="P_DISTINCT" && $(h["interpretation"]) ~ /^DISTINCT_SIGNALS_/ {distinct=1}
+  END {exit !(diagonal_shared == 2 && off_diagonal_distinct == 2 && distinct)}
+' "${FULL_PREFIX}.regional"; then
+  echo "error: signal-pair output did not resolve the shared and distinct fixtures" >&2
+  exit 1
+fi
+
+"$BIN" \
+  --rf-sumstat "$FULL_DIR/rf.txt" \
+  --protein-gwas-list "$FULL_DIR/manifest.txt" \
+  --cancer-sumstat "$FULL_DIR/outcome.txt" \
+  --protein-info "$FULL_DIR/protein_info.txt" \
+  --bfile "$FULL_DIR/ldref" \
+  --out "$FULL_LEGACY_REGIONAL_PREFIX" \
+  --regional-method single \
+  --p-thresh-rf 5e-6 \
+  --p-thresh-cis 1e-4 \
+  --cis-window 50 \
+  --clump-r2 0.05 \
+  --min-instruments 1 \
+  --heidi-off \
+  --no-steiger \
+  --max-cavi-iter 80
+
+if ! awk -F '\t' '
+  NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
+  {if ($(h["regional_method"]) != "single" || $(h["regional_signal_pairs"]) != 0) exit 1}
+  END {if (NR != 3) exit 1}
+' "${FULL_LEGACY_REGIONAL_PREFIX}.mediation"; then
+  echo "error: single-causal regional compatibility mode was not preserved" >&2
+  exit 1
+fi
+
 if ! awk -F '\t' '
   NR==1 {for (i=1; i<=NF; ++i) h[$i]=i; next}
   $1=="P_SHARED" {
     found=1
     if ($(h["regional_shared_given_both"]) < 0.80 ||
+        $(h["regional_method"]) != "ld-multisignal" ||
+        $(h["regional_protein_signals"]) != 2 ||
+        $(h["regional_outcome_signals"]) != 2 ||
+        $(h["regional_signal_pairs"]) != 4 ||
         $(h["P_mediator_identified"]) != $(h["P_mediator_ld_resolved"]) ||
         $(h["mediation_identifiability"]) != "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL") exit 1
   }
   END {if (!found) exit 1}
 ' "${FULL_PREFIX}.mediation"; then
   echo "error: shared-signal fixture was not conditionally identified" >&2
+  exit 1
+fi
+
+if "$BIN" \
+  --rf-sumstat "$FULL_DIR/rf.txt" \
+  --protein-gwas-list "$FULL_DIR/manifest.txt" \
+  --cancer-sumstat "$FULL_DIR/outcome.txt" \
+  --protein-info "$FULL_DIR/protein_info.txt" \
+  --bfile "$FULL_DIR/ldref" \
+  --out "$OUT_DIR/invalid_regional_method" \
+  --regional-method unsupported \
+  >/dev/null 2>&1; then
+  echo "error: invalid regional method was accepted" >&2
   exit 1
 fi
 

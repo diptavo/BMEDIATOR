@@ -22,9 +22,12 @@ analytical H3/H4 calculation.
 ## Regional configuration model
 
 Full mode retains all harmonized cis-region variants shared by the protein GWAS,
-outcome GWAS, and PLINK reference. For each variant it computes Wakefield
-approximate Bayes factors for the protein and outcome associations. It then
-integrates over the standard single-causal-variant configurations:
+outcome GWAS, and PLINK reference. The default `ld-multisignal` method extracts
+the regional genotypes from the PLINK panel, computes their signed correlation
+structure, and iteratively selects conditionally associated signals for each
+trait. For each retained signal it conditions on the other lead signals,
+computes Wakefield approximate Bayes factors and a posterior credible set, and
+then evaluates every protein-outcome signal pair under:
 
 - H0: neither trait is associated
 - H1: protein only
@@ -32,10 +35,12 @@ integrates over the standard single-causal-variant configurations:
 - H3: both traits, distinct causal variants
 - H4: both traits, the same causal variant
 
-The output reports `regional_PP_distinct` (H3), `regional_PP_shared` (H4), and
-`regional_shared_given_both` = H4 / (H3 + H4). Resolution requires both
-H3 + H4 >= `--regional-min-both` and the conditional shared or distinct
-probability to exceed `--regional-min-shared`.
+The `.regional` file reports all signal pairs. The `.mediation` regional fields
+report the pair selected for the protein-level decision: a supported shared pair
+takes priority, followed by the strongest supported distinct pair, followed by
+the pair with the largest H3+H4 evidence. Resolution requires H3+H4 >=
+`--regional-min-both` and the conditional shared or distinct probability to
+exceed `--regional-min-shared`.
 
 The default per-variant priors are `p_protein = 10^-4`,
 `p_outcome = 10^-4`, and `p_shared = 10^-8`. Thus
@@ -46,21 +51,21 @@ independence prior is conservative for true mediation but analytically
 defensible for distinguishing shared signal from distinct variants in high LD;
 it was chosen from the prior factorization, not fitted to simulation labels.
 
-This model uses the complete pattern of marginal associations across the
-region. Under the single-causal-variant assumption, that pattern contains the
-information needed to compare a shared causal variant with distinct variants
-in LD; an LD matrix does not enter the approximate-BF formula directly. The
-PLINK panel is still required for allele alignment, instrument clumping, proxy
-handling, and LD QC.
+The LD matrix now enters the regional calculation directly through conditional
+association statistics, signal separation, lead-pair LD, and credible-set-pair
+LD. `--regional-method single` reproduces the previous marginal one-causal
+calculation for compatibility; it should not be used as the primary analysis
+in regions with allelic heterogeneity.
 
 ## Conditional identification assumptions
 
 `LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL` means that the data support
 M1 and H4 under all of these assumptions:
 
-- At most one causal protein variant and one causal outcome variant occur in the
-  tested region, or the region has already been conditioned into single-signal
-  components.
+- The reference-panel LD is a sufficiently accurate estimate of the LD in both
+  GWAS samples for conditional signal separation.
+- The conditional signal threshold and maximum signal count do not omit a
+  material protein or outcome signal.
 - The retained RF instruments are independent at the configured LD threshold,
   the cis-only signal is sufficiently strong, and weak-instrument bias is
   negligible.
@@ -86,6 +91,10 @@ can produce a confident but incorrect result.
 - `LD_DISTINCT_SUPPORTED`: distinct protein and outcome causal configurations
   are favored; mediation selection is disabled.
 - `LD_CONFIGURATION_AMBIGUOUS`: H3 versus H4 is not resolved.
+- `UNRESOLVED_NO_OUTCOME_SIGNAL`: no outcome signal passes the conditional
+  regional signal threshold.
+- `UNRESOLVED_NO_PROTEIN_SIGNAL`: no protein signal passes the conditional
+  regional signal threshold.
 - `UNRESOLVED_WEAK_REGIONAL_EVIDENCE`: there is insufficient evidence that both
   traits are associated in the region.
 - `UNRESOLVED_INSUFFICIENT_*_INSTRUMENTS`: shared signal is supported but the
@@ -99,7 +108,10 @@ be used only for exploratory compatibility analyses.
 
 ## Multiple causal signals
 
-The present regional calculation is not a multi-signal fine-mapping method. A
-region with allelic heterogeneity must be conditioned or fine-mapped into
-single-signal components before confirmatory interpretation. Native multi-signal
-regional inference is planned but should not be claimed for this release.
+Native conditional multi-signal inference is the full-mode default. It is a
+summary-statistic conditional fine-mapping approximation, not an implementation
+of SuSiE. A prior-matched SuSiE/coloc comparison on the bundled UKB-PPP and
+deCODE examples agreed on the positive shared PCSK9 result but was more decisive
+for distinct IL6R signals. The native method conservatively left IL6R ambiguous.
+Scientific validation against broader architectures and ancestry-matched LD
+panels remains required.

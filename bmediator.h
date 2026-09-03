@@ -62,6 +62,22 @@ struct SumStat {
     int    bp;
 };
 
+struct RegionalSignalPairResult {
+    int protein_signal = 0;
+    int outcome_signal = 0;
+    std::string protein_lead;
+    std::string outcome_lead;
+    double pp_h0 = 0.0;
+    double pp_h1 = 0.0;
+    double pp_h2 = 0.0;
+    double pp_h3 = 0.0;
+    double pp_h4 = 0.0;
+    double shared_given_both = 0.0;
+    double lead_pair_r2 = 0.0;
+    double max_credible_set_pair_r2 = 0.0;
+    std::string interpretation;
+};
+
 // Per-protein data: three instrument sets (A, B, C)
 struct ProteinData {
     std::string protein_id;
@@ -108,8 +124,19 @@ struct ProteinData {
     std::vector<double> regional_pp_se;
     std::vector<double> regional_outcome_beta;
     std::vector<double> regional_outcome_se;
+    std::vector<int> regional_bim_index;
     bool regional_data_complete = false;
     bool ld_reference_used = false;
+    bool regional_multisignal_evaluated = false;
+    std::string regional_method = "single";
+    int regional_protein_signals = 0;
+    int regional_outcome_signals = 0;
+    double regional_best_pp_shared = 0.0;
+    double regional_best_pp_distinct = 0.0;
+    double regional_best_shared_given_both = 0.0;
+    double regional_best_cs_pair_r2 = 0.0;
+    std::string regional_multisignal_interpretation;
+    std::vector<RegionalSignalPairResult> regional_signal_pairs;
 
     int nC_exact = 0;
     int nC_proxy = 0;
@@ -205,13 +232,18 @@ struct ProteinResult {
     // Deprecated compatibility alias for prob_mediator_ld_resolved.
     double prob_mediator_identified;
 
-    // Regional single-causal-variant shared-versus-distinct evidence.
-    // This resolves LD-confounded distinct signals, but shared signal is evidence
-    // for mediation only conditional on exclusion/valid-instrument assumptions.
+    // Regional shared-versus-distinct evidence. Full mode uses LD-aware
+    // conditional multi-signal inference by default.
     int regional_n_variants;
     double regional_pp_shared;
     double regional_pp_distinct;
     double regional_shared_given_both;
+    std::string regional_method;
+    int regional_protein_signals;
+    int regional_outcome_signals;
+    int regional_signal_pair_count;
+    double regional_max_credible_set_pair_r2;
+    std::vector<RegionalSignalPairResult> regional_signal_pairs;
     std::string mediation_identifiability;
 
     // Estimates under M=1 (true mediation)
@@ -327,6 +359,11 @@ struct Options {
     double regional_prior_var_outcome;
     double regional_min_both;       // minimum P(shared or distinct)
     double regional_min_shared;     // minimum P(shared | both associated)
+    std::string regional_method;     // ld-multisignal or single
+    int regional_max_signals;
+    double regional_signal_p;
+    double regional_coverage;
+    double regional_high_ld_r2;
     bool allow_unresolved_selection;
 
     // Output
@@ -354,7 +391,9 @@ struct Options {
         regional_prior_pp(1e-4), regional_prior_outcome(1e-4),
         regional_prior_shared(1e-8), regional_prior_var_pp(0.04),
         regional_prior_var_outcome(0.04), regional_min_both(0.80),
-        regional_min_shared(0.80),
+        regional_min_shared(0.80), regional_method("ld-multisignal"),
+        regional_max_signals(10), regional_signal_p(5e-6),
+        regional_coverage(0.95), regional_high_ld_r2(0.80),
         allow_unresolved_selection(false),
         out_prefix("bmediator"), threads(1), verbose(false) {}
 };

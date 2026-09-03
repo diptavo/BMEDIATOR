@@ -49,6 +49,13 @@ inline double wakefield_log_abf(double beta, double se, double prior_variance) {
 inline RegionalEvidence compute_regional_evidence(const ProteinData& prot,
                                                    const Options& opts) {
     RegionalEvidence result;
+    if (prot.regional_multisignal_evaluated) {
+        result.n_variants = static_cast<int>(prot.regional_cis_rsid.size());
+        result.pp_shared = prot.regional_best_pp_shared;
+        result.pp_distinct = prot.regional_best_pp_distinct;
+        result.shared_given_both = prot.regional_best_shared_given_both;
+        return result;
+    }
     if (!prot.regional_data_complete) return result;
 
     std::vector<double> log_bf_pp;
@@ -1303,8 +1310,43 @@ ProteinResult analyze_protein(const ProteinData& prot,
     res.regional_pp_shared = regional.pp_shared;
     res.regional_pp_distinct = regional.pp_distinct;
     res.regional_shared_given_both = regional.shared_given_both;
+    res.regional_method = prot.regional_multisignal_evaluated
+        ? "ld-multisignal" : "single";
+    res.regional_protein_signals = prot.regional_protein_signals;
+    res.regional_outcome_signals = prot.regional_outcome_signals;
+    res.regional_signal_pair_count = static_cast<int>(prot.regional_signal_pairs.size());
+    res.regional_max_credible_set_pair_r2 = prot.regional_best_cs_pair_r2;
+    res.regional_signal_pairs = prot.regional_signal_pairs;
     if (!prot.ld_reference_used) {
         res.mediation_identifiability = "UNRESOLVED_NO_LD_REFERENCE";
+    } else if (prot.regional_multisignal_evaluated) {
+        const std::string& interpretation = prot.regional_multisignal_interpretation;
+        if (interpretation == "SHARED_SIGNAL_SUPPORTED") {
+            if (n_rf_to_pp >= 2 && prot.nB() >= 1) {
+                res.mediation_identifiability =
+                    "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
+            } else if (n_rf_to_pp < 2 && prot.nB() < 1) {
+                res.mediation_identifiability =
+                    "UNRESOLVED_INSUFFICIENT_RF_AND_CIS_INSTRUMENTS";
+            } else if (n_rf_to_pp < 2) {
+                res.mediation_identifiability =
+                    "UNRESOLVED_INSUFFICIENT_RF_INSTRUMENTS";
+            } else {
+                res.mediation_identifiability =
+                    "UNRESOLVED_INSUFFICIENT_CIS_INSTRUMENTS";
+            }
+        } else if (interpretation == "DISTINCT_SIGNALS_HIGH_LD" ||
+                   interpretation == "DISTINCT_SIGNALS_LOW_MODERATE_LD") {
+            res.mediation_identifiability = "LD_DISTINCT_SUPPORTED";
+        } else if (interpretation == "NO_OUTCOME_CREDIBLE_SET") {
+            res.mediation_identifiability = "UNRESOLVED_NO_OUTCOME_SIGNAL";
+        } else if (interpretation == "NO_PROTEIN_CREDIBLE_SET") {
+            res.mediation_identifiability = "UNRESOLVED_NO_PROTEIN_SIGNAL";
+        } else if (interpretation == "NO_REGIONAL_DATA") {
+            res.mediation_identifiability = "UNRESOLVED_NO_REGIONAL_DATA";
+        } else {
+            res.mediation_identifiability = "LD_CONFIGURATION_AMBIGUOUS";
+        }
     } else if (!prot.regional_data_complete || regional.n_variants < 2) {
         res.mediation_identifiability = "UNRESOLVED_NO_REGIONAL_DATA";
     } else if (regional.pp_shared + regional.pp_distinct < opts.regional_min_both) {
