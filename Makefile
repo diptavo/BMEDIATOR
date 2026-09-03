@@ -67,7 +67,7 @@ help:
 	@echo "Targets:"
 	@echo "  make              Build bmediator"
 	@echo "  make test         Run the smoke test"
-	@echo "  make test-regional-stress  Run the stochastic genotype/LD smoke stress"
+	@echo "  make test-regional-stress  Run the historical single-signal LD smoke stress"
 	@echo "  make clean        Remove build artifacts"
 	@echo ""
 	@echo "Variables:"

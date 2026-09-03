@@ -9,6 +9,14 @@
 - Add full-mode regional shared-versus-distinct causal-configuration evidence.
 - Replace the default one-causal regional calculation with native LD-aware
   conditional multi-signal fine-mapping and per-signal-pair H0-H4 output.
+- Add a joint regional structural likelihood over RF, protein, and outcome
+  component effects, with signed LD, LD regularization, configurable
+  summary-error correlation, M0-M5 regional evidence, and an explicit
+  correlated-pleiotropy alternative.
+- Prevent cis observations and beta priors from being counted twice when the
+  joint regional and independent genome-wide likelihood blocks are combined.
+- Require at least two regional components before joint evidence contributes to
+  structural ranking; report a one-component locus as unresolved.
 - Add `.regional` output with lead variants, signal-pair posteriors, and
   credible-set cross-LD diagnostics; retain `--regional-method single` for
   compatibility.

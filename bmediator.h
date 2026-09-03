@@ -125,10 +125,20 @@ struct ProteinData {
     std::vector<double> regional_outcome_beta;
     std::vector<double> regional_outcome_se;
     std::vector<int> regional_bim_index;
+    // Three-trait intersection used only by the joint structural likelihood.
+    std::vector<std::string> regional_joint_rsid;
+    std::vector<double> regional_joint_rf_beta;
+    std::vector<double> regional_joint_rf_se;
+    std::vector<double> regional_joint_pp_beta;
+    std::vector<double> regional_joint_pp_se;
+    std::vector<double> regional_joint_outcome_beta;
+    std::vector<double> regional_joint_outcome_se;
+    std::vector<int> regional_joint_bim_index;
     bool regional_data_complete = false;
     bool ld_reference_used = false;
     bool regional_multisignal_evaluated = false;
     std::string regional_method = "single";
+    int regional_rf_signals = 0;
     int regional_protein_signals = 0;
     int regional_outcome_signals = 0;
     double regional_best_pp_shared = 0.0;
@@ -137,6 +147,16 @@ struct ProteinData {
     double regional_best_cs_pair_r2 = 0.0;
     std::string regional_multisignal_interpretation;
     std::vector<RegionalSignalPairResult> regional_signal_pairs;
+    bool regional_joint_evaluated = false;
+    int regional_joint_n_variants = 0;
+    int regional_joint_components = 0;
+    double regional_joint_condition_number = 0.0;
+    std::string regional_joint_status;
+    std::vector<double> regional_joint_log_bf = std::vector<double>(6, 0.0);
+    std::vector<double> regional_joint_beta = std::vector<double>(3, 0.0);
+    std::vector<double> regional_joint_beta_se = std::vector<double>(3, 0.0);
+    std::vector<double> regional_joint_scenario_beta = std::vector<double>(18, 0.0);
+    std::vector<double> regional_joint_scenario_beta_se = std::vector<double>(18, 0.0);
 
     int nC_exact = 0;
     int nC_proxy = 0;
@@ -239,11 +259,22 @@ struct ProteinResult {
     double regional_pp_distinct;
     double regional_shared_given_both;
     std::string regional_method;
+    int regional_rf_signals;
     int regional_protein_signals;
     int regional_outcome_signals;
     int regional_signal_pair_count;
     double regional_max_credible_set_pair_r2;
     std::vector<RegionalSignalPairResult> regional_signal_pairs;
+    int regional_joint_n_variants;
+    int regional_joint_components;
+    double regional_joint_condition_number;
+    std::string regional_joint_status;
+    double regional_joint_log_bf_M0;
+    double regional_joint_log_bf_M1;
+    double regional_joint_log_bf_M2;
+    double regional_joint_log_bf_M3;
+    double regional_joint_log_bf_M4;
+    double regional_joint_log_bf_M5;
     std::string mediation_identifiability;
 
     // Estimates under M=1 (true mediation)
@@ -359,11 +390,17 @@ struct Options {
     double regional_prior_var_outcome;
     double regional_min_both;       // minimum P(shared or distinct)
     double regional_min_shared;     // minimum P(shared | both associated)
-    std::string regional_method;     // ld-multisignal or single
+    std::string regional_method;     // joint-ld, ld-multisignal, or single
     int regional_max_signals;
     double regional_signal_p;
     double regional_coverage;
     double regional_high_ld_r2;
+    double regional_prior_var_rf;
+    double regional_ld_shrinkage;
+    double overlap_rf_protein;
+    double overlap_rf_outcome;
+    double overlap_protein_outcome;
+    double regional_pleiotropy_rho;
     bool allow_unresolved_selection;
 
     // Output
@@ -391,9 +428,12 @@ struct Options {
         regional_prior_pp(1e-4), regional_prior_outcome(1e-4),
         regional_prior_shared(1e-8), regional_prior_var_pp(0.04),
         regional_prior_var_outcome(0.04), regional_min_both(0.80),
-        regional_min_shared(0.80), regional_method("ld-multisignal"),
+        regional_min_shared(0.80), regional_method("joint-ld"),
         regional_max_signals(10), regional_signal_p(5e-6),
         regional_coverage(0.95), regional_high_ld_r2(0.80),
+        regional_prior_var_rf(0.04), regional_ld_shrinkage(0.05),
+        overlap_rf_protein(0.0), overlap_rf_outcome(0.0),
+        overlap_protein_outcome(0.0), regional_pleiotropy_rho(0.5),
         allow_unresolved_selection(false),
         out_prefix("bmediator"), threads(1), verbose(false) {}
 };

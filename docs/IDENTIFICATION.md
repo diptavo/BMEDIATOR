@@ -1,33 +1,91 @@
 # Identification and LD Resolution
 
-BMEDIATOR separates two questions that must not be conflated:
+BMEDIATOR separates three questions:
 
-1. Does the six-state structural model favor M1 over M0-M5?
-2. Is the observed protein-outcome association compatible with one shared
-   regional causal signal rather than two distinct causal signals in LD?
+1. Which structural scenario (M0-M5) best explains the RF, protein, and outcome
+   summary statistics?
+2. Do the regional protein and outcome associations arise from shared or
+   distinct conditional signals?
+3. Does the locus contain enough independent information to distinguish a
+   mediated path from LD and modeled correlated pleiotropy?
 
-`P_M1` answers the first question. It is structural model support, not by itself
-an identified probability of mediation. `P_mediator_ld_resolved` is nonzero only
-when the second question passes, at least two independent observed RF-to-protein
-instruments are available, and a cis-only protein instrument exists. It remains
-conditional on the assumptions below. `P_mediator_identified` is retained as a
-deprecated compatibility alias and must not be read as assumption-free proof.
+`P_M1` answers the first question within the six-state model.
+`regional_PP_shared`, `regional_PP_distinct`, and the `.regional` file address
+the second. `P_mediator_ld_resolved` is equal to `P_M1` only when the regional
+and instrument requirements for the third question pass; otherwise it is zero.
+`P_mediator_identified` is a deprecated compatibility alias.
 
-The `P_M*` values are normalized weights constructed from scenario priors and
-variational evidence lower bounds. They are approximate model probabilities,
-not exact marginal-likelihood posterior probabilities. Their operating
-characteristics must be reported from validation studies separately from the
-analytical H3/H4 calculation.
+The probabilities are approximate model weights. The nonregional evidence is
+a variational evidence lower bound (ELBO), and the joint regional evidence uses
+a Laplace approximation. They are not assumption-free probabilities that a
+biological mechanism is true.
 
-## Regional configuration model
+## Joint LD-aware structural likelihood
 
-Full mode retains all harmonized cis-region variants shared by the protein GWAS,
-outcome GWAS, and PLINK reference. The default `ld-multisignal` method extracts
-the regional genotypes from the PLINK panel, computes their signed correlation
-structure, and iteratively selects conditionally associated signals for each
-trait. For each retained signal it conditions on the other lead signals,
-computes Wakefield approximate Bayes factors and a posterior credible set, and
-then evaluates every protein-outcome signal pair under:
+In full mode, the default `--regional-method joint-ld` retains harmonized RF,
+protein, and outcome statistics for the same variants in the protein cis
+region. This three-trait intersection is distinct from the larger
+protein-outcome intersection used for H3/H4, so missing RF rows cannot change
+the shared-versus-distinct diagnostic. Signed LD is calculated from the PLINK
+reference panel. For each trait, BMEDIATOR iteratively selects conditional lead
+variants. The union of RF, protein, and outcome leads defines the regional
+components.
+
+For a component LD matrix `R`, marginal effect vector `b_t`, and standard-error
+matrix `D_t` for trait `t`, BMEDIATOR forms the approximate joint effects
+
+```text
+theta_hat_t = R_lambda^-1 b_t
+```
+
+where `R_lambda = (1-lambda)R + lambda I`. The transformed sampling covariance
+between traits `s` and `t` is
+
+```text
+Cov(theta_hat_s, theta_hat_t)
+  = eta_st R_lambda^-1 D_s R_lambda D_t R_lambda^-1,
+```
+
+where `eta_st` is a prespecified summary-error correlation. The defaults are
+zero, corresponding to nonoverlapping studies or negligible overlap effects.
+The three supplied correlations must define a positive-definite matrix.
+
+At component `j`, the latent direct genetic effects are `g_j` on RF, `d_j` on
+protein, and `h_j` on outcome. The structural mapping is
+
+```text
+theta_Xj = g_j
+theta_Mj = beta1 g_j + d_j
+theta_Yj = (beta3 + beta1 beta2) g_j + beta2 d_j + h_j.
+```
+
+The latent direct effects have zero-mean normal priors with prespecified
+variances. Under M5, `d_j` and `h_j` additionally have correlation
+`regional_pleiotropy_rho`; under M0-M4 their covariance is zero. Integrating
+`g`, `d`, and `h` gives a multivariate normal likelihood for all three traits
+and all components. Active beta coefficients are optimized for each scenario,
+and a local Hessian supplies the Laplace evidence and approximate coefficient
+uncertainty.
+
+The independent genome-wide block uses Set A instruments in the existing CAVI
+model. Cis-only Set B and overlap Set C observations are removed from that block
+when the joint regional likelihood is available, preventing the same cis data
+from being counted twice. Because both blocks use the same beta priors, their
+approximate posterior overlap is divided by the prior once when combining
+evidence. M1 coefficient estimates combine the two normal posterior
+approximations by the same rule.
+
+At least two regional components are required before joint regional evidence is
+allowed to affect structural model ranking. A one-component locus is reported
+as `UNRESOLVED_SINGLE_COMPONENT`; its calculated regional values are diagnostic
+only.
+
+## Shared-versus-distinct diagnostic
+
+The conditional leads are also fine-mapped separately for protein and outcome.
+For each signal, BMEDIATOR conditions on the other leads, computes Wakefield
+approximate Bayes factors and a credible set, and evaluates every
+protein-outcome signal pair under:
 
 - H0: neither trait is associated
 - H1: protein only
@@ -35,83 +93,81 @@ then evaluates every protein-outcome signal pair under:
 - H3: both traits, distinct causal variants
 - H4: both traits, the same causal variant
 
-The `.regional` file reports all signal pairs. The `.mediation` regional fields
-report the pair selected for the protein-level decision: a supported shared pair
-takes priority, followed by the strongest supported distinct pair, followed by
-the pair with the largest H3+H4 evidence. Resolution requires H3+H4 >=
-`--regional-min-both` and the conditional shared or distinct probability to
-exceed `--regional-min-shared`.
+The `.regional` file reports all pairs. The protein-level decision prioritizes
+a supported shared pair, then a supported distinct pair, then the pair with the
+largest H3+H4 evidence. Resolution requires H3+H4 to meet
+`--regional-min-both` and H4/(H3+H4), or its complement, to meet
+`--regional-min-shared`.
 
-The default per-variant priors are `p_protein = 10^-4`,
-`p_outcome = 10^-4`, and `p_shared = 10^-8`. Thus
-`p_shared = p_protein * p_outcome`: before seeing the regional statistics, the
-two causal-status indicators are independent. This removes the 1,000-fold H4
-enrichment imposed by the commonly used `p_shared = 10^-5` setting. The
-independence prior is conservative for true mediation but analytically
-defensible for distinguishing shared signal from distinct variants in high LD;
-it was chosen from the prior factorization, not fitted to simulation labels.
+The default association priors are `p_protein = 10^-4`,
+`p_outcome = 10^-4`, and `p_shared = 10^-8`. Thus the shared prior equals the
+product of the trait-specific priors instead of imposing prior enrichment for
+colocalization.
 
-The LD matrix now enters the regional calculation directly through conditional
-association statistics, signal separation, lead-pair LD, and credible-set-pair
-LD. `--regional-method single` reproduces the previous marginal one-causal
-calculation for compatibility; it should not be used as the primary analysis
-in regions with allelic heterogeneity.
+`--regional-method ld-multisignal` retains this conditional H0-H4 procedure but
+does not add the joint structural regional likelihood. `--regional-method
+single` retains the earlier one-causal-variant regional calculation. Both are
+compatibility modes.
+
+## What multiple components resolve
+
+Multiple components provide overidentifying evidence because a single set of
+`beta1`, `beta2`, and `beta3` must explain the cross-trait effect pattern across
+independent genetic perturbations. For example, under mediation, independent
+protein components should induce outcome effects proportional to their protein
+effects through a common `beta2`, after accounting for RF and direct outcome
+effects. Two distinct variants merely in LD need not satisfy that pattern once
+their signed LD is included.
+
+Multiple components do not make mediation assumption-free. A horizontal
+pleiotropic mechanism that produces the same proportional effects at every
+component can remain observationally equivalent to mediation. M5 tests one
+prespecified correlated-pleiotropy alternative, but it cannot enumerate every
+biological confounder. External functional, interventional, or replication
+evidence is still needed for a causal biological claim.
 
 ## Conditional identification assumptions
 
-`LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL` means that the data support
-M1 and H4 under all of these assumptions:
+An LD-resolved mediation report depends on all of the following:
 
-- The reference-panel LD is a sufficiently accurate estimate of the LD in both
-  GWAS samples for conditional signal separation.
-- The conditional signal threshold and maximum signal count do not omit a
-  material protein or outcome signal.
-- The retained RF instruments are independent at the configured LD threshold,
-  the cis-only signal is sufficiently strong, and weak-instrument bias is
-  negligible.
-- The exclusion restriction holds: cis instruments affect the outcome through
-  the measured protein, apart from modeled sparse pleiotropy.
-- Same-variant horizontal pleiotropy is absent or adequately represented by M5
-  and the nuisance terms. H4 alone cannot distinguish this from mediation.
-- GWAS alleles and genome builds are aligned, and the LD panel matches the study
-  ancestry.
-- Correlated estimation error from participant overlap between the protein and
-  outcome GWAS is negligible. The current regional model does not estimate that
-  covariance.
+- The reference-panel LD represents the LD in each GWAS sample.
+- The conditional signal procedure has not omitted a material signal.
+- RF instruments are independent at the configured threshold and sufficiently
+  strong; weak-instrument bias is negligible.
+- The exclusion restriction holds apart from nuisance pleiotropy represented
+  by the six-state model.
+- The M5 direct-effect correlation is a scientifically reasonable sensitivity
+  model for correlated pleiotropy.
+- Alleles and genome builds are aligned across all inputs.
+- Supplied overlap correlations adequately represent correlated summary-error
+  noise. Their default of zero is inappropriate when material sample overlap is
+  expected and cannot otherwise be ignored.
+- The normal random-effects priors and Laplace approximation are adequate for
+  the number and magnitude of retained components.
 
-These are scientific assumptions, not quantities that can be learned from the
-same summary statistics without additional design information. Violating them
-can produce a confident but incorrect result.
+These assumptions are not learnable from the same summary statistics alone.
 
 ## Output states
 
-- `LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL`: shared regional signal,
-  at least two RF-to-protein instruments, and a cis-only signal; mediation
-  remains conditional on the exclusion assumptions.
-- `LD_DISTINCT_SUPPORTED`: distinct protein and outcome causal configurations
-  are favored; mediation selection is disabled.
+- `LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL`: the regional shared-signal
+  and instrument eligibility checks pass. The strength of mediation support is
+  still given by `P_M1`.
+- `LD_DISTINCT_SUPPORTED`: distinct protein and outcome configurations are
+  favored; confirmatory mediation selection is disabled.
 - `LD_CONFIGURATION_AMBIGUOUS`: H3 versus H4 is not resolved.
-- `UNRESOLVED_NO_OUTCOME_SIGNAL`: no outcome signal passes the conditional
-  regional signal threshold.
-- `UNRESOLVED_NO_PROTEIN_SIGNAL`: no protein signal passes the conditional
-  regional signal threshold.
-- `UNRESOLVED_WEAK_REGIONAL_EVIDENCE`: there is insufficient evidence that both
-  traits are associated in the region.
-- `UNRESOLVED_INSUFFICIENT_*_INSTRUMENTS`: shared signal is supported but the
-  RF or cis instrument requirement is not met.
+- `UNRESOLVED_SINGLE_COMPONENT`: fewer than two regional components are
+  available for overidentification.
+- `UNRESOLVED_JOINT_MODEL_FAILURE`: the regularized joint likelihood could not
+  be evaluated numerically.
+- `UNRESOLVED_NO_OUTCOME_SIGNAL` or `UNRESOLVED_NO_PROTEIN_SIGNAL`: a trait has
+  no retained conditional regional signal.
+- `UNRESOLVED_INSUFFICIENT_*_INSTRUMENTS`: a shared regional signal is supported
+  but the RF or cis instrument requirement does not pass.
 - `UNRESOLVED_NO_REGIONAL_DATA`: unpruned regional statistics are unavailable.
+- `UNRESOLVED_NO_JOINT_REGIONAL_DATA`: fewer than two variants are shared by
+  all three GWAS and the reference panel.
 - `UNRESOLVED_NO_LD_REFERENCE`: no LD reference was supplied.
 
 Legacy pre-clumped mode cannot provide confirmatory regional resolution.
-`--allow-unresolved-selection` restores the old selection behavior and should
-be used only for exploratory compatibility analyses.
-
-## Multiple causal signals
-
-Native conditional multi-signal inference is the full-mode default. It is a
-summary-statistic conditional fine-mapping approximation, not an implementation
-of SuSiE. A prior-matched SuSiE/coloc comparison on the bundled UKB-PPP and
-deCODE examples agreed on the positive shared PCSK9 result but was more decisive
-for distinct IL6R signals. The native method conservatively left IL6R ambiguous.
-Scientific validation against broader architectures and ancestry-matched LD
-panels remains required.
+`--allow-unresolved-selection` restores exploratory selection without this gate
+and should not be interpreted as identified mediation.
