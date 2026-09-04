@@ -10,12 +10,14 @@ Version 1.2.0-dev
 > production-calibrated mediation claims. See
 > [Validation Status](docs/VALIDATION.md).
 
-> **Current factorized validation:** The frozen 1.36-million-analysis run found
-> valid but zero-power e-BH selection in the tested proteome families, useful
-> Bayesian power only with broad instrument-strength variation, and frequent
-> unresolved effect estimation under slope/intercept collinearity. Accurate
-> ancestry-matched LD remains essential. Version 1.2.0-dev is not a production
-> or publication-ready release.
+> **Current factorized validation:** In the frozen one-million-analysis
+> analytical-repair grid, AdaFilter was powerful but missed its all-null FDR
+> endpoint (0.060 versus the prespecified 0.05 maximum). The direct balanced
+> Student-t/e-BH rule controlled FDR in the tested identifiable cells, but its
+> power was 0.638 in the broad-signal cell and zero in the narrow-signal cell,
+> below the prespecified 0.80 and 0.50 targets. Accurate ancestry-matched LD
+> remains essential. Version 1.2.0-dev is not a production or
+> publication-ready release.
 
 > **Experimental repair:** `--structural-method factorized` separates the two
 > causal legs, residual RF effect, and pleiotropy instead of forcing them into
@@ -117,6 +119,10 @@ instruments for a confirmatory call by default. The key new output columns are
 `factor_PP_two_stage`, `factor_posterior_cum_fdr`,
 `factor_log_BF_directional_XM`, `factor_log_BF_directional_MY`,
 `factor_directional_collinearity_XM`, `factor_directional_collinearity_MY`,
+`factor_balanced_conjunction_p`, `factor_balanced_conjunction_q_AdaFilter`,
+`factor_log_e_XM_balanced`, `factor_log_e_MY_balanced`,
+`factor_log_e_mediation_balanced`, `factor_e_q_balanced_EBH`,
+`factor_log_e_p2e_balanced_mediation`, `factor_e_q_p2e_balanced_EBH`,
 `factor_posterior_status`, `factor_mediation_status`,
 `factor_frequentist_status`, and `factor_ebh_status`. The factorized posterior
 is a fixed-prior working-model probability for two nonzero slopes, not an
@@ -354,6 +360,12 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_conjunction_p, factor_conjunction_q_BY | Intersection-union p-value and proteome-wide BY q-value |
 | factor_min_log_BF | Smaller of the two causal-leg log Bayes factors; not a joint BF |
 | factor_log_e_mediation, factor_e_q_EBH | Minimum causal-leg log e-value and proteome-wide e-BH adjusted value |
+| factor_p_XM_balanced, factor_p_MY_balanced | Experimental residual-scaled leg p-values under mean-zero pleiotropy/InSIDE |
+| factor_balanced_conjunction_p, factor_balanced_conjunction_q_BY | Experimental 2-of-2 balanced-pleiotropy p-value and arbitrary-dependence BY adjustment |
+| factor_balanced_conjunction_q_AdaFilter | Experimental AdaFilter-BH adjustment; conditional on independent legs and weak cross-protein dependence |
+| factor_log_e_XM_balanced, factor_log_e_MY_balanced, factor_log_e_mediation_balanced, factor_e_q_balanced_EBH | Balanced/InSIDE Student-t density-ratio e-values and arbitrary-dependence e-BH adjustment |
+| factor_log_e_p2e_balanced_mediation, factor_e_q_p2e_balanced_EBH | Fixed p-to-e calibration of the balanced 2-of-2 p-value and arbitrary-dependence e-BH adjustment |
+| factor_log_e_XM_adaptive, factor_log_e_MY_adaptive, factor_log_e_mediation_adaptive, factor_e_q_adaptive_EBH | Strict known-covariance Gaussian-mixture e-values and e-BH adjustment |
 | factor_p_XM_strict, factor_p_MY_strict, factor_strict_conjunction_p, factor_strict_conjunction_q_BY | Gaussian score p-values after projecting out an allele-oriented pleiotropic intercept, with BY adjustment |
 | factor_log_BF_directional_XM, factor_log_BF_directional_MY | Evidence for an allele-oriented pleiotropic intercept on each leg, averaged over slope presence |
 | factor_log_BF_slope_only_*, factor_log_BF_directional_only_*, factor_log_BF_slope_directional_* | Component-model log BFs versus the neither-component model, retained for prior sensitivity |
@@ -368,6 +380,7 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_mediation_status | Bayesian two-leg evidence plus instrument and regional identification gates |
 | factor_frequentist_status | Conjunction/BY evidence plus the same identification gates |
 | factor_ebh_status | Safe-e/e-BH evidence plus the same identification gates |
+| factor_balanced_status, factor_adafilter_status, factor_balanced_ebh_status, factor_balanced_p2e_status, factor_adaptive_ebh_status | Assumption-labeled decisions for the experimental analytical calibration tracks |
 | factor_posterior_status | Fixed-prior posterior expected-FDR selection plus identification gates |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |

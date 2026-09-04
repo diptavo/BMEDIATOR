@@ -231,6 +231,74 @@ evidence survived in some distinct-signal runs. An ancestry-matched LD panel
 and explicit mismatch sensitivity analysis are therefore release requirements,
 not optional refinements.
 
+## Analytical-repair LD validation
+
+The frozen 2026-09-04 genotype-based matrix comprised 1,200 analyses: 100
+replicates of four truth scenarios under matched high LD, matched moderate LD,
+and high-to-moderate reference mismatch. All array tasks and the compute-node
+summary completed successfully as Slurm jobs `29061808` and `29061811`.
+
+Under the no-second-stage null, the balanced two-leg nominal rejection rate was
+0.04 with matched high LD and 0.06 with matched moderate LD, satisfying the
+prespecified upper criterion of 0.075. It was 0.07 under deliberate LD mismatch.
+For distinct causal variants in LD, the balanced two-leg test was often positive
+(0.87 in matched high LD and 0.46 in matched moderate LD), as expected because
+both causal legs can exist without mediation. The regional model classified
+these loci as distinct in 0.90 and 0.85 of runs, respectively, and no run
+received final factorized mediation support.
+
+Same-variant pleiotropy and shared mediation remained observationally similar:
+both frequently had balanced two-leg evidence and shared regional signals. The
+final method must therefore continue to label support as exclusion-restriction
+conditional rather than claiming that LD alone distinguishes these mechanisms.
+The compact frozen table is
+`sim/results/analytic_repair_ld_20260904_v1/factorized_ld_stress_summary.tsv`.
+
+## Analytical-repair proteome calibration
+
+The 2026-09-04 confirmatory grid used 200 replicates of 500 jointly analyzed
+proteins in each of ten prespecified cells, for 1,000,000 protein analyses.
+Arrays `29061505` and `29061533` and compute-node summary `29061536`
+completed without failed tasks. The balanced AdaFilter rule retained mean
+power of 0.973 in the broad cell and 0.675 in the narrow cell, with mean FDP
+of 0.0379 and 0.0399. It nevertheless selected at least one false mediator in
+12 of 200 least-favorable all-null families, giving FDR 0.060. This fails the
+frozen requirement of no more than 0.05 and prevents designation of AdaFilter
+as the confirmatory primary method. The estimate is compatible with Monte
+Carlo variation around 0.05, but the endpoint was not passed.
+
+The balanced p-to-e/e-BH candidate was then run from a separately built and
+tested source snapshot as arrays `29066362` and `29066364`, with compute-node
+summary `29066368`. It made no false selections in the broad, narrow,
+least-favorable-null, global-null, heterogeneity, sparse-outlier, dense-
+dependence, or directional-pleiotropy cells. It therefore passed the frozen
+FDR criteria, but mean power was only 0.0969 in the broad cell and zero in the
+narrow cell. It is analytically defensible but not an adequately powered
+replacement.
+
+The direct balanced Student-t/e-BH candidate was frozen before its results and
+run from a separately built and tested source snapshot as arrays `29075015`
+and `29075017`, with compute-node summary `29075025`. All 2,000 array tasks
+completed successfully, producing 1,000,000 protein analyses. At 0.05, mean
+FDP was 0.0021 in the broad cell and zero in every other identifiable valid or
+stress cell; the global and least-favorable all-null cells had no selections.
+It therefore passed the frozen FDR checks in this grid. Mean power was 0.6382
+in the broad cell and zero in the narrow cell, failing the prespecified 0.80
+and 0.50 targets. The rule is materially more powerful than the balanced
+p-to-e transform in broad architectures, but it is still not an adequately
+powered primary method. At the exactly proportional M5 boundary it selected
+in 15 of 200 families; among selected proteins the pooled false fraction was
+0.476, consistent with that boundary being nonidentifiable rather than
+analytically calibratable.
+
+The arbitrary-dependence balanced BY comparator had broad-cell power 0.792 and
+narrow-cell power 0.0038. Directional pleiotropy and exactly proportional M5
+effects remained explicit assumption and identification boundaries. Compact
+tables are retained under `sim/results/analytic_repair_main_20260904_v1/` and
+`sim/results/analytic_repair_p2e_main_20260904_v1/`. The direct Student-t/e-BH
+tables are under
+`sim/results/analytic_repair_balanced_e_main_20260904_v1/`.
+
 ## Release interpretation
 
 - The historical single-signal gate controls the tested distinct-LD failure well
@@ -246,9 +314,11 @@ not optional refinements.
   they do not calibrate real-data results from labels.
 
 Accordingly, 1.2.0-dev is suitable only for research evaluation and transparent
-GitHub development. It is not a production-calibrated release. The `-dev`
-suffix should remain until the frozen factorized posterior rule passes
-held-out calibration, LD-mismatch and interval-coverage criteria, followed by
+GitHub development. It is not a production-calibrated release. AdaFilter does
+not pass the frozen all-null endpoint, while both analytically valid
+dependence-robust candidates fail the frozen power endpoints. The `-dev`
+suffix should remain until a prespecified rule jointly passes held-out FDR and
+power criteria, LD-mismatch and interval-coverage criteria, followed by
 real-data replication checks.
 
 ## Frozen Student-t/effect-validity validation

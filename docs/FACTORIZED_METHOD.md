@@ -212,6 +212,23 @@ or the observed cross-protein p-value distribution. Simulations are still
 required to verify finite-sample behavior and power under departures from the
 working assumptions.
 
+For the separate balanced/InSIDE track, BMEDIATOR forms the 2-of-2 p-value
+`p_balanced=max(p_XM_balanced,p_MY_balanced)` and applies the same frozen
+calibrator mixture directly to that valid union-null p-value. The resulting
+`factor_log_e_p2e_balanced_mediation` is passed to e-BH across proteins and
+reported as `factor_e_q_p2e_balanced_EBH`. This route does not require
+independence between the two legs or across proteins, but it does require the
+balanced/InSIDE and scalar-dispersion assumptions used to obtain the base leg
+p-values. See `docs/ANALYTICAL_CALIBRATION.md` for the full derivation and the
+AdaFilter comparator.
+
+The direct balanced e-value applies the prespecified Student-t
+alternative-density mixture to each residual-scaled balanced leg statistic,
+uses `min(E_XM_balanced,E_MY_balanced)` for the mediation union null, and
+applies e-BH. Unlike the p-to-e conversion, this retains more of the score
+magnitude; unlike AdaFilter, its FDR theorem permits arbitrary dependence. It
+retains the balanced/InSIDE and common scalar-dispersion assumptions.
+
 ## Safe e-values and e-BH
 
 Let `T` be the residual-scaled statistic above and `nu=n-2`. Under the leg null,
@@ -315,6 +332,15 @@ small-sample t test answer different questions.
 `factor_ebh_status` reports whether the safe mediation e-value passed e-BH and
 then records the same identification conditions. It is deliberately separate
 from the Bayes-factor evidence status.
+
+`factor_balanced_p2e_status` analogously combines balanced p-to-e/e-BH evidence
+with the identification gates. The e-BH theorem applies to the pre-gate
+two-leg family selected through `factor_e_q_p2e_balanced_EBH`; it does not imply
+a separate FDR theorem for the post-gate status subset.
+
+`factor_balanced_ebh_status` applies the same interpretation to the direct
+balanced Student-t e-value. Its formal guarantee likewise belongs to the
+pre-gate family selected by `factor_e_q_balanced_EBH`.
 
 `factor_posterior_status` reports the fixed-prior posterior expected-FDR rule
 and then applies the same regional and heterogeneity interpretation gates.

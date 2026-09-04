@@ -261,7 +261,9 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
         "cell", "scenario", "n", "mean_realized_causal_pair_ld", "mean_nA", "mean_nB",
         "mean_cross_set_max_r2",
         "finite_two_leg_rate", "stable_effect_rate", "numerical_failure_rate",
-        "two_leg_p_rate", "two_leg_BF_rate", "two_leg_e_rate", "regional_shared_rate",
+        "two_leg_p_rate", "two_leg_BF_rate", "two_leg_e_rate",
+        "balanced_two_leg_p_rate", "balanced_e_rate", "balanced_p2e_e_rate",
+        "adaptive_two_leg_e_rate", "regional_shared_rate",
         "regional_single_shared_rate", "regional_distinct_rate",
         "mean_independent_shared_signals", "my_heterogeneity_BF_rate",
         "factor_supported_rate", "factor_unresolved_single_rate",
@@ -302,6 +304,22 @@ def write_summary(path: Path, rows: list[dict[str, object]]) -> None:
                 "two_leg_p_rate": np.mean([float(row["factor_conjunction_p"]) <= 0.05 for row in group]),
                 "two_leg_BF_rate": np.mean([float(row["factor_min_log_BF"]) >= math.log(10.0) for row in group]),
                 "two_leg_e_rate": np.mean([float(row["factor_log_e_mediation"]) >= math.log(20.0) for row in group]),
+                "balanced_two_leg_p_rate": np.mean([
+                    float(row.get("factor_balanced_conjunction_p", math.nan)) <= 0.05
+                    for row in group
+                ]),
+                "balanced_p2e_e_rate": np.mean([
+                    float(row.get("factor_e_q_p2e_balanced_EBH", math.nan)) <= 0.05
+                    for row in group
+                ]),
+                "balanced_e_rate": np.mean([
+                    float(row.get("factor_e_q_balanced_EBH", math.nan)) <= 0.05
+                    for row in group
+                ]),
+                "adaptive_two_leg_e_rate": np.mean([
+                    float(row.get("factor_log_e_mediation_adaptive", math.nan)) >= math.log(20.0)
+                    for row in group
+                ]),
                 "regional_shared_rate": np.mean([row["mediation_identifiability"] == "OVERIDENTIFIED_SHARED_SIGNALS_ASSUMPTION_CONDITIONAL" for row in group]),
                 "regional_single_shared_rate": np.mean([row["mediation_identifiability"] == "UNRESOLVED_SINGLE_SHARED_SIGNAL" for row in group]),
                 "regional_distinct_rate": np.mean([row["mediation_identifiability"] == "LD_DISTINCT_SUPPORTED" for row in group]),
@@ -387,6 +405,14 @@ def main() -> None:
                     "factor_conjunction_p": as_float(result, "factor_conjunction_p"),
                     "factor_min_log_BF": as_float(result, "factor_min_log_BF"),
                     "factor_log_e_mediation": as_float(result, "factor_log_e_mediation"),
+                    "factor_p_XM_balanced": as_float(result, "factor_p_XM_balanced"),
+                    "factor_p_MY_balanced": as_float(result, "factor_p_MY_balanced"),
+                    "factor_balanced_conjunction_p": as_float(
+                        result, "factor_balanced_conjunction_p"
+                    ),
+                    "factor_log_e_mediation_adaptive": as_float(
+                        result, "factor_log_e_mediation_adaptive"
+                    ),
                     "factor_log_BF_heterogeneity_MY": as_float(
                         result, "factor_log_BF_heterogeneity_MY"
                     ),

@@ -320,6 +320,18 @@ struct ProteinResult {
     double factor_cross_set_max_r2;
     double factor_log_e_xm, factor_log_e_my, factor_log_e_xy;
     double factor_log_e_mediation, factor_e_q_ebh;
+    // Experimental analytical calibration tracks. The balanced score assumes
+    // mean-zero (InSIDE) pleiotropy. The adaptive e-value retains the oriented
+    // intercept but treats the reported outcome covariance as known.
+    double factor_p_xm_balanced, factor_p_my_balanced;
+    double factor_balanced_conjunction_p, factor_balanced_conjunction_q_by;
+    double factor_balanced_conjunction_q_adafilter;
+    double factor_log_e_xm_balanced, factor_log_e_my_balanced;
+    double factor_log_e_mediation_balanced, factor_e_q_balanced_ebh;
+    double factor_log_e_p2e_balanced_mediation;
+    double factor_e_q_p2e_balanced_ebh;
+    double factor_log_e_xm_adaptive, factor_log_e_my_adaptive;
+    double factor_log_e_mediation_adaptive, factor_e_q_adaptive_ebh;
     double factor_tau_xm, factor_tau_my, factor_tau_xy;
     double factor_indirect, factor_indirect_se;
     double factor_indirect_ci_lower, factor_indirect_ci_upper;
@@ -342,6 +354,11 @@ struct ProteinResult {
     std::string factor_strict_status;
     std::string factor_p2e_status;
     std::string factor_ebh_status;
+    std::string factor_balanced_status;
+    std::string factor_adafilter_status;
+    std::string factor_balanced_ebh_status;
+    std::string factor_balanced_p2e_status;
+    std::string factor_adaptive_ebh_status;
     std::string factor_posterior_status;
 
     // EB sufficient-stat approximations from the M1 fit

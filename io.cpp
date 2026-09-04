@@ -1021,7 +1021,9 @@ void write_results(const std::vector<ProteinResult>& results,
         return;
     }
 
-    fout << std::fixed << std::setprecision(6);
+    // Preserve genome-wide p-values and e-values rather than rounding values
+    // below 5e-7 to zero in the tabular output.
+    fout << std::setprecision(10);
     fout << "Protein\tGene\tnA\tnB\tnC\tnC_exact\tnC_proxy\tn_rf_to_pp_obs\trf_to_pp_identifiable\t"
          << "P_M0\tP_M1\tP_M2\tP_M3\tP_M4\tP_M5\t"
          << "P_mediator\tP_mediator_ld_resolved\tP_mediator_identified\t"
@@ -1067,6 +1069,15 @@ void write_results(const std::vector<ProteinResult>& results,
          << "factor_conjunction_q_BY\tfactor_strict_conjunction_p\t"
          << "factor_strict_conjunction_q_BY\tfactor_min_log_BF\t"
          << "factor_log_e_mediation\tfactor_e_q_EBH\t"
+         << "factor_p_XM_balanced\tfactor_p_MY_balanced\t"
+         << "factor_balanced_conjunction_p\tfactor_balanced_conjunction_q_BY\t"
+         << "factor_balanced_conjunction_q_AdaFilter\t"
+         << "factor_log_e_XM_balanced\tfactor_log_e_MY_balanced\t"
+         << "factor_log_e_mediation_balanced\tfactor_e_q_balanced_EBH\t"
+         << "factor_log_e_p2e_balanced_mediation\t"
+         << "factor_e_q_p2e_balanced_EBH\t"
+         << "factor_log_e_XM_adaptive\tfactor_log_e_MY_adaptive\t"
+         << "factor_log_e_mediation_adaptive\tfactor_e_q_adaptive_EBH\t"
          << "factor_log_e_p2e_mediation\tfactor_e_q_p2e_EBH\t"
          << "factor_PP_XM\tfactor_PP_MY\tfactor_PP_two_stage\t"
          << "factor_posterior_local_fdr\tfactor_posterior_cum_fdr\t"
@@ -1077,7 +1088,11 @@ void write_results(const std::vector<ProteinResult>& results,
          << "factor_pattern\t"
          << "factor_two_stage_status\tfactor_mediation_status\t"
          << "factor_frequentist_status\tfactor_strict_status\t"
-         << "factor_p2e_status\tfactor_ebh_status\tfactor_posterior_status\t"
+         << "factor_p2e_status\tfactor_ebh_status\t"
+         << "factor_balanced_status\tfactor_adafilter_status\t"
+         << "factor_balanced_ebh_status\t"
+         << "factor_balanced_p2e_status\t"
+         << "factor_adaptive_ebh_status\tfactor_posterior_status\t"
          << "mediated_effect\tse_mediated\t"
          << "ELBO_M0\tELBO_M1\tELBO_M2\tELBO_M3\tELBO_M4\tELBO_M5\t"
          << "converged\n";
@@ -1174,6 +1189,21 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.factor_strict_conjunction_q_by << "\t"
              << r.factor_min_log_bf << "\t"
              << r.factor_log_e_mediation << "\t" << r.factor_e_q_ebh << "\t"
+             << r.factor_p_xm_balanced << "\t"
+             << r.factor_p_my_balanced << "\t"
+             << r.factor_balanced_conjunction_p << "\t"
+             << r.factor_balanced_conjunction_q_by << "\t"
+             << r.factor_balanced_conjunction_q_adafilter << "\t"
+             << r.factor_log_e_xm_balanced << "\t"
+             << r.factor_log_e_my_balanced << "\t"
+             << r.factor_log_e_mediation_balanced << "\t"
+             << r.factor_e_q_balanced_ebh << "\t"
+             << r.factor_log_e_p2e_balanced_mediation << "\t"
+             << r.factor_e_q_p2e_balanced_ebh << "\t"
+             << r.factor_log_e_xm_adaptive << "\t"
+             << r.factor_log_e_my_adaptive << "\t"
+             << r.factor_log_e_mediation_adaptive << "\t"
+             << r.factor_e_q_adaptive_ebh << "\t"
              << r.factor_log_e_p2e_mediation << "\t"
              << r.factor_e_q_p2e_ebh << "\t"
              << r.factor_pp_xm << "\t" << r.factor_pp_my << "\t"
@@ -1189,7 +1219,13 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.factor_two_stage_status << "\t"
              << r.factor_mediation_status << "\t" << r.factor_frequentist_status << "\t"
              << r.factor_strict_status << "\t" << r.factor_p2e_status << "\t"
-             << r.factor_ebh_status << "\t" << r.factor_posterior_status << "\t"
+             << r.factor_ebh_status << "\t"
+             << r.factor_balanced_status << "\t"
+             << r.factor_adafilter_status << "\t"
+             << r.factor_balanced_ebh_status << "\t"
+             << r.factor_balanced_p2e_status << "\t"
+             << r.factor_adaptive_ebh_status << "\t"
+             << r.factor_posterior_status << "\t"
              << r.mediated_effect << "\t" << r.mediated_effect_se << "\t"
              << r.elbo_M0 << "\t" << r.elbo_M1 << "\t"
              << r.elbo_M2 << "\t" << r.elbo_M3 << "\t"
@@ -1288,6 +1324,14 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "factor_e_method\tstudent-t-density-ratio-mixture\n";
     hout << "factor_e_shift_grid\t2,4,6\n";
     hout << "factor_e_scale_grid\t2,4,8\n";
+    hout << "factor_balanced_model\tmean-zero-InSIDE-scalar-dispersion\n";
+    hout << "factor_balanced_e_method\tstudent-t-density-ratio-mixture\n";
+    hout << "factor_adafilter_method\t2-of-2-AdaFilter-BH\n";
+    hout << "factor_adafilter_assumption\tindependent-legs-weak-across-protein-dependence\n";
+    hout << "factor_balanced_p2e_method\tfixed-p-to-e-conjunction-eBH\n";
+    hout << "factor_balanced_p2e_assumption\tmean-zero-InSIDE-scalar-dispersion\n";
+    hout << "factor_adaptive_e_method\tknown-covariance-oriented-intercept-normal-mixture\n";
+    hout << "factor_adaptive_e_g_grid\t0.25,1,4,16\n";
     hout << "factor_p2e_calibrator\tmixture(0.10,0.25,0.50,0.75)\n";
     hout << "factor_independent_selection\t"
          << (opts.factor_independent_selection ? "YES" : "NO") << "\n";

@@ -24,6 +24,9 @@ struct FactorFit {
     double directional_intercept_se = std::numeric_limits<double>::quiet_NaN();
     double directional_collinearity = std::numeric_limits<double>::quiet_NaN();
     double log_e = std::numeric_limits<double>::quiet_NaN();
+    double p_balanced = std::numeric_limits<double>::quiet_NaN();
+    double log_e_balanced = std::numeric_limits<double>::quiet_NaN();
+    double log_e_adaptive = std::numeric_limits<double>::quiet_NaN();
     double tau = std::numeric_limits<double>::quiet_NaN();
     int n = 0;
     bool effect_valid = false;
@@ -36,6 +39,7 @@ struct ScoreFit {
     double dispersion = std::numeric_limits<double>::quiet_NaN();
     double statistic = std::numeric_limits<double>::quiet_NaN();
     double log_e = std::numeric_limits<double>::quiet_NaN();
+    double log_e_adaptive = std::numeric_limits<double>::quiet_NaN();
     bool valid = false;
 };
 
@@ -159,6 +163,24 @@ double student_t_mixture_log_e(double statistic, double df) {
            log_null;
 }
 
+// Conditional on the exposure associations, this is a fixed mixture of
+// Gaussian likelihood ratios for a N(0, 1) score. Each component uses a
+// normal prior with signal-to-noise variance g. The mixture is therefore an
+// e-value under the strict known-covariance null, while adapting its effect
+// prior to the information in the exposure associations rather than to the
+// observed outcome associations.
+double normal_information_mixture_log_e(double statistic) {
+    if (!std::isfinite(statistic)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    std::vector<double> terms;
+    for (double g : {0.25, 1.0, 4.0, 16.0}) {
+        terms.push_back(-0.5 * std::log1p(g) +
+                        0.5 * (g / (1.0 + g)) * statistic * statistic);
+    }
+    return log_sum_exp(terms) - std::log(static_cast<double>(terms.size()));
+}
+
 Matrix identity_matrix(int n) {
     Matrix result(n, std::vector<double>(n, 0.0));
     for (int i = 0; i < n; ++i) result[i][i] = 1.0;
@@ -249,7 +271,8 @@ std::vector<double> whiten(const Matrix& lower, const std::vector<double>& value
 ScoreFit gls_score(const std::vector<double>& x,
                    const std::vector<double>& y,
                    const std::vector<double>& se_y,
-                   const Matrix& ld) {
+                   const Matrix& ld,
+                   bool project_directional_intercept) {
     ScoreFit result;
     const int n = static_cast<int>(x.size());
     Matrix covariance(n, std::vector<double>(n, 0.0));
@@ -265,20 +288,23 @@ ScoreFit gls_score(const std::vector<double>& x,
     }
     const auto wx = whiten(lower, x);
     const auto wy = whiten(lower, y);
-    std::vector<double> orientation(n, 1.0);
-    for (int i = 0; i < n; ++i) orientation[i] = x[i] < 0.0 ? -1.0 : 1.0;
-    const auto ws = whiten(lower, orientation);
-    const double ss = std::inner_product(ws.begin(), ws.end(), ws.begin(), 0.0);
-    const double xs = std::inner_product(wx.begin(), wx.end(), ws.begin(), 0.0);
-    const double ys = std::inner_product(wy.begin(), wy.end(), ws.begin(), 0.0);
-    if (!(ss > 0.0) || !std::isfinite(ss) || !std::isfinite(xs) ||
-        !std::isfinite(ys)) {
-        return result;
-    }
-    std::vector<double> rx(n), ry(n);
-    for (int i = 0; i < n; ++i) {
-        rx[i] = wx[i] - (xs / ss) * ws[i];
-        ry[i] = wy[i] - (ys / ss) * ws[i];
+    std::vector<double> rx = wx;
+    std::vector<double> ry = wy;
+    if (project_directional_intercept) {
+        std::vector<double> orientation(n, 1.0);
+        for (int i = 0; i < n; ++i) orientation[i] = x[i] < 0.0 ? -1.0 : 1.0;
+        const auto ws = whiten(lower, orientation);
+        const double ss = std::inner_product(ws.begin(), ws.end(), ws.begin(), 0.0);
+        const double xs = std::inner_product(wx.begin(), wx.end(), ws.begin(), 0.0);
+        const double ys = std::inner_product(wy.begin(), wy.end(), ws.begin(), 0.0);
+        if (!(ss > 0.0) || !std::isfinite(ss) || !std::isfinite(xs) ||
+            !std::isfinite(ys)) {
+            return result;
+        }
+        for (int i = 0; i < n; ++i) {
+            rx[i] -= (xs / ss) * ws[i];
+            ry[i] -= (ys / ss) * ws[i];
+        }
     }
     const double q = std::inner_product(rx.begin(), rx.end(), rx.begin(), 0.0);
     const double t = std::inner_product(rx.begin(), rx.end(), ry.begin(), 0.0);
@@ -289,8 +315,10 @@ ScoreFit gls_score(const std::vector<double>& x,
         result.p_robust = 1.0;
         result.dispersion = 1.0;
         result.statistic = 0.0;
-        result.log_e = n > 2 ? student_t_mixture_log_e(0.0, n - 2.0) :
+        const double df = n - (project_directional_intercept ? 2.0 : 1.0);
+        result.log_e = df > 0.0 ? student_t_mixture_log_e(0.0, df) :
             std::numeric_limits<double>::quiet_NaN();
+        result.log_e_adaptive = normal_information_mixture_log_e(0.0);
         result.valid = std::isfinite(result.log_e);
         return result;
     }
@@ -300,7 +328,7 @@ ScoreFit gls_score(const std::vector<double>& x,
         const double residual = ry[i] - beta * rx[i];
         residual_q += residual * residual;
     }
-    const double df = n - 2.0;
+    const double df = n - (project_directional_intercept ? 2.0 : 1.0);
     const double estimated_dispersion = df > 0.0 ? residual_q / df :
         std::numeric_limits<double>::quiet_NaN();
     const double dispersion = std::max(estimated_dispersion, 1e-300);
@@ -313,8 +341,10 @@ ScoreFit gls_score(const std::vector<double>& x,
     result.dispersion = dispersion;
     result.statistic = robust_z;
     result.log_e = student_t_mixture_log_e(robust_z, df);
+    result.log_e_adaptive = normal_information_mixture_log_e(strict_z);
     result.valid = std::isfinite(result.p_strict) &&
-                   std::isfinite(result.p_robust) && std::isfinite(result.log_e);
+                   std::isfinite(result.p_robust) && std::isfinite(result.log_e) &&
+                   std::isfinite(result.log_e_adaptive);
     return result;
 }
 
@@ -851,9 +881,12 @@ FactorFit fit_eiv(const std::vector<double>& x,
     }
     const double log_no_heterogeneity = log_sum_exp(no_heterogeneity_terms);
     result.beta = best_beta;
-    const ScoreFit score = gls_score(x, y, se_y, ld);
+    const ScoreFit score = gls_score(x, y, se_y, ld, true);
+    const ScoreFit balanced_score = gls_score(x, y, se_y, ld, false);
     result.p = score.p_robust;
     result.p_strict = score.p_strict;
+    result.p_balanced = balanced_score.p_robust;
+    result.log_e_balanced = balanced_score.log_e;
     const double log_slope_marginal = log_weighted_pair(
         log_alternative, 1.0 - directional_prior_probability,
         log_slope_directional, directional_prior_probability);
@@ -890,12 +923,17 @@ FactorFit fit_eiv(const std::vector<double>& x,
                                      log_model_normalizer);
     result.log_bf_heterogeneity = log_alternative - log_no_heterogeneity;
     result.log_e = score.log_e;
+    result.log_e_adaptive = score.log_e_adaptive;
     result.effect_valid = joint_fit && std::isfinite(result.beta) &&
                           std::isfinite(result.se);
     result.valid = std::isfinite(result.p) && std::isfinite(result.p_strict) &&
                    std::isfinite(result.log_bf) &&
                    std::isfinite(result.log_bf_heterogeneity) &&
-                   std::isfinite(result.log_e) && std::isfinite(result.tau) &&
+                   std::isfinite(result.log_e) &&
+                   std::isfinite(result.p_balanced) &&
+                   std::isfinite(result.log_e_balanced) &&
+                   std::isfinite(result.log_e_adaptive) &&
+                   std::isfinite(result.tau) &&
                    std::isfinite(result.pp_slope);
     return result;
 }
@@ -1004,6 +1042,16 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_log_bf_heterogeneity_xy = nan;
     result.factor_log_e_xm = result.factor_log_e_my = result.factor_log_e_xy = nan;
     result.factor_log_e_mediation = result.factor_e_q_ebh = nan;
+    result.factor_p_xm_balanced = result.factor_p_my_balanced = nan;
+    result.factor_balanced_conjunction_p = nan;
+    result.factor_balanced_conjunction_q_by = nan;
+    result.factor_balanced_conjunction_q_adafilter = nan;
+    result.factor_log_e_xm_balanced = result.factor_log_e_my_balanced = nan;
+    result.factor_log_e_mediation_balanced = result.factor_e_q_balanced_ebh = nan;
+    result.factor_log_e_p2e_balanced_mediation = nan;
+    result.factor_e_q_p2e_balanced_ebh = nan;
+    result.factor_log_e_xm_adaptive = result.factor_log_e_my_adaptive = nan;
+    result.factor_log_e_mediation_adaptive = result.factor_e_q_adaptive_ebh = nan;
     result.factor_tau_xm = result.factor_tau_my = result.factor_tau_xy = nan;
     result.factor_indirect = result.factor_indirect_se = nan;
     result.factor_indirect_ci_lower = result.factor_indirect_ci_upper = nan;
@@ -1029,6 +1077,11 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_strict_status = "NOT_RUN";
     result.factor_p2e_status = "NOT_RUN";
     result.factor_ebh_status = "NOT_RUN";
+    result.factor_balanced_status = "NOT_RUN";
+    result.factor_adafilter_status = "NOT_RUN";
+    result.factor_balanced_ebh_status = "NOT_RUN";
+    result.factor_balanced_p2e_status = "NOT_RUN";
+    result.factor_adaptive_ebh_status = "NOT_RUN";
     result.factor_posterior_status = "NOT_RUN";
     if (opts.structural_method != "factorized") return;
 
@@ -1089,6 +1142,9 @@ void run_factorized_inference(const ProteinData& prot,
         result.factor_pp_directional_xm = stage1.pp_directional;
         result.factor_directional_collinearity_xm = stage1.directional_collinearity;
         result.factor_log_e_xm = stage1.log_e;
+        result.factor_p_xm_balanced = stage1.p_balanced;
+        result.factor_log_e_xm_balanced = stage1.log_e_balanced;
+        result.factor_log_e_xm_adaptive = stage1.log_e_adaptive;
         result.factor_tau_xm = stage1.tau;
     }
     if (stage1.effect_valid) {
@@ -1112,6 +1168,9 @@ void run_factorized_inference(const ProteinData& prot,
         result.factor_pp_directional_my = stage2.pp_directional;
         result.factor_directional_collinearity_my = stage2.directional_collinearity;
         result.factor_log_e_my = stage2.log_e;
+        result.factor_p_my_balanced = stage2.p_balanced;
+        result.factor_log_e_my_balanced = stage2.log_e_balanced;
+        result.factor_log_e_my_adaptive = stage2.log_e_adaptive;
         result.factor_tau_my = stage2.tau;
     }
     if (stage2.effect_valid) {
@@ -1193,6 +1252,14 @@ void run_factorized_inference(const ProteinData& prot,
             p_to_e_log_mixture(result.factor_strict_conjunction_p);
         result.factor_min_log_bf = std::min(stage1.log_bf, stage2.log_bf);
         result.factor_log_e_mediation = std::min(stage1.log_e, stage2.log_e);
+        result.factor_balanced_conjunction_p =
+            std::max(stage1.p_balanced, stage2.p_balanced);
+        result.factor_log_e_mediation_balanced =
+            std::min(stage1.log_e_balanced, stage2.log_e_balanced);
+        result.factor_log_e_p2e_balanced_mediation =
+            p_to_e_log_mixture(result.factor_balanced_conjunction_p);
+        result.factor_log_e_mediation_adaptive =
+            std::min(stage1.log_e_adaptive, stage2.log_e_adaptive);
     }
 
     // A de-noised residual-correlation diagnostic for coexisting pleiotropy.
@@ -1267,6 +1334,15 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_strict_status = evidence_gate(
         strict_evidence, "NO_TWO_STAGE_STRICT_EVIDENCE",
         "PENDING_MULTIPLE_TESTING");
+    const bool balanced_evidence =
+        std::isfinite(result.factor_balanced_conjunction_p) &&
+        result.factor_balanced_conjunction_p <= opts.factor_alpha;
+    result.factor_balanced_status = evidence_gate(
+        balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
+        "PENDING_MULTIPLE_TESTING");
+    result.factor_adafilter_status = evidence_gate(
+        balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
+        "PENDING_MULTIPLE_TESTING");
     if (result.factor_nA < opts.factor_min_set_a && result.factor_nB < opts.factor_min_set_b)
         result.factor_ebh_status = "INSUFFICIENT_SET_A_AND_SET_B";
     else if (result.factor_nA < opts.factor_min_set_a)
@@ -1277,6 +1353,9 @@ void run_factorized_inference(const ProteinData& prot,
         result.factor_ebh_status = "NUMERICAL_FAILURE";
     else
         result.factor_ebh_status = "PENDING_MULTIPLE_TESTING";
+    result.factor_adaptive_ebh_status = result.factor_ebh_status;
+    result.factor_balanced_ebh_status = result.factor_ebh_status;
+    result.factor_balanced_p2e_status = result.factor_ebh_status;
     if (result.factor_nA < opts.factor_min_set_a && result.factor_nB < opts.factor_min_set_b)
         result.factor_p2e_status = "INSUFFICIENT_SET_A_AND_SET_B";
     else if (result.factor_nA < opts.factor_min_set_a)
@@ -1317,11 +1396,36 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
                 std::numeric_limits<double>::quiet_NaN();
             result.factor_e_q_ebh = std::numeric_limits<double>::quiet_NaN();
             result.factor_e_q_p2e_ebh = std::numeric_limits<double>::quiet_NaN();
+            result.factor_balanced_conjunction_q_by =
+                std::numeric_limits<double>::quiet_NaN();
+            result.factor_balanced_conjunction_q_adafilter =
+                std::numeric_limits<double>::quiet_NaN();
+            result.factor_e_q_adaptive_ebh =
+                std::numeric_limits<double>::quiet_NaN();
+            result.factor_e_q_balanced_ebh =
+                std::numeric_limits<double>::quiet_NaN();
+            result.factor_e_q_p2e_balanced_ebh =
+                std::numeric_limits<double>::quiet_NaN();
             if (result.factor_ebh_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_ebh_status = "UNRESOLVED_SAMPLE_OVERLAP";
             }
             if (result.factor_p2e_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_p2e_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_balanced_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_balanced_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_adafilter_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_adafilter_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_adaptive_ebh_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_adaptive_ebh_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_balanced_ebh_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_balanced_ebh_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_balanced_p2e_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_balanced_p2e_status = "UNRESOLVED_SAMPLE_OVERLAP";
             }
         }
         return;
@@ -1386,6 +1490,146 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
             "SUPPORTED_GAUSSIAN_COVARIANCE_EXCLUSION_CONDITIONAL");
     }
 
+    std::vector<int> balanced_order;
+    for (int i = 0; i < static_cast<int>(results.size()); ++i) {
+        if (std::isfinite(results[i].factor_balanced_conjunction_p)) {
+            balanced_order.push_back(i);
+        }
+    }
+    std::sort(balanced_order.begin(), balanced_order.end(), [&](int a, int b) {
+        return results[a].factor_balanced_conjunction_p <
+               results[b].factor_balanced_conjunction_p;
+    });
+    const int balanced_m = static_cast<int>(balanced_order.size());
+    double balanced_harmonic = 0.0;
+    for (int i = 1; i <= balanced_m; ++i) balanced_harmonic += 1.0 / i;
+    double balanced_running = 1.0;
+    for (int rank = balanced_m; rank >= 1; --rank) {
+        ProteinResult& result = results[balanced_order[rank - 1]];
+        const double raw = result.factor_balanced_conjunction_p *
+                           balanced_m * balanced_harmonic / rank;
+        balanced_running = std::min(balanced_running, std::min(1.0, raw));
+        result.factor_balanced_conjunction_q_by = balanced_running;
+    }
+    for (auto& result : results) {
+        if (result.factor_balanced_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (result.factor_balanced_conjunction_q_by > opts.factor_alpha) {
+            result.factor_balanced_status = "NOT_SELECTED_BY_BALANCED_BY";
+            continue;
+        }
+        result.factor_balanced_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_BALANCED_INSIDE_EXCLUSION_CONDITIONAL");
+    }
+
+    // AdaFilter-BH for the 2-of-2 partial conjunction. Here F=min(p_XM,p_MY)
+    // and S=max(p_XM,p_MY). Its FDR guarantee requires independence between
+    // the two base studies and independence or weak dependence across proteins;
+    // the output is consequently labeled assumption-conditional.
+    std::vector<int> adafilter_order = balanced_order;
+    std::sort(adafilter_order.begin(), adafilter_order.end(), [&](int a, int b) {
+        return results[a].factor_balanced_conjunction_p <
+               results[b].factor_balanced_conjunction_p;
+    });
+    std::vector<double> adafilter_filtering_p;
+    adafilter_filtering_p.reserve(adafilter_order.size());
+    for (int index : adafilter_order) {
+        adafilter_filtering_p.push_back(std::min(
+            results[index].factor_p_xm_balanced,
+            results[index].factor_p_my_balanced));
+    }
+    std::sort(adafilter_filtering_p.begin(), adafilter_filtering_p.end());
+    double adafilter_running = 1.0;
+    for (int rank = balanced_m; rank >= 1; --rank) {
+        ProteinResult& result = results[adafilter_order[rank - 1]];
+        const double selection_p = result.factor_balanced_conjunction_p;
+        const int adjustment_count = static_cast<int>(std::upper_bound(
+            adafilter_filtering_p.begin(), adafilter_filtering_p.end(),
+            selection_p) - adafilter_filtering_p.begin());
+        const double raw = selection_p * adjustment_count / rank;
+        adafilter_running = std::min(adafilter_running, std::min(1.0, raw));
+        result.factor_balanced_conjunction_q_adafilter = adafilter_running;
+    }
+    for (auto& result : results) {
+        if (result.factor_adafilter_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (!(std::isfinite(result.factor_balanced_conjunction_q_adafilter) &&
+              result.factor_balanced_conjunction_q_adafilter < opts.factor_alpha)) {
+            result.factor_adafilter_status = "NOT_SELECTED_BY_ADAFILTER";
+            continue;
+        }
+        result.factor_adafilter_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_BALANCED_ADAFILTER_ASSUMPTION_CONDITIONAL");
+    }
+
+    std::vector<int> balanced_t_e_order;
+    for (int i = 0; i < static_cast<int>(results.size()); ++i) {
+        if (std::isfinite(results[i].factor_log_e_mediation_balanced)) {
+            balanced_t_e_order.push_back(i);
+        }
+    }
+    std::sort(balanced_t_e_order.begin(), balanced_t_e_order.end(),
+              [&](int a, int b) {
+        return results[a].factor_log_e_mediation_balanced >
+               results[b].factor_log_e_mediation_balanced;
+    });
+    const int balanced_t_e_m = static_cast<int>(balanced_t_e_order.size());
+    double balanced_t_e_running_log_q = std::numeric_limits<double>::infinity();
+    for (int rank = balanced_t_e_m; rank >= 1; --rank) {
+        ProteinResult& result = results[balanced_t_e_order[rank - 1]];
+        const double log_raw_q = std::log(static_cast<double>(balanced_t_e_m)) -
+            std::log(static_cast<double>(rank)) -
+            result.factor_log_e_mediation_balanced;
+        balanced_t_e_running_log_q = std::min(
+            balanced_t_e_running_log_q, log_raw_q);
+        result.factor_e_q_balanced_ebh = balanced_t_e_running_log_q >= 0.0
+            ? 1.0 : std::exp(balanced_t_e_running_log_q);
+    }
+    for (auto& result : results) {
+        if (result.factor_balanced_ebh_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (!(std::isfinite(result.factor_e_q_balanced_ebh) &&
+              result.factor_e_q_balanced_ebh <= opts.factor_alpha)) {
+            result.factor_balanced_ebh_status = "NOT_SELECTED_BY_BALANCED_EBH";
+            continue;
+        }
+        result.factor_balanced_ebh_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_BALANCED_T_EBH_EXCLUSION_CONDITIONAL");
+    }
+
+    std::vector<int> balanced_e_order;
+    for (int i = 0; i < static_cast<int>(results.size()); ++i) {
+        if (std::isfinite(results[i].factor_log_e_p2e_balanced_mediation)) {
+            balanced_e_order.push_back(i);
+        }
+    }
+    std::sort(balanced_e_order.begin(), balanced_e_order.end(), [&](int a, int b) {
+        return results[a].factor_log_e_p2e_balanced_mediation >
+               results[b].factor_log_e_p2e_balanced_mediation;
+    });
+    const int balanced_e_m = static_cast<int>(balanced_e_order.size());
+    double balanced_e_running_log_q = std::numeric_limits<double>::infinity();
+    for (int rank = balanced_e_m; rank >= 1; --rank) {
+        ProteinResult& result = results[balanced_e_order[rank - 1]];
+        const double log_raw_q = std::log(static_cast<double>(balanced_e_m)) -
+            std::log(static_cast<double>(rank)) -
+            result.factor_log_e_p2e_balanced_mediation;
+        balanced_e_running_log_q = std::min(balanced_e_running_log_q, log_raw_q);
+        result.factor_e_q_p2e_balanced_ebh = balanced_e_running_log_q >= 0.0
+            ? 1.0 : std::exp(balanced_e_running_log_q);
+    }
+    for (auto& result : results) {
+        if (result.factor_balanced_p2e_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (!(std::isfinite(result.factor_e_q_p2e_balanced_ebh) &&
+              result.factor_e_q_p2e_balanced_ebh <= opts.factor_alpha)) {
+            result.factor_balanced_p2e_status = "NOT_SELECTED_BY_BALANCED_P2E_EBH";
+            continue;
+        }
+        result.factor_balanced_p2e_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_BALANCED_EBH_EXCLUSION_CONDITIONAL");
+    }
+
     std::vector<int> e_order;
     for (int i = 0; i < static_cast<int>(results.size()); ++i) {
         if (std::isfinite(results[i].factor_log_e_mediation)) e_order.push_back(i);
@@ -1412,6 +1656,39 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
         result.factor_ebh_status = identification_gate(
             result, opts, "TWO_STAGE_EVIDENCE",
             "SUPPORTED_EXCLUSION_RESTRICTION_CONDITIONAL");
+    }
+
+    std::vector<int> adaptive_e_order;
+    for (int i = 0; i < static_cast<int>(results.size()); ++i) {
+        if (std::isfinite(results[i].factor_log_e_mediation_adaptive)) {
+            adaptive_e_order.push_back(i);
+        }
+    }
+    std::sort(adaptive_e_order.begin(), adaptive_e_order.end(), [&](int a, int b) {
+        return results[a].factor_log_e_mediation_adaptive >
+               results[b].factor_log_e_mediation_adaptive;
+    });
+    const int adaptive_e_m = static_cast<int>(adaptive_e_order.size());
+    double adaptive_running_log_q = std::numeric_limits<double>::infinity();
+    for (int rank = adaptive_e_m; rank >= 1; --rank) {
+        ProteinResult& result = results[adaptive_e_order[rank - 1]];
+        const double log_raw_q = std::log(static_cast<double>(adaptive_e_m)) -
+            std::log(static_cast<double>(rank)) -
+            result.factor_log_e_mediation_adaptive;
+        adaptive_running_log_q = std::min(adaptive_running_log_q, log_raw_q);
+        result.factor_e_q_adaptive_ebh = adaptive_running_log_q >= 0.0
+            ? 1.0 : std::exp(adaptive_running_log_q);
+    }
+    for (auto& result : results) {
+        if (result.factor_adaptive_ebh_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (!(std::isfinite(result.factor_e_q_adaptive_ebh) &&
+              result.factor_e_q_adaptive_ebh <= opts.factor_alpha)) {
+            result.factor_adaptive_ebh_status = "NOT_SELECTED_BY_ADAPTIVE_EBH";
+            continue;
+        }
+        result.factor_adaptive_ebh_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_KNOWN_COVARIANCE_EXCLUSION_CONDITIONAL");
     }
 
     std::vector<int> p2e_order;

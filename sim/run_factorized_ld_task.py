@@ -76,6 +76,24 @@ def main() -> None:
         "factor_conjunction_p": as_float(result, "factor_conjunction_p"),
         "factor_min_log_BF": as_float(result, "factor_min_log_BF"),
         "factor_log_e_mediation": as_float(result, "factor_log_e_mediation"),
+        "factor_p_XM_balanced": as_float(result, "factor_p_XM_balanced"),
+        "factor_p_MY_balanced": as_float(result, "factor_p_MY_balanced"),
+        "factor_balanced_conjunction_p": as_float(
+            result, "factor_balanced_conjunction_p"
+        ),
+        "factor_log_e_p2e_balanced_mediation": as_float(
+            result, "factor_log_e_p2e_balanced_mediation"
+        ),
+        "factor_log_e_mediation_balanced": as_float(
+            result, "factor_log_e_mediation_balanced"
+        ),
+        "factor_e_q_balanced_EBH": as_float(result, "factor_e_q_balanced_EBH"),
+        "factor_e_q_p2e_balanced_EBH": as_float(
+            result, "factor_e_q_p2e_balanced_EBH"
+        ),
+        "factor_log_e_mediation_adaptive": as_float(
+            result, "factor_log_e_mediation_adaptive"
+        ),
         "factor_log_BF_heterogeneity_MY": as_float(
             result, "factor_log_BF_heterogeneity_MY"
         ),
@@ -89,6 +107,11 @@ def main() -> None:
         "factor_mediation_status": result.get("factor_mediation_status", ""),
         "factor_frequentist_status": result.get("factor_frequentist_status", ""),
         "factor_ebh_status": result.get("factor_ebh_status", ""),
+        "factor_balanced_status": result.get("factor_balanced_status", ""),
+        "factor_adafilter_status": result.get("factor_adafilter_status", ""),
+        "factor_balanced_p2e_status": result.get("factor_balanced_p2e_status", ""),
+        "factor_balanced_ebh_status": result.get("factor_balanced_ebh_status", ""),
+        "factor_adaptive_ebh_status": result.get("factor_adaptive_ebh_status", ""),
     }
     rep_dir.mkdir(parents=True, exist_ok=True)
     with (rep_dir / "task_metrics.tsv").open("w", newline="", encoding="ascii") as handle:

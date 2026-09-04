@@ -135,6 +135,42 @@ Three family-level procedures are reported separately:
    eliminates the common scalar dispersion and unrestricted allele-oriented
    intercept; this is also valid under arbitrary cross-protein dependence.
 
+Two experimental analytical tracks address the observed power loss without
+changing the preceding outputs:
+
+4. A through-origin, residual-scaled score assumes mean-zero pleiotropy
+   conditional on instrument strength (balanced pleiotropy/InSIDE). It has a
+   Student t reference with `n-1` degrees of freedom under covariance
+   proportional to the declared LD-aware covariance. BMEDIATOR applies BY to
+   `max(p_XM_balanced,p_MY_balanced)` for arbitrary cross-protein dependence.
+5. AdaFilter-BH treats the two legs as a 2-of-2 partial conjunction, with
+   `F=min(p_XM_balanced,p_MY_balanced)` and
+   `S=max(p_XM_balanced,p_MY_balanced)`. This can reduce the multiplicity cost
+   of proteins for which neither leg is plausible, but its guarantee requires
+   independent base studies and independence or weak within-study dependence
+   across proteins. It is reported as assumption-conditional.
+6. A fixed p-to-e calibrator is applied directly to the balanced 2-of-2
+   p-value, followed by e-BH. This retains the balanced/InSIDE and scalar
+   covariance assumptions of the base p-value, but does not require
+   independence between legs or across proteins.
+7. A fixed Student t density-ratio e-value is also computed directly from each
+   balanced residual-scaled leg statistic. The minimum leg e-value is passed to
+   e-BH. This preserves the same mean-zero/InSIDE and scalar-dispersion model
+   while permitting arbitrary dependence between legs and across proteins.
+
+An additional strict e-value residualizes the oriented intercept and forms a
+fixed mixture of Gaussian likelihood ratios. For `Z~N(0,1)` under the leg null,
+
+```text
+E_g(Z) = (1+g)^(-1/2) exp{g Z^2/[2(1+g)]},
+g in {0.25, 1, 4, 16}.
+```
+
+The equally weighted mixture has null expectation one. The mediation e-value
+is the minimum leg e-value and is passed to e-BH. This path permits arbitrary
+cross-protein dependence but assumes the declared covariance is known; it does
+not absorb residual overdispersion. See `docs/ANALYTICAL_CALIBRATION.md`.
+
 The strict p-to-e sensitivity uses a fixed mixture of calibrators
 
 ```text

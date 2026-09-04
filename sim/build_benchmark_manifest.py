@@ -11,6 +11,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--benchmark", choices=["classification", "calibration", "all"], default="all")
+    parser.add_argument(
+        "--replicates",
+        type=int,
+        help="Override the configured replicate count when building a validation manifest.",
+    )
+    parser.add_argument("--shard-count", type=int, default=1)
+    parser.add_argument("--shard-index", type=int, default=1)
     return parser.parse_args()
 
 
@@ -22,7 +29,8 @@ def main() -> None:
     for benchmark in benchmarks:
         bench_cfg = config[benchmark]
         for cell in bench_cfg["cells"]:
-            for rep in range(1, int(bench_cfg["replicates"]) + 1):
+            replicates = args.replicates or int(bench_cfg["replicates"])
+            for rep in range(1, replicates + 1):
                 rows.append(
                     {
                         "benchmark": benchmark,
@@ -30,6 +38,9 @@ def main() -> None:
                         "replicate": rep,
                     }
                 )
+    if args.shard_count < 1 or not 1 <= args.shard_index <= args.shard_count:
+        raise ValueError("shard index must be between 1 and shard count")
+    rows = rows[args.shard_index - 1 :: args.shard_count]
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", newline="") as handle:
         writer = csv.DictWriter(

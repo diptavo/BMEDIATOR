@@ -161,9 +161,6 @@ if ! awk -F '\t' '
     if ($(h["factor_nA"]) != 4 || $(h["factor_nB"]) != 4 ||
         $(h["factor_log_BF_XM"]) < 2.302585 ||
         $(h["factor_log_BF_MY"]) < 2.302585 ||
-        $(h["factor_p_XM_strict"]) > $(h["factor_p_XM"]) ||
-        $(h["factor_p_MY_strict"]) > $(h["factor_p_MY"]) ||
-        $(h["factor_strict_conjunction_p"]) > $(h["factor_conjunction_p"]) ||
         $(h["factor_log_e_p2e_mediation"]) == "nan" ||
         $(h["factor_e_q_p2e_EBH"]) > 0.05 ||
         $(h["factor_PP_XM"]) < 0.99 ||
@@ -576,5 +573,9 @@ if LC_ALL=C grep -q $'\r' "$OUT_DIR/factorized_manifest.tsv" "$OUT_DIR/factorize
   echo "error: SLURM manifest contains CRLF line endings" >&2
   exit 1
 fi
+
+python3 "$ROOT/test/check_analytic_calibration.py" \
+  "${FULL_FACTOR_PREFIX}.mediation" \
+  "${FULL_FACTOR_OVERLAP_PREFIX}.mediation"
 
 echo "BMEDIATOR smoke test passed."

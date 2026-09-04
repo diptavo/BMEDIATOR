@@ -329,6 +329,89 @@ H3/H4 classification is a subsequent causal-identification assessment. The
 post-gate subset is not claimed to inherit the e-BH guarantee without a
 separate structured e-value argument.
 
+### Balanced-pleiotropy score and adaptive partial-conjunction testing
+
+The unrestricted allele-oriented intercept protects against directional
+pleiotropy but can be nearly collinear with the causal slope when instrument
+magnitudes have a narrow range. We therefore report a separate higher-power
+working model that assumes mean-zero pleiotropy conditional on instrument
+strength. In whitened coordinates this model is `y=beta*x+epsilon`, without an
+intercept. The through-origin score is divided by the residual scalar
+dispersion after fitting the slope and is compared with a Student t reference
+with `n-1` degrees of freedom. The 2-of-2 mediation p-value remains the maximum
+of the two leg p-values. BY adjustment supplies an arbitrary-dependence result
+when the base p-values are valid under this balanced/InSIDE model.
+
+The two-leg hypothesis is also a partial-conjunction hypothesis. For protein
+`j`, define filtering and selection p-values
+
+```text
+F_j = min(p_XM,j, p_MY,j),
+S_j = max(p_XM,j, p_MY,j).
+```
+
+After sorting by `S_(1)<=...<=S_(m)`, let
+`m_AF,(j)=sum_h 1{F_h<=S_(j)}`. The AdaFilter-BH adjusted value is
+
+```text
+q_AF,(j) = min_{h>=j} min{1, S_(h) m_AF,(h) / h}.
+```
+
+This procedure is more efficient than direct adjustment when few proteins
+have even one credible leg. Its finite-sample FDR theorem requires independent
+base p-values; the asymptotic extension permits weak dependence within each
+study while retaining independence between studies (Wang et al., 2022).
+Because proteomic errors and shared GWAS can induce stronger dependence,
+BMEDIATOR labels this output assumption-conditional and retains BY and e-BH as
+the more conservative dependence-robust tracks.
+
+As a dependence-robust alternative to AdaFilter, we transform the balanced
+partial-conjunction p-value with the fixed calibrator mixture
+
+```text
+e(p) = (1/4) sum_{kappa in {0.10,0.25,0.50,0.75}}
+       kappa p^(kappa-1).
+```
+
+Each component integrates to one under a uniform p-value and has expectation
+at most one for a super-uniform p-value. The maximum of the two leg p-values is
+super-uniform under the union null without requiring independence between the
+legs. Applying e-BH across proteins therefore permits arbitrary cross-protein
+dependence, conditional on validity of the balanced/InSIDE leg tests. The grid
+and equal weights are prespecified and are not estimated from simulations or
+the analysis data.
+
+We additionally construct a more information-preserving e-value directly from
+each balanced Student t statistic. Under the balanced leg null, the statistic
+has `n-1` degrees of freedom after estimating the through-origin slope and
+common residual scale. We divide the prespecified equal-weight mixture of
+symmetric shifted Student t densities (shifts 2, 4, and 6) and scaled Student t
+densities (scales 2, 4, and 8) by the central null density. This density ratio
+has expectation one under the leg null for every common positive scale. The
+minimum of the two leg e-values is valid for the mediation union null and is
+passed to e-BH. This procedure does not require independence between legs or
+proteins, but it remains conditional on balanced/InSIDE pleiotropy, correct
+LD-aware covariance up to a scalar, independent selection, and no causal-leg
+sample overlap.
+
+### Information-adaptive strict e-value
+
+Let `Z` be the strict standard-normal score after projecting both whitened
+vectors away from the allele-oriented intercept. For a fixed
+signal-to-noise variance `g`, the likelihood ratio obtained by mixing the
+alternative score mean under a zero-centered normal prior is
+
+```text
+E_g(Z) = (1+g)^(-1/2) exp{g Z^2/[2(1+g)]}.
+```
+
+Each component has expectation one under `Z~N(0,1)`. We average the frozen
+grid `g={0.25,1,4,16}`, take the minimum across causal legs, and apply e-BH.
+The grid is independent of outcome data and simulation labels. This strict
+track retains the oriented-intercept nuisance model and arbitrary-dependence
+e-BH guarantee, but requires the reported sampling covariance to be correct
+rather than merely correct up to an unknown scalar.
+
 ### LD-aware regional hypotheses
 
 Within each cis region, BMEDIATOR uses unpruned molecular and outcome summary
@@ -409,3 +492,7 @@ the National Academy of Sciences* 117, 16880-16890 (2020).
 
 Wang R, Ramdas A. False discovery rate control with e-values. *Journal of the
 Royal Statistical Society: Series B* 84, 822-852 (2022).
+
+Wang J, Gui L, Su WJ, Sabatti C, Owen AB. Detecting multiple replicating
+signals using adaptive filtering procedures. *Annals of Statistics* 50,
+1890-1909 (2022).

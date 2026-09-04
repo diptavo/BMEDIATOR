@@ -19,6 +19,12 @@
   allele-oriented pleiotropic intercept, with a known-covariance Gaussian
   version and a scalar-dispersion t version; retain BY and fixed
   p-to-e/e-BH family procedures separately.
+- Add a higher-power balanced/InSIDE score, 2-of-2 partial-conjunction test,
+  AdaFilter-BH sensitivity, and fixed conjunction-p-to-e/e-BH procedure. The
+  latter retains arbitrary-dependence FDR control when the balanced leg
+  p-values are valid.
+- Add direct balanced Student-t density-ratio e-values and e-BH as the
+  information-preserving arbitrary-dependence analytical candidate.
 - Add a four-model Bayesian competitor on each leg (null, slope,
   allele-oriented intercept, and both), component Bayes factors, fixed-prior
   posterior probabilities, and slope-intercept collinearity diagnostics.
@@ -43,6 +49,8 @@
 - Skip six-state CAVI in factorized mode and add a frozen 2,400-analysis pilot.
 - Correct `.regional` row serialization so H3, H4, and downstream columns align
   with the header.
+- Preserve ten significant digits in `.mediation` output so genome-wide
+  p-values are not rounded to zero.
 
 - Withdraw the experimental joint regional structural likelihood because its
   unrestricted M5 protein/outcome direct-effect covariance is nonidentified

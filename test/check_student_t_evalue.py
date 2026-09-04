@@ -130,6 +130,16 @@ def check_output(path):
             raise SystemExit(
                 f"{leg} log e-value mismatch: observed={observed}, expected={expected}"
             )
+        balanced_df = float(row[count_name]) - 1.0
+        balanced_p = float(row[f"factor_p_{leg}_balanced"])
+        balanced_observed = float(row[f"factor_log_e_{leg}_balanced"])
+        balanced_statistic = statistic_from_p(balanced_p, balanced_df)
+        balanced_expected = log_evalue(balanced_statistic, balanced_df)
+        if abs(balanced_observed - balanced_expected) > 2e-5:
+            raise SystemExit(
+                f"balanced {leg} log e-value mismatch: "
+                f"observed={balanced_observed}, expected={balanced_expected}"
+            )
 
 
 def main():

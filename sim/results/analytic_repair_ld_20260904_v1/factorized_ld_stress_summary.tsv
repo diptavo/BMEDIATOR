@@ -1,0 +1,13 @@
+cell	scenario	n	mean_realized_causal_pair_ld	mean_nA	mean_nB	mean_cross_set_max_r2	finite_two_leg_rate	stable_effect_rate	numerical_failure_rate	two_leg_p_rate	two_leg_BF_rate	two_leg_e_rate	balanced_two_leg_p_rate	adaptive_two_leg_e_rate	regional_shared_rate	regional_single_shared_rate	regional_distinct_rate	mean_independent_shared_signals	my_heterogeneity_BF_rate	factor_supported_rate	factor_unresolved_single_rate	factor_unresolved_heterogeneity_rate	factor_rejected_distinct_rate	frequentist_supported_rate	frequentist_rejected_distinct_rate	ebh_supported_rate	ebh_rejected_distinct_rate
+matched_high	distinct_ld	100	0.7133901799884856	5.95	3.0	0.0	1.0	0.74	0.0	0.01	0.0	0.0	0.87	0.0	0.0	0.0	0.9	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.01	0.0	0.0
+matched_high	no_second_stage	100	1.0	5.93	3.0	0.0	1.0	0.62	0.0	0.01	0.0	0.0	0.04	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+matched_high	same_variant_pleiotropy	100	1.0	5.92	3.0	0.0	1.0	0.72	0.0	0.0	0.0	0.0	0.98	0.0	0.37	0.4	0.04	1.2	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+matched_high	shared_mediation	100	1.0	5.94	3.0	0.0	1.0	0.68	0.0	0.02	0.0	0.0	0.93	0.0	0.4	0.4	0.08	1.24	0.0	0.0	0.0	0.0	0.0	0.02	0.0	0.0	0.0
+matched_moderate	distinct_ld	100	0.4099461521246074	5.98	3.03	0.0	1.0	0.68	0.0	0.03	0.0	0.0	0.46	0.0	0.0	0.0	0.85	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.03	0.0	0.0
+matched_moderate	no_second_stage	100	1.0	5.96	3.03	0.0	1.0	0.71	0.0	0.0	0.0	0.0	0.06	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+matched_moderate	same_variant_pleiotropy	100	1.0	5.94	3.01	0.0	1.0	0.68	0.0	0.0	0.0	0.0	0.94	0.0	0.42	0.46	0.0	1.39	0.01	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+matched_moderate	shared_mediation	100	1.0	5.91	3.02	0.0	1.0	0.67	0.0	0.02	0.01	0.0	0.94	0.0	0.4	0.4	0.01	1.26	0.0	0.0	0.0	0.0	0.0	0.01	0.0	0.0	0.0
+mismatch_high_to_moderate	distinct_ld	100	0.7130159254465691	5.96	7.3	0.0	1.0	0.74	0.0	0.01	0.14	0.0	1.0	0.0	0.0	0.02	0.9	0.02	0.02	0.0	0.0	0.0	0.14	0.0	0.01	0.0	0.0
+mismatch_high_to_moderate	no_second_stage	100	1.0	5.94	7.36	0.0	1.0	0.78	0.0	0.0	0.0	0.0	0.07	0.0	0.0	0.0	0.01	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+mismatch_high_to_moderate	same_variant_pleiotropy	100	1.0	5.93	7.44	0.0	1.0	0.78	0.0	0.13	0.36	0.0	1.0	0.01	0.35	0.45	0.04	1.19	0.0	0.17	0.11	0.0	0.02	0.06	0.01	0.0	0.0
+mismatch_high_to_moderate	shared_mediation	100	1.0	5.98	7.22	0.0	1.0	0.82	0.0	0.09	0.34	0.02	1.0	0.0	0.33	0.44	0.06	1.19	0.0	0.1	0.13	0.0	0.03	0.02	0.0	0.01	0.0
