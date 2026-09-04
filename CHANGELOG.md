@@ -26,7 +26,9 @@
 - Add direct balanced Student-t density-ratio e-values and e-BH as the
   information-preserving arbitrary-dependence analytical candidate.
 - Add ordinary BH for the balanced two-leg partial-conjunction p-value, with
-  explicit independence/PRDS labeling and a frozen new-seed validation design.
+  explicit independence/PRDS labeling. In the frozen new-seed
+  1.8-million-analysis validation, it passed every prespecified FDR and power
+  criterion and became the leading assumption-conditional statistical rule.
 - Add a four-model Bayesian competitor on each leg (null, slope,
   allele-oriented intercept, and both), component Bayes factors, fixed-prior
   posterior probabilities, and slope-intercept collinearity diagnostics.

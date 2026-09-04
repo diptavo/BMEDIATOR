@@ -39,6 +39,24 @@ one-sided 95% Wilson upper bound must not exceed 0.065. Stress cells retain the
 mean-FDP criterion of 0.05. No rule or threshold may be changed after this
 paragraph is committed to the validation snapshot.
 
+## Observed frozen balanced-BH result
+
+The new-seed run was executed from commit `dc6eb00` without changing the
+criteria above. All 3,600 families completed, for 1.8 million protein analyses.
+At `alpha=0.05`, broad and narrow mean FDP were 0.0376 and 0.0298, while mean
+power was 0.9720 and 0.5945. Least-favorable-null and global-null FDR were
+0.009 and 0, with one-sided 95% Wilson upper bounds 0.0154 and 0.0027.
+Balanced heterogeneity, sparse outliers, and dense cross-protein dependence
+had mean FDP 0.0043, 0.0082, and 0.0232. Every frozen criterion passed.
+
+This result designates balanced partial-conjunction BH as the leading
+statistical candidate only where cross-protein independence or PRDS is
+defensible. The dense-dependence cell is a stress test and does not establish a
+general dependence theorem. Directional pleiotropy and exactly proportional
+M5 remain, respectively, an assumption violation and an identification
+boundary. Machine-readable decisions are in
+`sim/results/analytic_bh_validation_20260905_v1/summary/analytic_bh_frozen_decision.tsv`.
+
 ## Valid-model cells
 
 The following cells evaluate the stated balanced/InSIDE working model:

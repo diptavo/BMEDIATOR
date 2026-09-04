@@ -8,8 +8,11 @@ calibration map from simulations or real data. The direct balanced
 Student-t/e-BH and balanced p-to-e/e-BH rules passed the frozen FDR checks in
 the tested identifiable cells, but both failed the prespecified power targets.
 AdaFilter retained substantially more power but failed its all-null FDR
-endpoint. Ordinary balanced partial-conjunction BH is undergoing a frozen
-new-seed validation. None is designated as a production primary method.
+endpoint. Ordinary balanced partial-conjunction BH subsequently passed every
+frozen FDR and power criterion in a new-seed 1.8-million-analysis validation.
+It is the leading confirmatory statistical candidate when independence or PRDS
+across protein-level p-values is defensible. It is not an arbitrary-dependence
+or assumption-free causal guarantee.
 
 ## Hypothesis
 
@@ -117,7 +120,13 @@ the Benjamini-Hochberg procedure across proteins. This does not require the two
 leg p-values to be independent: under the mediation union null, at least one
 leg p-value is super-uniform, and their maximum is therefore super-uniform.
 BH controls FDR when the resulting protein-level p-values are independent or
-satisfy positive regression dependency on each null statistic (PRDS).
+satisfy positive regression dependency on each null statistic (PRDS)
+([Benjamini and Hochberg, 1995](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x);
+[Benjamini and Yekutieli, 2001](https://doi.org/10.1214/aos/1013699998)).
+Generic correlation is not enough to assert PRDS. In particular, correlated
+two-sided Gaussian tests can violate ordinary BH control
+([Dobriban, 2026](https://arxiv.org/abs/2607.12208)), so the software does not
+label this track valid merely because protein correlations are positive.
 
 The output is `factor_balanced_conjunction_q_BH`; the corresponding gated
 interpretation is `factor_balanced_bh_status`. The BH theorem concerns the
@@ -126,6 +135,17 @@ causal-identification diagnostic, not part of that FDR theorem. For arbitrary
 cross-protein dependence, use `factor_balanced_conjunction_q_BY`; for designs
 that justify stronger leg and cross-protein independence assumptions,
 AdaFilter is retained as a separate comparison.
+
+This candidate and all pass/fail thresholds were frozen before the new-seed
+validation. Across 1.8 million protein analyses, broad and narrow balanced
+cells had mean FDP 0.0376 and 0.0298 and mean power 0.9720 and 0.5945.
+Least-favorable-null and global-null FDR were 0.009 and 0. The balanced
+heterogeneity, sparse-outlier, and dense-dependence stress cells also met their
+prespecified mean-FDP criteria. Directional pleiotropy failed, as expected
+outside the balanced/InSIDE assumption, and the exactly proportional M5
+boundary remained nonidentified. Full compact summaries and the
+machine-readable frozen decision are under
+`sim/results/analytic_bh_validation_20260905_v1/summary/`.
 
 ## AdaFilter partial-conjunction FDR
 

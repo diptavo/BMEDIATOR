@@ -213,8 +213,9 @@ recorded in `.hyp` and can be changed explicitly. They and the Student-t
 alternative-density grid were frozen before the held-out validation seeded
 `20261603`. Posterior FDR is a model-based
 expectation, not a frequentist guarantee under prior or likelihood
-misspecification. Results must include prior sensitivity, and the default must
-remain provisional until held-out validation is complete.
+misspecification. Results must include prior sensitivity; the Bayesian family
+rule remains provisional because the held-out success applies to balanced
+partial-conjunction BH, not to posterior FDR.
 
 The heterogeneity Bayes factor compares the effect model integrated over
 `tau > 0` with the corresponding `tau = 0` model. Strong Set B heterogeneity
@@ -277,6 +278,8 @@ Every molecular trait must report, separately:
 - factorized leg and two-stage posterior probabilities, posterior local FDR,
   cumulative posterior FDR, rank, and `factor_posterior_status`;
 - family-level BY and e-BH decisions when their assumptions are met.
+- balanced partial-conjunction BH q-values and statuses when cross-protein
+  independence or PRDS is defensible.
 
 Legacy M0-M5 probabilities may be emitted for compatibility but are not part
 of confirmatory factorized inference.
@@ -302,3 +305,10 @@ shows all of the following:
 Passing simulations is necessary for release but cannot prove the exclusion
 restriction in real data. Real-data conclusions must retain the
 assumption-conditional label.
+
+The frozen 1.8-million-analysis validation from commit `dc6eb00` satisfied the
+prespecified FDR and power criteria for balanced partial-conjunction BH. This
+completes the statistical-family criterion only under balanced/InSIDE leg
+validity and cross-protein independence/PRDS. It does not complete the other
+release criteria above, establish arbitrary-dependence control, or identify
+exactly proportional pleiotropy.

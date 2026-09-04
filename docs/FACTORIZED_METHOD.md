@@ -216,7 +216,10 @@ For the separate balanced/InSIDE track, BMEDIATOR forms the 2-of-2 p-value
 `p_balanced=max(p_XM_balanced,p_MY_balanced)`. Ordinary BH is reported as
 `factor_balanced_conjunction_q_BH` when independence or PRDS across proteins
 is defensible; BY remains the arbitrary-dependence result. Neither procedure
-requires the two causal-leg p-values themselves to be independent.
+requires the two causal-leg p-values themselves to be independent. In the
+frozen new-seed 1.8-million-analysis validation, this BH rule was the first
+candidate to pass all prespecified FDR and power criteria. That empirical result
+does not broaden the theorem to arbitrary cross-protein dependence.
 
 BMEDIATOR also applies the frozen calibrator mixture directly to that valid
 union-null p-value. The resulting

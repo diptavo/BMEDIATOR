@@ -10,14 +10,15 @@ Version 1.2.0-dev
 > production-calibrated mediation claims. See
 > [Validation Status](docs/VALIDATION.md).
 
-> **Current factorized validation:** In the frozen one-million-analysis
-> analytical-repair grid, AdaFilter was powerful but missed its all-null FDR
-> endpoint (0.060 versus the prespecified 0.05 maximum). The direct balanced
-> Student-t/e-BH rule controlled FDR in the tested identifiable cells, but its
-> power was 0.638 in the broad-signal cell and zero in the narrow-signal cell,
-> below the prespecified 0.80 and 0.50 targets. Accurate ancestry-matched LD
-> remains essential. Version 1.2.0-dev is not a production or
-> publication-ready release.
+> **Current factorized validation:** Balanced partial-conjunction BH passed all
+> frozen criteria in a new-seed 1.8-million-analysis run: broad and narrow
+> power were 0.972 and 0.595, with mean FDP 0.0376 and 0.0298. The
+> least-favorable and global-null family error rates were 0.009 and 0.000 over
+> 1,000 replicates each. This rule requires valid balanced/InSIDE leg tests and
+> independence or PRDS across protein-level p-values. Directional pleiotropy,
+> exact proportional pleiotropy, and LD-reference mismatch remain explicit
+> limitations. Version 1.2.0-dev is not yet a production or publication-ready
+> release.
 
 > **Experimental repair:** `--structural-method factorized` separates the two
 > causal legs, residual RF effect, and pleiotropy instead of forcing them into

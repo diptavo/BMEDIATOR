@@ -1,0 +1,17 @@
+cell	criterion	observed	limit	pass
+broad_balanced	mean_FDP_max	0.0375557	0.05	YES
+broad_balanced	mean_FDP_normal_upper_max	0.041414411	0.06	YES
+narrow_balanced	mean_FDP_max	0.0298135	0.05	YES
+narrow_balanced	mean_FDP_normal_upper_max	0.034083046	0.06	YES
+rare_mediation	mean_FDP_max	0.00291667	0.05	YES
+rare_mediation	mean_FDP_normal_upper_max	0.006990138	0.06	YES
+least_favorable_null	pure_null_FDR_max	0.009	0.05	YES
+least_favorable_null	pure_null_Wilson_upper_max	0.015406257	0.065	YES
+global_null	pure_null_FDR_max	0	0.05	YES
+global_null	pure_null_Wilson_upper_max	0.0026982432	0.065	YES
+balanced_heterogeneity	stress_mean_FDP_max	0.00433333	0.05	YES
+sparse_outliers	stress_mean_FDP_max	0.00817926	0.05	YES
+dense_cross_protein_dependence	stress_mean_FDP_max	0.0232007	0.05	YES
+broad_balanced	mean_power_min	0.972029	0.8	YES
+narrow_balanced	mean_power_min	0.594523	0.5	YES
+ALL	overall_frozen_decision	1	1	YES

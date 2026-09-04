@@ -349,7 +349,9 @@ between the two legs. BH therefore controls FDR under independence or PRDS
 across proteins, while BY remains the reported arbitrary-dependence analysis.
 The BH decision is kept separate from AdaFilter because it requires no
 data-dependent filtering and weaker assumptions about dependence between the
-two causal legs.
+two causal legs. Correlation alone does not establish PRDS, particularly for
+two-sided Gaussian tests, so the ordinary-BH result is not labeled valid under
+unspecified cross-protein dependence.
 
 The two-leg hypothesis is also a partial-conjunction hypothesis. For protein
 `j`, define filtering and selection p-values
@@ -494,6 +496,29 @@ multivariable MR where their estimands are applicable. Real-data evaluation
 should include independent molecular resources, positive controls, negative
 controls, and replication across outcome studies.
 
+### Frozen analytical-calibration result
+
+We froze balanced partial-conjunction BH and its decision criteria before
+examining results, then evaluated a new simulation seed in 3,600 families of
+500 proteins each. The design comprised 200 replicates of each mixed or stress
+cell and 1,000 replicates of each global-null and least-favorable-null cell. At
+a 5% target, mean FDP was 0.0376 in the broad balanced cell and 0.0298 in the
+narrow balanced cell, with mean power 0.9720 and 0.5945. The least-favorable
+and global-null family error rates were 0.009 and 0, with one-sided 95% Wilson
+upper bounds 0.0154 and 0.0027. Mean FDP was 0.0043 under balanced
+heterogeneity, 0.0082 with sparse outliers, and 0.0232 in the dense-dependence
+stress cell. All prespecified criteria passed.
+
+These results establish finite-grid operating characteristics, not the truth
+of the causal assumptions. The dense-dependence cell does not prove PRDS or
+arbitrary-dependence validity. Under directional pleiotropy, which violates
+the balanced/InSIDE model, mean FDP was 0.5753. At the exactly proportional M5
+boundary, mean FDP was 0.5008 because the observed summaries cannot identify
+mediation separately from a direct effect proportional to pQTL strength. The
+BH rule is therefore the leading confirmatory statistical procedure under its
+stated assumptions, while regional H3/H4 evidence, heterogeneity, and external
+replication remain separate causal-identification checks.
+
 ## Methodological references
 
 Wasserman L, Ramdas A, Balakrishnan S. Universal inference. *Proceedings of
@@ -505,3 +530,10 @@ Royal Statistical Society: Series B* 84, 822-852 (2022).
 Wang J, Gui L, Su WJ, Sabatti C, Owen AB. Detecting multiple replicating
 signals using adaptive filtering procedures. *Annals of Statistics* 50,
 1890-1909 (2022).
+
+Benjamini Y, Hochberg Y. Controlling the false discovery rate: a practical and
+powerful approach to multiple testing. *Journal of the Royal Statistical
+Society: Series B* 57, 289-300 (1995).
+
+Benjamini Y, Yekutieli D. The control of the false discovery rate in multiple
+testing under dependency. *Annals of Statistics* 29, 1165-1188 (2001).

@@ -306,7 +306,34 @@ independence between causal legs. Its FDR theorem requires independence or
 PRDS across protein-level p-values. The frozen new-seed design and automated
 decision criteria are recorded in `sim/configs/analytic_bh_validation.json`,
 `sim/ANALYTIC_REPAIR_DECISION_RULES.md`, and
-`sim/evaluate_analytic_bh_validation.py`. Results are pending.
+`sim/evaluate_analytic_bh_validation.py`.
+
+That validation was run from frozen commit `dc6eb00` as four 900-task Slurm
+arrays (`29082551`, `29082559`, `29082564`, and `29082573`) with compute-node
+aggregation in job `29082597`. All 3,600 tasks completed, comprising 1.8
+million protein analyses. At `alpha=0.05`, balanced BH passed every frozen
+criterion:
+
+| Cell | Mean FDP or null-family FDR | Mean power | Frozen result |
+|---|---:|---:|---|
+| Broad balanced | 0.0376 | 0.9720 | PASS |
+| Narrow balanced | 0.0298 | 0.5945 | PASS |
+| Rare mediation | 0.0029 | 0.1039 | PASS; power descriptive |
+| Least-favorable null | 0.0090 | n/a | PASS |
+| Global null | 0.0000 | n/a | PASS |
+| Balanced heterogeneity | 0.0043 | 0.0087 | PASS stress criterion |
+| Sparse outliers | 0.0082 | 0.0647 | PASS stress criterion |
+| Dense cross-protein dependence | 0.0232 | 0.5574 | PASS descriptive stress criterion |
+
+The least-favorable and global-null one-sided 95% Wilson upper bounds were
+0.0154 and 0.0027, below the prespecified 0.065 limit. The dense-dependence
+result is empirical stress evidence, not proof of PRDS; generic correlation of
+two-sided p-values is insufficient for the ordinary-BH theorem. Directional
+pleiotropy produced mean FDP 0.5753, as expected outside the balanced/InSIDE
+model. At the exactly proportional M5 boundary, M1 and M5 were selected at
+nearly equal rates and the mean FDP was 0.5008, confirming rather than
+resolving the stated nonidentifiability. Compact result tables are retained
+under `sim/results/analytic_bh_validation_20260905_v1/summary/`.
 
 ## Release interpretation
 
@@ -322,13 +349,17 @@ decision criteria are recorded in `sim/configs/analytic_bh_validation.json`,
 - These simulations validate implementation behavior against known truth;
   they do not calibrate real-data results from labels.
 
-Accordingly, 1.2.0-dev is suitable only for research evaluation and transparent
-GitHub development. It is not a production-calibrated release. AdaFilter does
-not pass the frozen all-null endpoint, while both analytically valid
-dependence-robust candidates fail the frozen power endpoints. The `-dev`
-suffix should remain until a prespecified rule jointly passes held-out FDR and
-power criteria, LD-mismatch and interval-coverage criteria, followed by
-real-data replication checks.
+Accordingly, balanced partial-conjunction BH is the first candidate to pass
+the prespecified held-out FDR and power endpoints. This supports its use as the
+leading confirmatory statistical rule when the balanced/InSIDE leg model and
+cross-protein independence/PRDS assumptions are defensible. Version 1.2.0-dev
+nevertheless remains suitable only for research evaluation and transparent
+GitHub development. The `-dev` suffix should remain until LD-mismatch,
+sample-overlap, effect-bias and interval-coverage criteria are completed,
+published competitor implementations are benchmarked, and real-data
+replication checks succeed. BY and e-BH remain the conservative
+arbitrary-dependence sensitivity analyses, although their frozen power was
+inadequate.
 
 ## Frozen Student-t/effect-validity validation
 
