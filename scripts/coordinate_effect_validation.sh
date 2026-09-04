@@ -30,10 +30,18 @@ python3 "$BMEDIATOR_DIR/sim/build_benchmark_manifest.py" \
   --benchmark calibration \
   --out "$manifest"
 
+if [[ "$BLOCK_SIZE" -le 0 ]]; then
+  echo "BLOCK_SIZE must be positive" >&2
+  exit 1
+fi
 n_tasks=$(( $(wc -l < "$manifest") - 1 ))
-array_tasks=$(( (n_tasks + BLOCK_SIZE - 1) / BLOCK_SIZE ))
 if [[ "$n_tasks" -le 0 ]]; then
   echo "Manifest has no tasks: $manifest" >&2
+  exit 1
+fi
+array_tasks=$(( (n_tasks + BLOCK_SIZE - 1) / BLOCK_SIZE ))
+if [[ "$array_tasks" -gt 1000 ]]; then
+  echo "Array requires $array_tasks elements; increase BLOCK_SIZE to stay at or below 1000" >&2
   exit 1
 fi
 
