@@ -8,6 +8,36 @@
 - Add signed-LD errors-in-variables likelihoods, deterministic fixed-prior Bayes
   factors, conservative intersection-union tests, and BY correction across
   proteins for factorized analyses.
+- Add symmetric half-normal residual-heterogeneity integration under each
+  factorized null and alternative after sparse Set B outliers exposed false
+  support from the original fixed-slope Bayes factor.
+- Add fixed Student-t density-ratio e-values and base e-BH adjusted values for
+  arbitrary-dependence FDR control of the two-leg statistical hypotheses under
+  the declared common-scale Gaussian null; project an unrestricted
+  allele-oriented intercept under each leg null.
+- Add analytically calibrated causal-slope scores that GLS-project an
+  allele-oriented pleiotropic intercept, with a known-covariance Gaussian
+  version and a scalar-dispersion t version; retain BY and fixed
+  p-to-e/e-BH family procedures separately.
+- Add a four-model Bayesian competitor on each leg (null, slope,
+  allele-oriented intercept, and both), component Bayes factors, fixed-prior
+  posterior probabilities, and slope-intercept collinearity diagnostics.
+- Replace attenuated residual-likelihood point estimates with joint
+  slope/intercept generalized adjusted-profile estimates, finite-instrument
+  intervals, and conservative product intervals.
+- Add independent discovery `P_SELECT` support for three-sample instrument
+  selection and record the selection design in every factorized result.
+- Enforce the factorized Set A/Set B partition by excluding all cis-region RF
+  instruments from Set A and moving cross-set LD overlaps to Set C; report the
+  maximum retained cross-set `r²` and fail closed on threshold violations.
+- Add fixed-prior factorized leg posteriors, joint two-stage posterior,
+  posterior local/cumulative FDR, and an identification-gated posterior status.
+- Require at least three instruments per causal leg, two independently matched shared regional signals, and gate strong
+  residual heterogeneity on both causal legs; aligned proportional pleiotropy
+  remains explicitly nonidentified.
+- Add batched proteome calibration and genotype-based multi-signal LD stress
+  runners, including matched/mismatched reference LD and the aligned-
+  pleiotropy boundary.
 - Require separate Set A and Set B evidence and retain regional H3/H4 as an
   independent identification gate; sample-overlap analyses remain unresolved.
 - Skip six-state CAVI in factorized mode and add a frozen 2,400-analysis pilot.

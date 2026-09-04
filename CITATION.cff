@@ -8,4 +8,4 @@ authors:
 license: "GPL-3.0-only"
 repository-code: "https://github.com/diptavo/BMEDIATOR"
 url: "https://github.com/diptavo/BMEDIATOR"
-abstract: "Bayesian framework for identifying mediating plasma proteins between risk factors and disease outcomes using GWAS summary statistics."
+abstract: "Bayesian framework for evaluating candidate plasma-protein mediators between risk factors and disease outcomes using GWAS summary statistics."

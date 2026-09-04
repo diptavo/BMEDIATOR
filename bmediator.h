@@ -131,6 +131,7 @@ struct ProteinData {
     std::string regional_method = "single";
     int regional_protein_signals = 0;
     int regional_outcome_signals = 0;
+    int regional_independent_shared_signals = 0;
     double regional_best_pp_shared = 0.0;
     double regional_best_pp_distinct = 0.0;
     double regional_best_shared_given_both = 0.0;
@@ -150,6 +151,7 @@ struct ProteinData {
     // Empty matrices imply identity LD (legacy input without a reference).
     std::vector<std::vector<double>> setA_ld;
     std::vector<std::vector<double>> setB_ld;
+    double setAB_max_r2 = 0.0;
 
     int nA() const { return (int)setA_rsid.size(); }
     int nB() const { return (int)setB_rsid.size(); }
@@ -247,6 +249,7 @@ struct ProteinResult {
     int regional_protein_signals;
     int regional_outcome_signals;
     int regional_signal_pair_count;
+    int regional_independent_shared_signals;
     double regional_max_credible_set_pair_r2;
     std::vector<RegionalSignalPairResult> regional_signal_pairs;
     std::string mediation_identifiability;
@@ -287,18 +290,59 @@ struct ProteinResult {
 
     // Factorized effects are allowed to coexist. They are not normalized over
     // the legacy mutually exclusive M0-M5 scenario list.
-    double factor_beta1, factor_beta1_se, factor_p_xm, factor_log_bf_xm;
-    double factor_beta2, factor_beta2_se, factor_p_my, factor_log_bf_my;
-    double factor_beta3, factor_beta3_se, factor_p_xy, factor_log_bf_xy;
+    double factor_beta1, factor_beta1_se, factor_p_xm, factor_p_xm_strict,
+           factor_log_bf_xm;
+    double factor_beta1_ci_lower, factor_beta1_ci_upper;
+    double factor_beta2, factor_beta2_se, factor_p_my, factor_p_my_strict,
+           factor_log_bf_my;
+    double factor_beta2_ci_lower, factor_beta2_ci_upper;
+    double factor_beta3, factor_beta3_se, factor_p_xy, factor_p_xy_strict,
+           factor_log_bf_xy;
+    double factor_log_bf_heterogeneity_xm;
+    double factor_log_bf_heterogeneity_my;
+    double factor_log_bf_heterogeneity_xy;
+    double factor_log_bf_directional_xm;
+    double factor_log_bf_directional_my;
+    double factor_log_bf_slope_only_xm;
+    double factor_log_bf_directional_only_xm;
+    double factor_log_bf_slope_directional_xm;
+    double factor_log_bf_slope_only_my;
+    double factor_log_bf_directional_only_my;
+    double factor_log_bf_slope_directional_my;
+    double factor_pp_directional_xm;
+    double factor_pp_directional_my;
+    double factor_directional_intercept_xm;
+    double factor_directional_intercept_xm_se;
+    double factor_directional_intercept_my;
+    double factor_directional_intercept_my_se;
+    double factor_directional_collinearity_xm;
+    double factor_directional_collinearity_my;
+    double factor_cross_set_max_r2;
+    double factor_log_e_xm, factor_log_e_my, factor_log_e_xy;
+    double factor_log_e_mediation, factor_e_q_ebh;
+    double factor_tau_xm, factor_tau_my, factor_tau_xy;
     double factor_indirect, factor_indirect_se;
+    double factor_indirect_ci_lower, factor_indirect_ci_upper;
     double factor_conjunction_p, factor_conjunction_q_by;
+    double factor_strict_conjunction_p, factor_strict_conjunction_q_by;
     double factor_min_log_bf;
+    double factor_log_e_p2e_mediation, factor_e_q_p2e_ebh;
+    double factor_pp_xm, factor_pp_my, factor_pp_two_stage;
+    double factor_posterior_local_fdr, factor_posterior_cum_fdr;
+    int factor_posterior_rank;
     double factor_pleiotropy_rho, factor_pleiotropy_p;
     int factor_nA, factor_nB;
     std::string factor_ld_source;
+    std::string factor_selection_design;
+    std::string factor_effect_estimator;
     std::string factor_pattern;
+    std::string factor_two_stage_status;
     std::string factor_mediation_status;
     std::string factor_frequentist_status;
+    std::string factor_strict_status;
+    std::string factor_p2e_status;
+    std::string factor_ebh_status;
+    std::string factor_posterior_status;
 
     // EB sufficient-stat approximations from the M1 fit
     double eb_beta1_second_moment;
@@ -393,7 +437,16 @@ struct Options {
     int factor_min_set_b;
     double factor_alpha;
     double factor_bf_threshold;
+    double factor_prior_xm;
+    double factor_prior_my;
+    double factor_prior_directional;
+    double factor_directional_variance;
     int factor_quadrature_points;
+    double factor_pleio_sd_xm;
+    double factor_pleio_sd_my;
+    double factor_pleio_sd_xy;
+    int factor_pleio_quadrature_points;
+    bool factor_independent_selection;
 
     // Output
     std::string out_prefix;
@@ -427,9 +480,13 @@ struct Options {
         structural_method("legacy-six-state"),
         sampling_corr_rf_pqtl(0.0), sampling_corr_rf_outcome(0.0),
         sampling_corr_pqtl_outcome(0.0),
-        factor_min_set_a(2), factor_min_set_b(2), factor_alpha(0.05),
-        factor_bf_threshold(10.0),
+        factor_min_set_a(3), factor_min_set_b(3), factor_alpha(0.05),
+        factor_bf_threshold(10.0), factor_prior_xm(0.5), factor_prior_my(0.25),
+        factor_prior_directional(0.1), factor_directional_variance(0.01),
         factor_quadrature_points(161),
+        factor_pleio_sd_xm(0.1), factor_pleio_sd_my(0.1),
+        factor_pleio_sd_xy(0.1), factor_pleio_quadrature_points(41),
+        factor_independent_selection(false),
         out_prefix("bmediator"), threads(1), verbose(false) {}
 };
 
@@ -442,7 +499,8 @@ void parse_args(int argc, char* argv[], Options& opts);
 void read_sumstats(const std::string& file, std::map<std::string, SumStat>& ss);
 void read_sumstats_with_pval(const std::string& file,
                              std::map<std::string, SumStat>& ss,
-                             std::map<std::string, double>& pvals);
+                             std::map<std::string, double>& pvals,
+                             bool use_selection_p = false);
 void read_sumstats_with_pval_subset(const std::string& file,
                                     std::map<std::string, SumStat>& ss,
                                     std::map<std::string, double>& pvals,
@@ -452,7 +510,8 @@ void read_sumstats_with_pval_subset(const std::string& file,
                                     bool verbose);
 void read_pqtl_sumstats(const std::string& file,
                         std::map<std::string, std::map<std::string, SumStat>>& pqtl_by_protein,
-                        std::map<std::string, std::map<std::string, double>>& pqtl_pval);
+                        std::map<std::string, std::map<std::string, double>>& pqtl_pval,
+                        bool use_selection_p = false);
 void read_protein_info(const std::string& file,
                        std::vector<ProteinData>& proteins);
 void build_instrument_sets(const std::map<std::string, SumStat>& rf_ss,

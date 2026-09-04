@@ -26,8 +26,8 @@ and molecular cis instruments not associated with the risk factor have
 different identifying roles. The two causal legs, residual risk-factor effect,
 and correlated pleiotropy are estimated as separate components rather than as
 exclusive biological states. The two-stage null is tested by an
-intersection-union procedure, while fixed-prior Bayes factors quantify
-evidence for each leg. A separate LD-aware regional analysis distinguishes
+intersection-union procedure, while fixed-prior Bayes factors and posterior
+expected-FDR values quantify model-based evidence for each leg. A separate LD-aware regional analysis distinguishes
 shared from distinct molecular and disease association signals. The resulting
 mediation claim is explicitly conditional on instrument validity and the
 absence of direct effects exactly aligned with molecular instrument strength.
@@ -50,6 +50,16 @@ molecular trait:
   two causal legs because their two roles cannot be separated without further
   assumptions.
 
+Disjoint variant identifiers alone do not establish distinct instrument roles.
+We therefore cross-clump Set A and Set B using chromosome-wide reference-panel
+LD. Every risk-factor instrument within the molecular cis window is assigned
+to Set C or excluded from confirmatory estimation, irrespective of its
+molecular-association p-value. A cis molecular-QTL above the cross-set LD
+threshold with any risk-factor instrument is also assigned to Set C and the
+corresponding risk-factor instrument is removed from Set A. The maximum
+retained cross-set `r²` is reported and threshold violations fail the causal
+identification gate.
+
 Each causal leg is fit with an LD-aware errors-in-variables likelihood. A
 zero-centered normal prior is integrated deterministically to obtain a Bayes
 factor against a point null. In parallel, a conservative conditional score
@@ -70,7 +80,9 @@ H3/H4 probabilities are not treated as p-values; they form a separate
 Bayesian gate for whether molecular and outcome signals are distinct or
 shared. Confirmatory reporting requires evidence for both causal legs,
 adequate independent instruments, a matched LD reference, independent GWAS
-estimation errors, and a shared regional signal.
+estimation errors, and at least two independently matched shared regional
+signals. Even then, the interpretation remains conditional on exclusion and
+independence assumptions.
 
 ## Detailed methods
 
@@ -85,7 +97,8 @@ standard errors, disallowed allele frequencies, or absence from the reference
 panel are removed.
 
 Risk-factor instruments and cis molecular-QTL instruments are selected using
-prespecified significance thresholds and LD clumping. Optional HEIDI and
+prespecified significance thresholds, within-set clumping, and cross-set LD
+exclusion. Optional HEIDI and
 Steiger filters are applied before factor inference. A variant belongs to only
 one of Sets A, B, and C for a given molecular trait. Proxy-projected molecular
 associations are excluded from the factorized first stage because their
@@ -131,23 +144,67 @@ The limited-information likelihood is
 ell(b) = -1/2 {log|V(b)| + r(b)'V(b)^-1 r(b) + n log(2 pi)}.
 ```
 
-BMEDIATOR maximizes this scalar likelihood using a deterministic grid followed
-by golden-section refinement. The local observed curvature supplies the
-reported standard error. Covariance calculations use Cholesky factorization
-with a small escalating ridge only when reference-panel sampling noise makes a
-matrix numerically non-positive-definite.
+BMEDIATOR augments the covariance by `tau^2 I`, where `tau` is a residual
+heterogeneity SD. Point estimation uses a generalized adjusted profile score:
+the quadratic term is optimized in `b` without the residual-variance
+determinant that otherwise attenuates weak-instrument estimates, while `tau`
+is estimated from the residual likelihood. Independent instruments use the
+adjusted-profile sandwich variance and correlated instruments use profile
+curvature. Covariance
+calculations use Cholesky factorization with a small escalating ridge only when
+reference-panel sampling noise makes a matrix numerically
+non-positive-definite.
 
-For a prespecified normal alternative `b ~ N(0,W)`, evidence against `b=0` is
+For Bayesian evidence, define `s_i=sign(x_i)` and add an allele-oriented
+pleiotropic component `eta s`, with `eta ~ N(0,W_eta)`. The method compares
+four models: neither slope nor directional component, slope only, directional
+only, and both. With `b ~ N(0,W)` and `tau ~ HN(s_tau)`, the directional
+coefficient is integrated analytically and `b,tau` are integrated by
+prespecified quadrature.
 
 ```text
-BF_10 = integral exp{ell(b)} N(b;0,W) db / exp{ell(0)}.
+BF_slope = p(data | slope present, averaged over eta presence)
+           / p(data | slope absent, averaged over eta presence).
 ```
 
-The one-dimensional integral is evaluated by deterministic Simpson
-quadrature. `W` is fixed before analysis and written to the hyperparameter
-file. The weaker of the two leg-specific log Bayes factors is reported as
-`factor_min_log_BF`; this is a conservative evidence summary and is not
-described as a Bayes factor for the composite union null.
+The integrals are represented by normalized deterministic Simpson-weighted
+grids, giving proper finite discrete mixture distributions. `W` and `s_tau`
+are fixed before analysis and written to the hyperparameter file. The weaker
+of the two leg-specific log Bayes factors is reported as
+`factor_min_log_BF`; this is an evidence summary and is not described as a
+Bayes factor for the composite union null.
+
+Numerical validity of the integrated evidence and of the joint
+slope/intercept point estimate are assessed separately. If the joint profile
+curvature is not positive definite, the software retains well-defined
+projected tests and integrated evidence but withholds the effect estimate and
+indirect-effect interval. It does not substitute a zero-intercept estimate,
+and the causal identification status is `UNRESOLVED_EFFECT_ESTIMATION`.
+
+### Fixed-prior Bayesian posterior FDR
+
+Let `pi_XM` and `pi_MY` be prespecified probabilities of nonzero slopes and
+let `pi_eta` be the prespecified directional-component probability. The leg
+posterior probabilities are obtained by normalizing the four model weights;
+equivalently they are slope-present probability marginalized over directional
+presence:
+
+```text
+PP_l = P(slope present | data).
+```
+
+After cross-clumping confirmatory Sets A and B, the factorized working-model
+probability of two nonzero slopes is
+`PP_two-stage = PP_XM PP_MY`. The posterior local FDR is one minus this
+quantity. Traits are sorted by local FDR and their running mean estimates the
+posterior expected false-discovery proportion. The development defaults
+`pi_XM=0.50`, `pi_MY=0.25`, and `pi_eta=0.10` were frozen before confirmatory
+validation and are recorded in every analysis. This is Bayesian calibration under the fixed-prior
+likelihood model, not a frequentist guarantee under model or prior
+misspecification. The product is exact only under the working likelihood
+factorization. Because nonzero LD can correlate sampling errors even for
+different variants, the maximum retained cross-set `r²` is reported and a
+configured-threshold violation fails closed.
 
 ### Risk-factor-to-molecular effect
 
@@ -161,7 +218,9 @@ alpha_A = beta_1j gamma_A + residual_A.
 Because Set A was selected in the risk-factor GWAS, the molecular association
 test is conditional on the observed risk-factor associations and requires
 independent risk-factor and molecular GWAS estimation errors for confirmatory
-calibration.
+calibration. Exposure-only selection may use these same exposure estimates;
+an independent discovery statistic is preferred for effect estimation and
+Bayesian evidence to reduce winner's-curse bias.
 
 ### Molecular-to-outcome effect
 
@@ -171,11 +230,12 @@ The second leg uses Set B only:
 Gamma_B = beta_2j alpha_B + direct_B + sampling_error_B.
 ```
 
-Using Set B prevents covariance among risk-factor instruments from generating
-the evidence for `beta_2j`. Balanced direct effects are accommodated by the
-overdispersion calculation in the score test. Causal interpretation still
-requires an exclusion restriction: direct effects must not be systematically
-proportional to `alpha_B`.
+Using Set B prevents the same risk-factor instruments from generating the
+evidence for `beta_2j`. The residual-scaled score permits a common Gaussian
+variance multiplier relative to the declared LD covariance; it is not valid
+for arbitrary balanced, sparse, or variant-specific direct effects. Causal
+interpretation still requires an exclusion restriction: direct effects must
+not be systematically proportional to `alpha_B`.
 
 ### Residual risk-factor effect and pleiotropy
 
@@ -196,20 +256,26 @@ as a fully calibrated test.
 
 ### Conditional score tests
 
-For each leg, the score under `b=0`, conditional on `x`, is
+For each leg let `s_i=sign(x_i)`. After whitening by the reported outcome
+covariance, we project both the exposure and outcome vectors away from `s`.
+Writing the residualized vectors as `x_perp` and `y_perp`, the score under
+`b=0`, conditional on `x`, is
 
 ```text
-U = x' S_y^-1 y,
-I = x' S_y^-1 x,
+U = x_perp' y_perp,
+I = x_perp' x_perp,
 z = U / sqrt(I phi).
 ```
 
-The scale `phi` is the whitened residual sum of squares divided by `n-1`,
-truncated below at one so heterogeneity can only increase uncertainty. A
-Student t reference with `n-1` degrees of freedom is used. Under independent
-GWAS errors and the proportional overdispersion working model, this gives a
-small-sample test that is conservative when the reported sampling variance is
-sufficient.
+The scale `phi` is the whitened residual sum of squares divided by `n-2`. A
+Student t reference with `n-2` degrees of freedom is used. Conditional on `x`,
+this is exact under independent GWAS errors when the declared outcome
+covariance is correct up to a common positive Gaussian scale multiplier.
+
+A second score uses the reported outcome covariance without estimating
+overdispersion and has a standard-normal null reference. It is exact under the
+declared Gaussian covariance while allowing an arbitrary allele-oriented
+intercept, but it is not robust to additional residual heterogeneity.
 
 The intersection-union p-value `max(p_XM,j,p_MY,j)` rejects mediation only when
 both required legs reject their respective nulls. Across traits, BMEDIATOR
@@ -217,6 +283,51 @@ computes Benjamini-Yekutieli q-values, which control FDR under arbitrary
 dependence under valid marginal p-values. This calibration is analytical: no
 simulated labels, empirical null fitted across proteins, or truth-dependent
 thresholds enter the calculation.
+
+### Safe e-values and arbitrary-dependence FDR
+
+Let `T` denote the residual-scaled statistic above and `nu=n-2`. Conditional on
+the selected exposure associations, `T` has density `f_nu`, the central Student
+t density, under the leg null for every unrestricted common allele-oriented
+intercept and positive common Gaussian scale multiplier. We prespecify
+
+```text
+g_nu(t) = (1/6) [
+  sum_(mu in {2,4,6}) {f_nu(t-mu) + f_nu(t+mu)}/2
+  + sum_(s in {2,4,8}) f_nu(t/s)/s
+],
+E_leg = g_nu(T)/f_nu(T).
+```
+
+Every shifted or scaled component and therefore `g_nu` is a proper density.
+It follows directly that `E_0(E_leg|x)=1`. The symmetric shift and scale grids
+have equal fixed weights, are recorded in the hyperparameter output, and are
+not estimated from outcomes or simulation labels. The guarantee requires
+independent exposure and outcome GWAS errors and correct LD/error covariance
+up to the common scalar; it excludes arbitrary heterogeneous, sparse, and
+exactly slope-aligned direct effects. If a nonzero sampling-error correlation
+is declared for either causal leg, the software reports exploratory leg
+statistics but does not calculate BY or e-BH q-values and labels the result
+unresolved for sample overlap.
+
+The composite mediation null is `H_XM,0 union H_MY,0`. The statistic
+
+```text
+E_med,j = min(E_XM,j, E_MY,j)
+```
+
+is valid under this union because it is no greater than the valid leg e-value
+for whichever null is true. Let `E_(1) >= ... >= E_(m)` be the ordered
+mediation e-values. Base e-BH selects the largest `k` satisfying
+`E_(k) >= m/(alpha k)`. This controls FDR under arbitrary cross-protein
+dependence when the leg likelihood and independence assumptions hold. The
+implementation reports adjusted e-BH values in `factor_e_q_EBH` (Wang and
+Ramdas, 2022).
+
+This FDR statement applies to the two-leg statistical hypotheses. Regional
+H3/H4 classification is a subsequent causal-identification assessment. The
+post-gate subset is not claimed to inherit the e-BH guarantee without a
+separate structured e-value argument.
 
 ### LD-aware regional hypotheses
 
@@ -240,17 +351,24 @@ pleiotropically.
 
 ### Decision rule and output
 
-The default Bayesian status requires at least two exact Set A associations,
-at least two independent Set B instruments, both leg-specific BFs at least 10,
-an LD reference, zero declared sampling-error correlation for the causal legs,
-and regional support for H4. The frequentist status applies the same
-identification gates and requires the BY q-value to be no greater than the
-prespecified alpha. Effect estimates, SEs, leg-specific BFs and p-values,
-conjunction p and q-values, regional probabilities, instrument counts, and
+The primary development Bayesian family rule uses the posterior cumulative
+FDR. A separate evidence status retains the historical requirement that both
+leg-specific BFs exceed 10. Confirmatory interpretation additionally requires
+at least three exact Set A associations, at least three independent Set B
+instruments, an LD reference, at least two independently matched H4 signal
+pairs, and no strong residual heterogeneity on either causal leg. The robust
+frequentist and safe-e statuses apply the same interpretation gates after BY
+or e-BH selection. Strict Gaussian statuses are explicitly labeled as
+exclusion-model sensitivities. Effect estimates, heterogeneity estimates,
+SEs, leg-specific BFs and posterior probabilities, e-values and p-values,
+family-level decisions, regional probabilities, instrument counts, and
 explicit unresolved states are retained for every molecular trait.
 
-The mediated effect is `beta_1j beta_2j`; its SE uses a first-order delta
-method. A positive status is a conditional causal conclusion under the stated
+The mediated effect is `beta_1j beta_2j`; its SE includes the second-order
+product-of-variance term. Its confidence interval is the range of the four
+corner products from Bonferroni simultaneous t intervals for the two legs,
+using `n-2` degrees of freedom on each leg. This interval is deliberately
+conservative. A positive status is a conditional causal conclusion under the stated
 instrument and regional assumptions, not assumption-free proof of biological
 mediation.
 
@@ -283,3 +401,11 @@ MR-Egger, weighted-median or robust MR, SMR/HEIDI, colocalization, and
 multivariable MR where their estimands are applicable. Real-data evaluation
 should include independent molecular resources, positive controls, negative
 controls, and replication across outcome studies.
+
+## Methodological references
+
+Wasserman L, Ramdas A, Balakrishnan S. Universal inference. *Proceedings of
+the National Academy of Sciences* 117, 16880-16890 (2020).
+
+Wang R, Ramdas A. False discovery rate control with e-values. *Journal of the
+Royal Statistical Society: Series B* 84, 822-852 (2022).

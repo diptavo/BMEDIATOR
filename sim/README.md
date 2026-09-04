@@ -2,6 +2,21 @@
 
 ## Current LD benchmark
 
+The factorized multi-signal runner tests the complete two-leg and regional
+pipeline with multiple independent cis blocks:
+
+```bash
+python3 sim/run_factorized_ld_stress.py \
+  --binary ./bmediator \
+  --outdir build/factorized_ld_stress \
+  --replicates 100
+```
+
+It includes matched moderate/high LD, mismatched target/reference LD, shared
+mediation, distinct variants in LD, no second stage, and same-variant aligned
+pleiotropy. The older command below remains the frozen single-signal regional
+benchmark.
+
 Use the genotype-based regional stress runner for mediation-versus-LD claims:
 
 ```bash
@@ -28,6 +43,31 @@ distinct causal variant in LD. The task runner now refuses those cells instead
 of producing a misleading LD benchmark. The old framework also runs legacy
 pre-clumped mode and therefore validates `P_M1`, not
 `P_mediator_ld_resolved`.
+
+## Factorized batched calibration
+
+Use `run_factorized_task.py` for calibration of the factorized method. It runs
+all proteins in one BMEDIATOR invocation so BY and e-BH operate over the actual
+simulated family rather than over one protein at a time.
+
+```bash
+python3 sim/run_factorized_task.py \
+  --config sim/configs/factorized_calibration_smoke.json \
+  --benchmark calibration \
+  --cell baseline_signed_mix \
+  --replicate 1 \
+  --outdir build/factorized_calibration_smoke \
+  --binary ./bmediator
+python3 sim/summarize_factorized_calibration.py \
+  --input build/factorized_calibration_smoke \
+  --output-dir build/factorized_calibration_smoke/summary
+```
+
+The configuration covers signed instruments, near-threshold selection,
+directional and sparse Set B pleiotropy, sampling-error correlation, missing
+Set B instruments, and the exact aligned-pleiotropy boundary. The dedicated
+1,000-protein least-favorable null check is
+`configs/factorized_evalue_null_smoke.json`.
 
 ## Dedicated M1-versus-M5 study
 
@@ -146,6 +186,25 @@ Each run creates:
   config for paper-grade Biowulf runs.
 
 ## Biowulf
+
+Do not run simulation, manifest-generation, compilation, or summarization
+commands on the Biowulf login node. The factorized launchers below perform
+only one `sbatch` call on the login node; a small coordinator allocation builds
+the manifest and submits the array and dependent summary jobs.
+
+```bash
+bash scripts/submit_factorized_calibration.sh \
+  /data/Dutta_lab/BMEDIATOR/BMEDIATOR \
+  /data/Dutta_lab/BMEDIATOR/BMEDIATOR/sim/configs/factorized_final_validation.json \
+  /data/Dutta_lab/BMEDIATOR/sim_benchmark/factorized_final_validation
+
+bash scripts/submit_factorized_ld_validation.sh \
+  /data/Dutta_lab/BMEDIATOR/BMEDIATOR \
+  /data/Dutta_lab/BMEDIATOR/sim_benchmark/factorized_ld_validation
+```
+
+The coordinator writes the child array and summary IDs to
+`OUT_ROOT/manifests/job_ids.tsv`.
 
 The repository also includes a manifest-driven Biowulf workflow:
 

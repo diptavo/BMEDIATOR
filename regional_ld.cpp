@@ -1,5 +1,6 @@
 #include "regional_ld.h"
 
+#include <functional>
 #include <unordered_set>
 
 namespace bmediator {
@@ -322,6 +323,44 @@ RegionalSignalPairResult coloc_signal_pair(const FineMapSignal& protein_signal,
     return result;
 }
 
+int maximum_shared_signal_matching(
+    const std::vector<RegionalSignalPairResult>& pairs,
+    int n_protein_signals,
+    int n_outcome_signals) {
+    std::vector<std::vector<int>> edges(n_protein_signals);
+    for (const auto& pair : pairs) {
+        if (pair.interpretation != "SHARED_SIGNAL_SUPPORTED") continue;
+        const int protein_index = pair.protein_signal - 1;
+        const int outcome_index = pair.outcome_signal - 1;
+        if (protein_index >= 0 && protein_index < n_protein_signals &&
+            outcome_index >= 0 && outcome_index < n_outcome_signals) {
+            edges[protein_index].push_back(outcome_index);
+        }
+    }
+
+    std::vector<int> outcome_match(n_outcome_signals, -1);
+    std::function<bool(int, std::vector<bool>&)> augment =
+        [&](int protein_index, std::vector<bool>& seen) {
+            for (int outcome_index : edges[protein_index]) {
+                if (seen[outcome_index]) continue;
+                seen[outcome_index] = true;
+                if (outcome_match[outcome_index] < 0 ||
+                    augment(outcome_match[outcome_index], seen)) {
+                    outcome_match[outcome_index] = protein_index;
+                    return true;
+                }
+            }
+            return false;
+        };
+
+    int matched = 0;
+    for (int protein_index = 0; protein_index < n_protein_signals; ++protein_index) {
+        std::vector<bool> seen(n_outcome_signals, false);
+        if (augment(protein_index, seen)) matched++;
+    }
+    return matched;
+}
+
 } // namespace
 
 void compute_multisignal_regional_evidence(ProteinData& protein,
@@ -330,6 +369,7 @@ void compute_multisignal_regional_evidence(ProteinData& protein,
     protein.regional_method = "ld-multisignal";
     protein.regional_multisignal_evaluated = true;
     protein.regional_signal_pairs.clear();
+    protein.regional_independent_shared_signals = 0;
     if (!protein.regional_data_complete || protein.regional_bim_index.size() < 2) {
         protein.regional_multisignal_interpretation = "NO_REGIONAL_DATA";
         return;
@@ -363,6 +403,11 @@ void compute_multisignal_regional_evidence(ProteinData& protein,
             ));
         }
     }
+    protein.regional_independent_shared_signals = maximum_shared_signal_matching(
+        protein.regional_signal_pairs,
+        static_cast<int>(protein_signals.size()),
+        static_cast<int>(outcome_signals.size())
+    );
 
     const RegionalSignalPairResult* chosen = nullptr;
     for (const auto& pair : protein.regional_signal_pairs) {

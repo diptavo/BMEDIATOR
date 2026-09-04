@@ -1,6 +1,6 @@
 # BMEDIATOR: Bayesian Mediation MR
 
-**Bayesian framework for identifying mediating plasma proteins between risk factors and disease outcomes using GWAS summary statistics.**
+**Bayesian framework for evaluating candidate plasma-protein mediators between risk factors and disease outcomes using GWAS summary statistics.**
 
 Version 1.2.0-dev 
 
@@ -10,18 +10,29 @@ Version 1.2.0-dev
 > production-calibrated mediation claims. See
 > [Validation Status](docs/VALIDATION.md).
 
+> **Current factorized validation:** The frozen 1.36-million-analysis run found
+> valid but zero-power e-BH selection in the tested proteome families, useful
+> Bayesian power only with broad instrument-strength variation, and frequent
+> unresolved effect estimation under slope/intercept collinearity. Accurate
+> ancestry-matched LD remains essential. Version 1.2.0-dev is not a production
+> or publication-ready release.
+
 > **Experimental repair:** `--structural-method factorized` separates the two
 > causal legs, residual RF effect, and pleiotropy instead of forcing them into
-> mutually exclusive M1-M5 states. It reports fixed-prior Bayes factors,
-> analytically calibrated conjunction p-values, BY q-values, and a separate
-> regional H3/H4 identification gate. It is not yet the default. See
+> mutually exclusive M1-M5 states. It reports nuisance-aware fixed-prior
+> Bayes factors, model-conditional conjunction p-values, BY q-values,
+> safe e-values with e-BH, fixed-prior posterior expected-FDR values, and a
+> separate regional H3/H4 identification gate.
+> It is not yet the default. See
 > [Factorized two-stage method](docs/FACTORIZED_METHOD.md).
 
 ---
 
 ## Overview
 
-BMEDIATOR identifies which intermediate phenotypes (e.g. plasma proteins; PP) are true causal mediators on the pathway from a risk factor (RF) to a disease outcome (e.g., cancer), using only summary statistics from three sources:
+BMEDIATOR evaluates whether intermediate phenotypes (for example, plasma
+proteins) are compatible with mediating a risk-factor effect on a disease
+outcome, using summary statistics from three sources:
 
 1. **RF GWAS** — genome-wide significant instruments for the risk factor
 2. **pQTL study** — protein quantitative trait loci (cis and trans)
@@ -38,10 +49,10 @@ RF ---β₁---> PP ---β₂---> Cancer
          (direct effect)
 ```
 
-For each protein, BMEDIATOR computes ELBO-based variational approximate model
-probabilities for six scenarios.
-Mediation is modeled as **partial mediation**: a protein may carry an identifiable
-component of the RF→disease association while a residual RF→disease effect remains.
+In legacy mode, BMEDIATOR computes ELBO-based variational approximate model
+probabilities for six scenarios. These states are retained for compatibility;
+the recommended research workflow in this development release is the
+factorized mode described below.
 
 | Scenario | Interpretation | Constraints |
 |----------|---------------|-------------|
@@ -60,11 +71,17 @@ For each protein, instruments are partitioned into:
 - **Set B** (cis-only): Significant cis-pQTL for the protein, NOT genome-wide significant for RF
 - **Set C** (overlap): Both RF-significant AND in the cis-region
 
-Set C instruments are handled with a dedicated likelihood that avoids
-double-counting, but they cannot by themselves distinguish mediation from
-correlated pleiotropy. The identifying evidence for β₂ comes primarily from
-multiple independent Set B instruments under the assumption that their sparse
-outcome-direct effects are independent of their protein effects. M5 permits
+In factorized mode, Set A and Set B are also cross-clumped at `--clump-r2`.
+Any cis-pQTL above that LD threshold with an RF instrument is moved to Set C,
+and every RF instrument physically inside the cis window is excluded from Set
+A regardless of its protein-association p-value.
+
+Set C instruments are excluded from the factorized confirmatory leg estimates
+and retained for regional diagnostics; they cannot by themselves distinguish
+mediation from correlated pleiotropy. The identifying evidence for β₂ comes
+from multiple independent Set B instruments under the assumption that their
+outcome-direct effects are not systematically aligned with their protein
+effects. The legacy M5 state permits
 correlated RF-to-protein and RF-to-outcome residuals at RF-associated Set A/C
 instruments; it does not permit unrestricted protein-effect/outcome-direct
 covariance at Set B instruments. Without this restriction, M1 and M5 are
@@ -80,8 +97,9 @@ observationally equivalent. See
 
 `P_M1` is approximate structural support for mediation within the six-state model.
 `P_mediator_ld_resolved` is nonzero only when full regional data support a
-shared signal, at least two independent RF-to-protein instruments exist, and a
-cis-only signal is available. This remains conditional on exclusion and
+shared signal, at least two independent RF-to-protein instruments exist, and
+at least two independently matched cis protein-outcome signals are available.
+This remains conditional on exclusion and
 valid-instrument assumptions; see
 [Identification and LD Resolution](docs/IDENTIFICATION.md) and
 [Validation Status](docs/VALIDATION.md).
@@ -92,12 +110,24 @@ The experimental factorized analysis is enabled with:
 ./bmediator [the usual input options] --structural-method factorized
 ```
 
-It requires at least two exact observed Set A instruments and two independent Set B
+It requires at least three exact observed Set A instruments and three independent Set B
 instruments for a confirmatory call by default. The key new output columns are
 `factor_log_BF_XM`, `factor_log_BF_MY`, `factor_conjunction_p`,
-`factor_conjunction_q_BY`, `factor_mediation_status`, and
-`factor_frequentist_status`. These must not be interpreted as M1/M5 posterior
-probabilities.
+`factor_conjunction_q_BY`, `factor_log_e_mediation`, `factor_e_q_EBH`,
+`factor_PP_two_stage`, `factor_posterior_cum_fdr`,
+`factor_log_BF_directional_XM`, `factor_log_BF_directional_MY`,
+`factor_directional_collinearity_XM`, `factor_directional_collinearity_MY`,
+`factor_posterior_status`, `factor_mediation_status`,
+`factor_frequentist_status`, and `factor_ebh_status`. The factorized posterior
+is a fixed-prior working-model probability for two nonzero slopes, not an
+assumption-free M1/M5 probability. The e-BH guarantee concerns the two-leg evidence family; the
+regional H3/H4 result is an additional causal-identification assessment.
+When sampling-error overlap is declared for either causal leg, factorized BY
+and e-BH q-values are unavailable rather than being presented as calibrated.
+When slope and oriented-intercept curvature is unstable, statistical evidence
+is retained but effect estimates are unavailable and the causal status is
+`UNRESOLVED_EFFECT_ESTIMATION`; BMEDIATOR does not silently substitute a
+zero-intercept estimate.
 
 Factorized mode skips six-state CAVI for efficiency. The legacy `P_M0`-`P_M5`,
 ELBO, and legacy selection columns are therefore `nan` in a factorized run;
@@ -191,6 +221,7 @@ Run:
     --cancer-sumstat outcome_sumstats.tsv \
     --protein-info protein_info.tsv \
     --bfile LD_reference_prefix \
+    --structural-method factorized \
     --out one_protein_result
 ```
 
@@ -206,11 +237,18 @@ each manifest row and run the same command:
     --cancer-sumstat outcome_sumstats.tsv \
     --protein-info protein_info.tsv \
     --bfile LD_reference_prefix \
+    --structural-method factorized \
     --out manifest_result
 ```
 
 Full mode requires the `.bed`, `.bim`, and `.fam` files represented by
 `LD_reference_prefix`. All inputs must use the same genome build.
+
+For three-sample instrument selection, add `--factor-independent-selection`
+and provide `P_SELECT` (or `SELECT_P`) in the RF and protein files. `P_SELECT`
+must come from a discovery sample independent of the effect estimates used in
+the causal-leg likelihoods. Without that flag, selection uses `P` and the
+output records `factor_selection_design=same-sample`.
 
 ---
 
@@ -272,7 +310,7 @@ TNF      TNF    6    31543344   31546112
 
 Tab-delimited, one row per protein. Legacy mode sorts by
 `selection_probability`; factorized mode sorts by finite
-`factor_conjunction_q_BY` ascending.
+`factor_posterior_rank` ascending.
 
 | Column | Description |
 |--------|-------------|
@@ -305,16 +343,32 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | regional_signal_pairs | Number of protein-outcome signal pairs tested |
 | regional_max_credible_set_pair_r2 | Maximum cross-trait credible-set LD for the selected signal pair |
 | mediation_identifiability | Explicit LD-resolution and conditional-identification state |
-| factor_beta1, factor_beta1_se, factor_p_XM, factor_log_BF_XM | Factorized RF-to-protein estimate and evidence |
-| factor_beta2, factor_beta2_se, factor_p_MY, factor_log_BF_MY | Factorized protein-to-outcome estimate and evidence from Set B only |
+| factor_beta1, factor_beta1_se, factor_p_XM, factor_log_BF_XM | Factorized RF-to-protein adjusted-profile estimate and oriented-intercept-adjusted evidence |
+| factor_beta2, factor_beta2_se, factor_p_MY, factor_log_BF_MY | Factorized protein-to-outcome adjusted-profile estimate and oriented-intercept-adjusted evidence from Set B only |
+| factor_beta1_ci_lower/upper, factor_beta2_ci_lower/upper | Approximate finite-instrument t intervals with `n-2` degrees of freedom |
 | factor_beta3, factor_beta3_se, factor_p_XY, factor_log_BF_XY | Factorized residual RF-to-outcome estimate and evidence |
-| factor_indirect, factor_indirect_se | Factorized mediated effect and delta-method SE |
+| factor_log_e_XM, factor_log_e_MY, factor_log_e_XY | Safe log e-values from a fixed Student t density-ratio mixture after eliminating common scale and oriented-intercept nuisance terms |
+| factor_tau_XM, factor_tau_MY, factor_tau_XY | Profile estimates of residual heterogeneity SD for each leg |
+| factor_indirect, factor_indirect_se | Factorized mediated effect and second-order product SE |
+| factor_indirect_ci_lower/upper | Conservative simultaneous-confidence-rectangle interval for the product |
 | factor_conjunction_p, factor_conjunction_q_BY | Intersection-union p-value and proteome-wide BY q-value |
 | factor_min_log_BF | Smaller of the two causal-leg log Bayes factors; not a joint BF |
-| factor_nA, factor_nB, factor_ld_source | Instruments and LD source used by factor inference |
+| factor_log_e_mediation, factor_e_q_EBH | Minimum causal-leg log e-value and proteome-wide e-BH adjusted value |
+| factor_p_XM_strict, factor_p_MY_strict, factor_strict_conjunction_p, factor_strict_conjunction_q_BY | Gaussian score p-values after projecting out an allele-oriented pleiotropic intercept, with BY adjustment |
+| factor_log_BF_directional_XM, factor_log_BF_directional_MY | Evidence for an allele-oriented pleiotropic intercept on each leg, averaged over slope presence |
+| factor_log_BF_slope_only_*, factor_log_BF_directional_only_*, factor_log_BF_slope_directional_* | Component-model log BFs versus the neither-component model, retained for prior sensitivity |
+| factor_PP_directional_XM, factor_PP_directional_MY | Fixed-prior posterior probabilities of the directional component |
+| factor_directional_intercept_XM, factor_directional_intercept_MY (and `_se`) | Joint adjusted-profile estimates of the allele-oriented intercepts |
+| factor_directional_collinearity_XM, factor_directional_collinearity_MY | Weighted design collinearity between the causal slope and oriented intercept; values near 1 indicate weak separation |
+| factor_log_e_p2e_mediation, factor_e_q_p2e_EBH | Fixed p-to-e strict-model sensitivity and e-BH adjusted value |
+| factor_PP_XM, factor_PP_MY, factor_PP_two_stage | Fixed-prior working-model posterior probabilities for each leg and both legs |
+| factor_posterior_local_fdr, factor_posterior_cum_fdr, factor_posterior_rank | Bayesian expected-FDR diagnostics across the analyzed protein family |
+| factor_nA, factor_nB, factor_ld_source, factor_cross_set_max_r2 | Instruments, LD source, and largest retained Set A/Set B cross-LD `r²` used by factor inference |
 | factor_pattern | Descriptive nominal evidence pattern; not a biological state posterior |
 | factor_mediation_status | Bayesian two-leg evidence plus instrument and regional identification gates |
 | factor_frequentist_status | Conjunction/BY evidence plus the same identification gates |
+| factor_ebh_status | Safe-e/e-BH evidence plus the same identification gates |
+| factor_posterior_status | Fixed-prior posterior expected-FDR selection plus identification gates |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |
 | ELBO_M0 ... ELBO_M5 | Evidence lower bounds per scenario |
@@ -388,10 +442,17 @@ calibration.
 | `--sampling-corr-rf-pqtl <val>` | 0 | RF/pQTL estimation-error correlation |
 | `--sampling-corr-rf-outcome <val>` | 0 | RF/outcome estimation-error correlation |
 | `--sampling-corr-pqtl-outcome <val>` | 0 | pQTL/outcome estimation-error correlation |
-| `--factor-min-set-a <int>` | 2 | Minimum exact Set A associations for confirmatory factor inference |
-| `--factor-min-set-b <int>` | 2 | Minimum independent Set B instruments |
+| `--factor-min-set-a <int>` | 3 | Minimum exact Set A associations for confirmatory factor inference |
+| `--factor-min-set-b <int>` | 3 | Minimum independent Set B instruments |
 | `--factor-alpha <val>` | 0.05 | Leg-test and BY decision threshold |
 | `--factor-bf-threshold <val>` | 10 | Minimum BF required for each causal leg |
+| `--factor-prior-xm <val>` | 0.50 | Fixed prior probability for an RF-to-protein effect |
+| `--factor-prior-my <val>` | 0.25 | Fixed prior probability for a protein-to-outcome effect |
+| `--factor-prior-directional <val>` | 0.10 | Fixed prior probability for allele-oriented pleiotropy on either leg |
+| `--factor-directional-variance <val>` | 0.01 | Fixed prior variance for the oriented pleiotropic intercept |
+| `--factor-pleio-sd-xm <val>` | 0.1 | Half-normal prior SD for RF-to-protein residual heterogeneity |
+| `--factor-pleio-sd-my <val>` | 0.1 | Half-normal prior SD for protein-to-outcome residual heterogeneity |
+| `--factor-pleio-sd-xy <val>` | 0.1 | Half-normal prior SD for residual RF-to-outcome heterogeneity |
 | `--max-cavi-iter <int>` | 200 | Max CAVI iterations per scenario |
 | `--elbo-tol <val>` | 1e-6 | ELBO convergence tolerance |
 | `--max-eb-iter <int>` | 20 | Max empirical Bayes iterations when enabled |
@@ -447,6 +508,7 @@ This command analyzes IL6R as the only candidate mediator:
     --cancer-sumstat outcome/chd_finngen_r12_grch38.bmediator.tsv \
     --protein-info protein_panels/ukb_ppp_combined/protein_info.tsv \
     --bfile ld_reference/G1000plink \
+    --structural-method factorized \
     --out bmi_chd_il6r
 ```
 
@@ -467,7 +529,22 @@ This command analyzes all five UKB-PPP proteins in the supplied manifest:
     --cancer-sumstat outcome/chd_finngen_r12_grch38.bmediator.tsv \
     --protein-info protein_panels/ukb_ppp_combined/protein_info.tsv \
     --bfile ld_reference/G1000plink \
+    --structural-method factorized \
     --out bmi_chd_ukb_ppp_all5
+```
+
+To run the supplied five-protein deCODE panel, change the manifest and protein
+annotation paths:
+
+```bash
+/path/to/BMEDIATOR/bmediator \
+    --rf-sumstat rf/bmi_giant_locke_eur_grch38.bmediator.tsv \
+    --protein-gwas-list manifests/decode.protein_gwas_manifest.txt \
+    --cancer-sumstat outcome/chd_finngen_r12_grch38.bmediator.tsv \
+    --protein-info protein_panels/decode/protein_info.tsv \
+    --bfile ld_reference/G1000plink \
+    --structural-method factorized \
+    --out bmi_chd_decode_all5
 ```
 
 ### Expected results
@@ -483,34 +560,67 @@ Each command creates four files:
 
 For the one-protein command, `bmi_chd_il6r.mediation` contains one protein row:
 
-| Protein | Gene | nA | nB | nC | P_M1 | regional_PP_distinct | regional_PP_shared | P_mediator_ld_resolved | mediation_identifiability | mediated_effect |
-|---------|------|----|----|----|------|----------------------|--------------------|------------------------|---------------------------|-----------------|
-| OID20385 | IL6R | 112 | 87 | 0 | 0.999995 | 0.735029 | 0.064727 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | -0.001403 |
+| Protein | Gene | factor_nA | factor_nB | log BF XM | log BF MY | PP two-stage | Regional shared | Regional distinct | Mediation status |
+|---------|------|-----------|-----------|-----------|-----------|--------------|-----------------|-------------------|------------------|
+| OID20385 | IL6R | 75 | 87 | -2.508583 | 11.081333 | 0.075255 | 0.064727 | 0.735029 | NO_TWO_STAGE_BAYES_EVIDENCE |
 
-The high `P_M1` indicates structural support for M1, but IL6R is not identified
-as an LD-resolved mediator. The regional model finds 10 conditional protein
-signals and one outcome signal, evaluates 10 signal pairs, and does not pass the
-configured evidence threshold for either a shared or distinct protein-outcome
-configuration.
+IL6R has strong protein-to-CHD evidence in this analysis, but no corresponding
+BMI-to-IL6R leg (`factor_p_XM=0.535829`). It is therefore not supported as a BMI
+mediator. Its regional configuration is also ambiguous. The joint
+slope/intercept effect estimate is unavailable and is explicitly labeled
+`unresolved-joint-directional-curvature`; no zero-intercept estimate is
+substituted.
 
 For the five-protein command, `bmi_chd_ukb_ppp_all5.mediation` contains:
 
-| Protein | Gene | P_M1 | regional_PP_distinct | regional_PP_shared | Protein signals | Outcome signals | P_mediator_ld_resolved | mediation_identifiability | selected_fdr5 |
-|---------|------|------|----------------------|--------------------|-----------------|-----------------|------------------------|---------------------------|---------------|
-| OID20235 | PCSK9 | 1.000000 | 0.000002 | 0.999998 | 10 | 10 | 1.000000 | LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL | YES |
-| OID20385 | IL6R | 0.999995 | 0.735029 | 0.064727 | 10 | 1 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | NO |
-| OID20407 | ANGPTL3 | 0.999935 | 0.000000 | 0.000000 | 10 | 0 | 0.000000 | UNRESOLVED_NO_OUTCOME_SIGNAL | NO |
-| OID20049 | NPPB | 0.156211 | 0.715503 | 0.000001 | 10 | 1 | 0.000000 | LD_CONFIGURATION_AMBIGUOUS | NO |
-| OID20650 | VEGFA | 0.007081 | 0.000000 | 0.000000 | 10 | 0 | 0.000000 | UNRESOLVED_NO_OUTCOME_SIGNAL | NO |
+| Protein | Gene | log BF XM | log BF MY | PP two-stage | Shared signals | Regional interpretation | Final posterior status |
+|---------|------|-----------|-----------|--------------|----------------|-------------------------|------------------------|
+| OID20235 | PCSK9 | 4.508972 | 22.203667 | 0.989110 | 1 | UNRESOLVED_SINGLE_SHARED_SIGNAL | UNRESOLVED_SINGLE_SHARED_SIGNAL |
+| OID20049 | NPPB | 2.841584 | -0.174359 | 0.206692 | 0 | LD_CONFIGURATION_AMBIGUOUS | NOT_SELECTED_BY_POSTERIOR_FDR |
+| OID20385 | IL6R | -2.508583 | 11.081333 | 0.075255 | 0 | LD_CONFIGURATION_AMBIGUOUS | NOT_SELECTED_BY_POSTERIOR_FDR |
+| OID20407 | ANGPTL3 | -0.471483 | -1.527416 | 0.025931 | 0 | UNRESOLVED_NO_OUTCOME_SIGNAL | NOT_SELECTED_BY_POSTERIOR_FDR |
+| OID20650 | VEGFA | 2.295403 | -3.593386 | 0.008254 | 0 | UNRESOLVED_NO_OUTCOME_SIGNAL | NOT_SELECTED_BY_POSTERIOR_FDR |
 
-With the supplied files and default settings, PCSK9 is the only protein selected
-as an LD-resolved mediator at 5% FDR. These values were generated on Biowulf
-with the bundled production code and the GRCh38 European reference supplied in
-the example-data folder.
+PCSK9 passes the two-leg working-model posterior threshold, but the regional
+model recovers only one shared signal. A single shared variant cannot separate
+protein mediation from an exactly aligned direct effect, so the result is
+`UNRESOLVED_SINGLE_SHARED_SIGNAL`, not a confirmed mediator. None of the five
+proteins is selected by the analytically calibrated e-BH procedure. These
+values were generated on Biowulf with the GRCh38 European reference supplied
+in the example-data folder and the same-sample instrument-selection setting.
+
+The deCODE manifest run gives the same qualitative conclusion:
+
+| Protein | Gene | log BF XM | log BF MY | PP two-stage | Shared signals | Final status |
+|---------|------|-----------|-----------|--------------|----------------|--------------|
+| SeqId_5231_79 | PCSK9 | 2.391288 | 21.509874 | 0.916161 | 1 | UNRESOLVED_SINGLE_SHARED_SIGNAL |
+| SeqId_15602_43 | IL6R | -1.230570 | 8.791513 | 0.225979 | 0 | NO_TWO_STAGE_BAYES_EVIDENCE |
+| SeqId_16751_15 | NPPB | -0.393690 | -0.774358 | 0.053656 | 0 | NO_TWO_STAGE_BAYES_EVIDENCE |
+| SeqId_10391_1 | ANGPTL3 | 2.888711 | -1.786530 | 0.050105 | 0 | NO_TWO_STAGE_BAYES_EVIDENCE |
+| SeqId_2597_8 | VEGFA | 5.858941 | -2.322421 | 0.031554 | 0 | NO_TWO_STAGE_BAYES_EVIDENCE |
+
+The legacy engine assigned `P(M1)` near 1 to PCSK9, IL6R, and ANGPTL3 in one
+or both panels. Those probabilities are not estimates of the factorized target
+and should not be compared numerically to `factor_PP_two_stage`. Under the new
+analysis, IL6R and ANGPTL3 lack evidence for both causal legs, while PCSK9 has
+two-leg evidence but remains nonidentifiable at a single shared signal. No
+example protein is a confirmed mediator, and none is selected by e-BH.
 
 ---
 
 ## Interpreting Results
+
+For factorized runs, start with `factor_two_stage_status` and the
+multiple-testing status matching the inferential framework you prespecified:
+`factor_ebh_status` for analytical e-BH, `factor_frequentist_status` for the
+residual-scaled BY analysis, or `factor_posterior_status` for the fixed-prior
+working Bayesian analysis. A statistical selection is not an identified
+mediation result unless the regional and instrument checks also return a
+supported conditional status. `UNRESOLVED_*` values are results, not missing
+labels.
+
+The following columns apply to the legacy six-state mode and are `nan` in a
+factorized run:
 
 - **P(M1) > 0.8**: Strong structural evidence for M1, not necessarily identified mediation
 - **P_mediator_ld_resolved > 0.8**: Strong conditional evidence after regional and instrument checks
@@ -520,4 +630,6 @@ the example-data folder.
 - **P(M5) dominant**: Apparent mediation signal driven by correlated/shared pleiotropy
 - **P(M0) dominant**: No evidence for protein involvement
 
-Check `beta2` and `se_beta2` under M=1 for the estimated causal effect of the protein on cancer. The `mediated_effect` (β₁×β₂) quantifies how much of the RF→Cancer effect flows through this protein.
+In factorized mode, use `factor_beta1`, `factor_beta2`, and `factor_indirect`
+only when `factor_effect_estimator` is not an unresolved value. In legacy mode,
+`beta2`, `se_beta2`, and `mediated_effect` retain their original meanings.

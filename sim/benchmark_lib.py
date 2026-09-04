@@ -7,7 +7,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -83,6 +83,12 @@ def scenario_parameters(cell: Dict, scenario: str) -> Dict[str, float]:
         "delta_sd": float(cell["delta_sd"]),
         "psi_sd": float(cell["psi_sd"]),
         "phi_sd": float(cell["phi_sd"]),
+        "phi_mean": float(cell.get("phi_mean", 0.0)),
+        "phi_oriented_mean": float(cell.get("phi_oriented_mean", 0.0)),
+        "phi_alpha_slope": float(cell.get("phi_alpha_slope", 0.0)),
+        "phi_outlier_rate": float(cell.get("phi_outlier_rate", 0.0)),
+        "phi_outlier_sd": float(cell.get("phi_outlier_sd", 0.0)),
+        "delta_gamma_slope": float(cell.get("delta_gamma_slope", 0.0)),
         "rho_m5": float(cell.get("rho_m5", cell.get("rho_m3", 0.0))),
         "direction_flip_rate": float(cell.get("direction_flip_rate", 0.0)),
     }
@@ -120,6 +126,8 @@ def sample_observed_effects(
     rf_se: float,
     pqtl_se: float,
     outcome_se: float,
+    shared_noise: Optional[np.ndarray] = None,
+    cross_protein_error_corr: float = 0.0,
 ) -> Tuple[float, float, float]:
     rf_obs = float(rf_true)
     pqtl_obs = float(pqtl_true)
@@ -154,6 +162,9 @@ def sample_observed_effects(
         except np.linalg.LinAlgError:
             cov = cov + np.eye(3) * 1e-10
             noise = rng.multivariate_normal(np.zeros(3), cov)
+        if shared_noise is not None and cross_protein_error_corr > 0.0:
+            rho = max(0.0, min(0.99, float(cross_protein_error_corr)))
+            noise = math.sqrt(rho) * shared_noise + math.sqrt(1.0 - rho) * noise
         rf_obs += float(noise[0])
         pqtl_obs += float(noise[1])
         outcome_obs += float(noise[2])
@@ -202,6 +213,15 @@ def simulate_effects(
     gamma_c = rng.uniform(gamma_lo, gamma_hi, size=n_c) if n_c else np.array([])
     cis_b = rng.uniform(cis_lo, cis_hi, size=n_b) if n_b else np.array([])
     cis_c = rng.uniform(cis_lo, cis_hi, size=n_c) if n_c else np.array([])
+    gamma_negative_rate = float(cell.get("gamma_negative_rate", 0.0))
+    cis_negative_rate = float(cell.get("cis_negative_rate", 0.0))
+    if n_a:
+        gamma_a *= np.where(rng.random(n_a) < gamma_negative_rate, -1.0, 1.0)
+    if n_c:
+        gamma_c *= np.where(rng.random(n_c) < gamma_negative_rate, -1.0, 1.0)
+        cis_c *= np.where(rng.random(n_c) < cis_negative_rate, -1.0, 1.0)
+    if n_b:
+        cis_b *= np.where(rng.random(n_b) < cis_negative_rate, -1.0, 1.0)
 
     if scenario == "M5":
         cov = np.array(
@@ -217,16 +237,30 @@ def simulate_effects(
         delta_ac = rng.normal(0.0, delta_sd, size=n_a + n_c) if (n_a + n_c) else np.array([])
         psi_ac = rng.normal(0.0, psi_sd, size=n_a + n_c) if (n_a + n_c) else np.array([])
 
-    phi_b = rng.normal(0.0, phi_sd, size=n_b) if n_b else np.array([])
     delta_a = delta_ac[:n_a]
     delta_c = delta_ac[n_a:]
     psi_a = psi_ac[:n_a]
     psi_c = psi_ac[n_a:]
 
+    if n_a:
+        delta_a = delta_a + params["delta_gamma_slope"] * gamma_a
+    if n_c:
+        delta_c = delta_c + params["delta_gamma_slope"] * gamma_c
+
     alpha_a_true = beta1 * gamma_a + delta_a
     alpha_b_true = cis_b
     alpha_c_true = beta1 * gamma_c + cis_c + delta_c
     gamma_b_true = rng.normal(0.0, 0.005, size=n_b) if n_b else np.array([])
+
+    phi_b = (
+        rng.normal(params["phi_mean"], phi_sd, size=n_b)
+        + params["phi_oriented_mean"] * np.sign(alpha_b_true)
+        + params["phi_alpha_slope"] * alpha_b_true
+        if n_b else np.array([])
+    )
+    if n_b and params["phi_outlier_rate"] > 0.0 and params["phi_outlier_sd"] > 0.0:
+        outliers = rng.random(n_b) < params["phi_outlier_rate"]
+        phi_b = phi_b + outliers * rng.normal(0.0, params["phi_outlier_sd"], size=n_b)
 
     gamma_out_a = (beta2 * beta1 + beta3) * gamma_a + beta2 * delta_a + psi_a
     gamma_out_b = beta2 * cis_b + phi_b
@@ -334,6 +368,7 @@ def write_dataset(
                 "true_beta2": protein["true_beta2"],
                 "true_beta3": protein["true_beta3"],
                 "true_mediated_effect": protein["true_beta1"] * protein["true_beta2"],
+                "true_directional_intercept_my": protein["true_directional_intercept_my"],
                 "direction_flipped": int(bool(protein.get("direction_flipped", False))),
                 "identification_class": protein.get("identification_class", "identified"),
                 "data_generating_mechanism": protein.get("data_generating_mechanism", protein["scenario"]),
@@ -351,6 +386,7 @@ def write_dataset(
                         "BETA": rec["rf_beta"],
                         "SE": rf_se,
                         "P": rec["rf_p"],
+                        "P_SELECT": rec["rf_select_p"],
                         "CHR": chr_num,
                         "BP": rec["bp"],
                     }
@@ -365,6 +401,7 @@ def write_dataset(
                         "BETA": rec["pqtl_beta"],
                         "SE": pqtl_se,
                         "P": rec["pqtl_p"],
+                        "P_SELECT": rec["pqtl_select_p"],
                         "CHR": chr_num,
                         "BP": rec["bp"],
                     }
@@ -389,14 +426,14 @@ def write_dataset(
     protein_info = rep_dir / "protein_info.txt"
     truth = rep_dir / "truth.tsv"
 
-    write_table(rf, rf_rows, ["SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP"], " ")
-    write_table(pqtl, pqtl_rows, ["PROTEIN", "SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP"], " ")
+    write_table(rf, rf_rows, ["SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP", "P_SELECT"], " ")
+    write_table(pqtl, pqtl_rows, ["PROTEIN", "SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP", "P_SELECT"], " ")
     write_table(cancer, cancer_rows, ["SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP"], " ")
     write_table(protein_info, info_rows, ["PROTEIN", "GENE", "CHR", "START", "END"], " ")
     write_table(
         truth,
         truth_rows,
-        ["protein_id", "gene_name", "true_scenario", "nA_true", "nB_true", "nC_true", "true_beta1", "true_beta2", "true_beta3", "true_mediated_effect", "direction_flipped", "identification_class", "data_generating_mechanism"],
+        ["protein_id", "gene_name", "true_scenario", "nA_true", "nB_true", "nC_true", "true_beta1", "true_beta2", "true_beta3", "true_mediated_effect", "true_directional_intercept_my", "direction_flipped", "identification_class", "data_generating_mechanism"],
         "\t",
     )
     return BenchmarkFiles(rf=rf, pqtl=pqtl, cancer=cancer, protein_info=protein_info, truth=truth)
@@ -409,6 +446,10 @@ def generate_proteins(
     scenario_sequence: Iterable[str],
 ) -> List[Dict]:
     proteins: List[Dict] = []
+    cross_protein_error_corr = max(
+        0.0, min(0.99, float(cell.get("cross_protein_error_corr", 0.0)))
+    )
+    shared_sampling_errors: Dict[Tuple[str, int], np.ndarray] = {}
     for idx, scenario in enumerate(scenario_sequence, start=1):
         n_a, n_b, n_c = sample_set_counts(rng, benchmark, cell, scenario)
         effects = simulate_effects(rng, scenario, cell, n_a, n_b, n_c)
@@ -445,6 +486,25 @@ def generate_proteins(
                 rf_se = float(cell["rf_se"])
                 pqtl_se = float(cell["pqtl_se"])
                 outcome_se = float(cell["outcome_se"])
+                shared_noise = None
+                if bool(cell.get("sampling_noise", False)) and cross_protein_error_corr > 0.0:
+                    noise_key = (set_name, j)
+                    if noise_key not in shared_sampling_errors:
+                        rf_pqtl, rf_outcome, pqtl_outcome = sampling_error_correlations(cell)
+                        corr = np.array(
+                            [
+                                [1.0, rf_pqtl, rf_outcome],
+                                [rf_pqtl, 1.0, pqtl_outcome],
+                                [rf_outcome, pqtl_outcome, 1.0],
+                            ],
+                            dtype=float,
+                        )
+                        scales = np.array([rf_se, pqtl_se, outcome_se], dtype=float)
+                        covariance = corr * np.outer(scales, scales)
+                        shared_sampling_errors[noise_key] = rng.multivariate_normal(
+                            np.zeros(3), covariance
+                        )
+                    shared_noise = shared_sampling_errors[noise_key]
                 rf_beta, pqtl_beta, outcome_beta = sample_observed_effects(
                     rng,
                     cell,
@@ -455,10 +515,26 @@ def generate_proteins(
                     rf_se,
                     pqtl_se,
                     outcome_se,
+                    shared_noise,
+                    cross_protein_error_corr,
                 )
                 rf_p = float(norm_sf(np.array([rf_beta / rf_se]))[0] * 2.0)
                 pqtl_p = float(norm_sf(np.array([pqtl_beta / pqtl_se]))[0] * 2.0)
                 outcome_p = float(norm_sf(np.array([outcome_beta / outcome_se]))[0] * 2.0)
+                if bool(cell.get("independent_selection", False)):
+                    rf_selection_se = float(cell.get("rf_selection_se", rf_se))
+                    pqtl_selection_se = float(cell.get("pqtl_selection_se", pqtl_se))
+                    rf_select_beta = float(rf_true + rng.normal(0.0, rf_selection_se))
+                    pqtl_select_beta = float(pqtl_true + rng.normal(0.0, pqtl_selection_se))
+                    rf_select_p = float(
+                        norm_sf(np.array([rf_select_beta / rf_selection_se]))[0] * 2.0
+                    )
+                    pqtl_select_p = float(
+                        norm_sf(np.array([pqtl_select_beta / pqtl_selection_se]))[0] * 2.0
+                    )
+                else:
+                    rf_select_p = rf_p
+                    pqtl_select_p = pqtl_p
                 snps[set_name].append(
                     {
                         "rsid": f"rs{scenario.lower()}_{idx}_{set_name.lower()}{j + 1}",
@@ -470,6 +546,8 @@ def generate_proteins(
                         "outcome_beta": outcome_beta,
                         "rf_p": rf_p,
                         "pqtl_p": pqtl_p,
+                        "rf_select_p": rf_select_p,
+                        "pqtl_select_p": pqtl_select_p,
                         "outcome_p": outcome_p,
                         "bp": int(bp),
                     }
@@ -490,8 +568,15 @@ def generate_proteins(
                 "true_beta1": effects["true_beta1"],
                 "true_beta2": effects["true_beta2"],
                 "true_beta3": effects["true_beta3"],
+                "true_directional_intercept_my": (
+                    params["phi_oriented_mean"] if scenario != "M0" else 0.0
+                ),
                 "direction_flipped": effects["direction_flipped"],
-                "identification_class": str(cell.get("identification_class", "identified")),
+                "identification_class": str(
+                    cell.get("scenario_identification_class", {}).get(
+                        scenario, cell.get("identification_class", "identified")
+                    )
+                ),
                 "data_generating_mechanism": (
                     "M5_ALIGNED_PLEIOTROPY"
                     if scenario == "M5" and float(cell.get("m5_aligned_pleiotropy_beta", 0.0)) != 0.0

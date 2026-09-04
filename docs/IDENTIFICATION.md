@@ -1,17 +1,22 @@
 # Identification and LD Resolution
 
-BMEDIATOR separates two questions that must not be conflated:
+BMEDIATOR separates three questions that must not be conflated:
 
-1. Does the six-state structural model favor M1 over M0-M5?
-2. Is the observed protein-outcome association compatible with one shared
-   regional causal signal rather than two distinct causal signals in LD?
+1. Is there evidence for the RF-to-protein causal leg?
+2. Is there independent Set B evidence for a protein-associated outcome slope?
+3. Do regional and overidentification diagnostics distinguish the observed
+   pattern from distinct variants in LD and detectable heterogeneous pleiotropy?
 
-`P_M1` answers the first question. It is structural model support, not by itself
-an identified probability of mediation. `P_mediator_ld_resolved` is nonzero only
-when the second question passes, at least two independent observed RF-to-protein
-instruments are available, and a cis-only protein instrument exists. It remains
-conditional on the assumptions below. `P_mediator_identified` is retained as a
-deprecated compatibility alias and must not be read as assumption-free proof.
+The factorized outputs answer these questions directly. The legacy `P_M1` and
+`P_M5` values are retained for compatibility, but their six-state validation
+failed and they are not confirmatory probabilities. `P_mediator_identified` is
+also a deprecated compatibility alias and must not be read as assumption-free
+proof.
+
+Disjoint variant names do not imply independent evidence. Factorized Set A and
+Set B are therefore cross-clumped using reference-panel LD, all RF instruments
+inside the molecular cis window are excluded from Set A, and the largest
+retained cross-set `r²` is reported explicitly.
 
 The `P_M*` values are normalized weights constructed from scenario priors and
 variational evidence lower bounds. They are approximate model probabilities,
@@ -19,25 +24,26 @@ not exact marginal-likelihood posterior probabilities. Their operating
 characteristics must be reported from validation studies separately from the
 analytical H3/H4 calculation.
 
-## How M1 and M5 are separated
+## Why M1 and M5 are not forced into exclusive classes
 
-M1 and M5 are distinguishable only because their nuisance structures are
-restricted differently across the instrument sets. For a protein-specific
+Detectable forms of mediation and pleiotropy are distinguishable only because
+their nuisance structures are restricted differently across the instrument
+sets. For a protein-specific
 Set B instrument `l`, the outcome equation is
 
 ```text
 Gamma_l = beta2 * alpha_l + phi_l + error_l.
 ```
 
-Under M1, `beta2` is common across Set B instruments and `phi_l` is a sparse,
-mean-zero direct effect independent of `alpha_l`. Under M5, `beta2 = 0`.
-Correlated pleiotropy in M5 is represented by correlation between the
+Under the mediation working model, `beta2` is common across Set B instruments
+and `phi_l` is a mean-zero direct effect independent of `alpha_l`. Correlated
+RF-instrument pleiotropy is represented by correlation between the
 RF-to-protein residual `delta_k` and RF-to-outcome residual `psi_k` at
 RF-associated Set A/C instruments. It is not allowed to create unrestricted
 correlation between protein effects and outcome-direct effects at Set B
 instruments. Thus multiple independent Set B signals can support a common
-protein-to-outcome slope under M1 while the RF-instrument residual pattern can
-support M5.
+protein-to-outcome slope while the RF-instrument residual pattern can
+independently support coexisting pleiotropy.
 
 This restriction is essential. Suppose a proposed M5 model instead allowed a
 protein-direct component `d` and an outcome-direct component `h` to have
@@ -56,11 +62,13 @@ determined by prior scale and parameter-count choices, not by identified
 mediation evidence. BMEDIATOR does not use that formulation.
 
 The remaining identification claim is explicitly conditional. It requires at
-least two independent RF-to-protein observations, at least one protein-specific
-cis instrument, and the exclusion/independence assumptions above. A locus with
-only a shared variant, or a model that permits outcome-direct effects
-proportional to every protein effect, cannot distinguish M1 from M5 using these
-summary statistics and must remain unresolved.
+least three independent RF-to-protein observations, at least three independent cis
+instruments, at least two independently matched shared regional signals, and
+the exclusion/independence assumptions above. A locus with only one shared
+signal must remain unresolved. A model that permits outcome-direct effects
+proportional to every protein effect remains observationally equivalent to
+mediation even with multiple instruments; the strongest software status
+therefore names the exclusion-restriction condition explicitly.
 
 ## Regional configuration model
 
@@ -78,7 +86,9 @@ then evaluates every protein-outcome signal pair under:
 - H3: both traits, distinct causal variants
 - H4: both traits, the same causal variant
 
-The `.regional` file reports all signal pairs. The `.mediation` regional fields
+The `.regional` file reports all signal pairs. Shared edges are counted with a
+maximum bipartite matching, so no protein or outcome signal contributes more
+than once to `regional_independent_shared_signals`. The `.mediation` regional fields
 report the pair selected for the protein-level decision: a supported shared pair
 takes priority, followed by the strongest supported distinct pair, followed by
 the pair with the largest H3+H4 evidence. Resolution requires H3+H4 >=
@@ -102,8 +112,9 @@ in regions with allelic heterogeneity.
 
 ## Conditional identification assumptions
 
-`LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL` means that the data support
-M1 and H4 under all of these assumptions:
+`OVERIDENTIFIED_SHARED_SIGNALS_ASSUMPTION_CONDITIONAL` means that the data
+support both causal legs and at least two independent shared signal pairs under
+all of these assumptions:
 
 - The reference-panel LD is a sufficiently accurate estimate of the LD in both
   GWAS samples for conditional signal separation.
@@ -130,9 +141,14 @@ can produce a confident but incorrect result.
 
 ## Output states
 
-- `LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL`: shared regional signal,
-  at least two RF-to-protein instruments, and a cis-only signal; mediation
+- `OVERIDENTIFIED_SHARED_SIGNALS_ASSUMPTION_CONDITIONAL`: at least two matched
+  shared regional signals and adequate Set A/Set B instruments; interpretation
   remains conditional on the exclusion assumptions.
+- `UNRESOLVED_SINGLE_SHARED_SIGNAL`: H4 is supported for only one independent
+  signal, which cannot distinguish mediation from same-variant pleiotropy.
+- `UNRESOLVED_XM_HETEROGENEITY`, `UNRESOLVED_MY_HETEROGENEITY`, or
+  `UNRESOLVED_XM_AND_MY_HETEROGENEITY`: both causal legs may have evidence, but
+  residual heterogeneity is supported and a mediation interpretation is withheld.
 - `LD_DISTINCT_SUPPORTED`: distinct protein and outcome causal configurations
   are favored; mediation selection is disabled.
 - `LD_CONFIGURATION_AMBIGUOUS`: H3 versus H4 is not resolved.

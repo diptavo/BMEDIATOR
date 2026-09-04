@@ -21,6 +21,15 @@ VARIANTS = [
     (2, "d4", 220_000),
     (3, "r1", 300_000),
     (3, "r2", 400_000),
+    (3, "r3", 500_000),
+    (3, "r4", 600_000),
+    (4, "f1", 500_000),
+    (4, "f2", 510_000),
+    (4, "f3", 520_000),
+    (4, "f4", 530_000),
+    (4, "f5", 540_000),
+    (4, "f6", 550_000),
+    (4, "q1", 1_000_000),
 ]
 
 
@@ -55,6 +64,7 @@ def write_plink(prefix: Path) -> dict[tuple[str, str], float]:
         ]
     s1 = independent()
     d1 = independent()
+    q1 = independent()
     genotypes = [
         s1,
         correlated_copy(rng, s1, 0.18),
@@ -66,6 +76,15 @@ def write_plink(prefix: Path) -> dict[tuple[str, str], float]:
         None,
         independent(),
         independent(),
+        independent(),
+        independent(),
+        independent(),
+        independent(),
+        independent(),
+        independent(),
+        independent(),
+        correlated_copy(rng, q1, 0.25),
+        q1,
     ]
     genotypes[7] = correlated_copy(rng, genotypes[6], 0.18)
 
@@ -98,13 +117,14 @@ def write_plink(prefix: Path) -> dict[tuple[str, str], float]:
 def write_standard_sumstats(path: Path, effects: dict[str, tuple[float, float]]) -> None:
     lookup = {rsid: (chrom, bp) for chrom, rsid, bp in VARIANTS}
     with path.open("w", encoding="ascii") as handle:
-        handle.write("SNP A1 A2 FREQ BETA SE P CHR BP\n")
+        handle.write("SNP A1 A2 FREQ BETA SE P CHR BP P_SELECT\n")
         for _, rsid, _ in VARIANTS:
             beta, se = effects.get(rsid, (0.0, 0.02))
             chrom, bp = lookup[rsid]
             handle.write(
                 f"{rsid} A G 0.5 {beta:.6g} {se:.6g} "
-                f"{two_sided_p(beta / se):.8g} {chrom} {bp}\n"
+                f"{two_sided_p(beta / se):.8g} {chrom} {bp} "
+                f"{two_sided_p(beta / se):.8g}\n"
             )
 
 
@@ -116,7 +136,7 @@ def write_protein_gwas(
     lookup = {rsid: (chrom, bp) for chrom, rsid, bp in VARIANTS}
     columns = [
         "#CHROM", "POS", "ID", "REF", "ALT", "A1", "A1_FREQ",
-        "TEST", "BETA", "SE", "P", "ERRCODE",
+        "TEST", "BETA", "SE", "P", "ERRCODE", "P_SELECT",
     ]
     with path.open("w", encoding="ascii") as handle:
         handle.write("\t".join(columns) + "\n")
@@ -127,6 +147,7 @@ def write_protein_gwas(
                 str(chrom), str(bp), rsid, "G", "A", "A", "0.5", "ADD",
                 f"{beta:.6g}", f"{se:.6g}",
                 f"{two_sided_p(beta / se):.8g}", ".",
+                f"{two_sided_p(beta / se):.8g}",
             ]
             handle.write("\t".join(row) + "\n")
 
@@ -138,7 +159,11 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
     ld = write_plink(output / "ldref")
 
-    rf_effects = {"r1": (0.12, 0.015), "r2": (0.10, 0.015)}
+    rf_effects = {
+        "r1": (0.07, 0.01), "r2": (0.12, 0.01),
+        "r3": (0.22, 0.01), "r4": (0.40, 0.01),
+        "f5": (0.20, 0.01), "q1": (0.20, 0.01),
+    }
     outcome_effects = {
         snp: (0.18 * ld[(snp, "s1")] + 0.16 * ld[(snp, "s3")], 0.02)
         for snp in ("s1", "s2", "s3", "s4")
@@ -149,6 +174,10 @@ def main() -> None:
         "d3": (0.18 * ld[("d3", "d3")], 0.02),
         "d4": (0.18 * ld[("d4", "d3")], 0.02),
         "r1": (0.05, 0.015), "r2": (0.04, 0.015),
+        "r3": (0.09, 0.015), "r4": (0.16, 0.015),
+        "f1": (0.056, 0.01), "f2": (0.104, 0.01),
+        "f3": (0.20, 0.01), "f4": (0.36, 0.01),
+        "f5": (0.0, 0.01), "f6": (0.24, 0.01), "q1": (0.12, 0.01),
     })
     write_standard_sumstats(output / "rf.txt", rf_effects)
     write_standard_sumstats(output / "outcome.txt", outcome_effects)
@@ -167,6 +196,13 @@ def main() -> None:
         "d4": (0.20 * ld[("d4", "d1")], 0.02),
         "r1": (0.12, 0.02), "r2": (0.10, 0.02),
     }
+    factor_effects = {
+        "r1": (0.035, 0.01), "r2": (0.06, 0.01),
+        "r3": (0.11, 0.01), "r4": (0.20, 0.01),
+        "f1": (0.07, 0.01), "f2": (0.13, 0.01),
+        "f3": (0.25, 0.01), "f4": (0.45, 0.01),
+        "f5": (0.005, 0.01), "f6": (0.30, 0.01), "q1": (0.15, 0.01),
+    }
     write_protein_gwas(
         output / "shared.glm.linear", ["s1", "s2", "s3", "s4", "r1", "r2"],
         shared_effects,
@@ -175,16 +211,26 @@ def main() -> None:
         output / "distinct.glm.linear", ["d1", "d2", "d3", "d4", "r1", "r2"],
         distinct_effects,
     )
+    write_protein_gwas(
+        output / "factor.glm.linear",
+        ["f1", "f2", "f3", "f4", "f5", "f6", "q1",
+         "r1", "r2", "r3", "r4"],
+        factor_effects,
+    )
 
     with (output / "manifest.txt").open("w", encoding="ascii") as handle:
         handle.write(f"P_SHARED {output / 'shared.glm.linear'}\n")
         handle.write(f"P_DISTINCT {output / 'distinct.glm.linear'}\n")
+        handle.write(f"P_FACTOR {output / 'factor.glm.linear'}\n")
     with (output / "manifest_single.txt").open("w", encoding="ascii") as handle:
         handle.write(f"P_SHARED {output / 'shared.glm.linear'}\n")
+    with (output / "manifest_factor.txt").open("w", encoding="ascii") as handle:
+        handle.write(f"P_FACTOR {output / 'factor.glm.linear'}\n")
     with (output / "protein_info.txt").open("w", encoding="ascii") as handle:
         handle.write("PROTEIN GENE CHR START END\n")
         handle.write("P_SHARED G_SHARED 1 100000 110000\n")
         handle.write("P_DISTINCT G_DISTINCT 2 200000 210000\n")
+        handle.write("P_FACTOR G_FACTOR 4 500000 530000\n")
 
 
 if __name__ == "__main__":

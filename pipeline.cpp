@@ -168,6 +168,16 @@ static void read_single_protein_gwas_file(const ProteinFileSpec& spec,
             std::exit(1);
         }
     }
+    int pval_column = col["P"];
+    if (opts.factor_independent_selection) {
+        if (col.count("P_SELECT")) pval_column = col["P_SELECT"];
+        else if (col.count("SELECT_P")) pval_column = col["SELECT_P"];
+        else {
+            std::cerr << "Error: --factor-independent-selection requires a "
+                      << "P_SELECT column in " << spec.path << "\n";
+            std::exit(1);
+        }
+    }
 
     int n = 0;
     while (std::getline(fin, line)) {
@@ -178,7 +188,7 @@ static void read_single_protein_gwas_file(const ProteinFileSpec& spec,
             std::string field;
             while (std::getline(iss, field, '\t')) fields.push_back(field);
         }
-        if (static_cast<int>(fields.size()) <= col["P"]) continue;
+        if (static_cast<int>(fields.size()) <= pval_column) continue;
         if (fields[col["TEST"]] != "ADD") continue;
         if (col.count("ERRCODE") && fields[col["ERRCODE"]] != ".") continue;
         if (fields[col["ID"]] == ".") continue;
@@ -194,7 +204,7 @@ static void read_single_protein_gwas_file(const ProteinFileSpec& spec,
             s.freq = std::stod(fields[col["A1_FREQ"]]);
             s.beta = std::stod(fields[col["BETA"]]);
             s.se = std::stod(fields[col["SE"]]);
-            pval = std::stod(fields[col["P"]]);
+            pval = std::stod(fields[pval_column]);
             s.chr = std::stoi(fields[col["#CHROM"]]);
             s.bp = std::stoi(fields[col["POS"]]);
         } catch (...) {
@@ -337,6 +347,7 @@ static std::vector<RfInstrumentRef> nearby_rf_instruments(
     std::vector<RfInstrumentRef> out;
     auto it = rf_by_chr.find(chr);
     if (it == rf_by_chr.end()) return out;
+    if (window_bp < 0) return it->second;
     for (const auto& rf : it->second) {
         if (rf.bp < bp - window_bp) continue;
         if (rf.bp > bp + window_bp) break;
@@ -466,6 +477,7 @@ static void assign_ld_weights(ProteinData& prot,
     prot.ld_weight_cancer_union.assign(nU, 1.0);
     prot.setA_ld.clear();
     prot.setB_ld.clear();
+    prot.setAB_max_r2 = 0.0;
 
     struct UnionSnp { int chr; int bp; int bim_idx; };
     std::vector<UnionSnp> ac_snps;
@@ -582,6 +594,15 @@ static void assign_ld_weights(ProteinData& prot,
     };
     prot.setA_ld = ld_for(prot.setA_rsid);
     prot.setB_ld = ld_for(prot.setB_rsid);
+    for (const auto& a_rsid : prot.setA_rsid) {
+        const int a = plink.rsid_to_idx.at(a_rsid);
+        for (const auto& b_rsid : prot.setB_rsid) {
+            const int b = plink.rsid_to_idx.at(b_rsid);
+            if (plink.bim[a].chr != plink.bim[b].chr) continue;
+            prot.setAB_max_r2 = std::max(
+                prot.setAB_max_r2, ld_r2_with_cache(plink, cache, a, b));
+        }
+    }
 }
 
 static std::set<std::string> select_rf_instruments(const std::map<std::string, SumStat>& rf_ss,
@@ -689,11 +710,11 @@ static void copy_mediation_outputs(const Options& opts,
     std::sort(results.begin(), results.end(),
               [&](const ProteinResult& a, const ProteinResult& b) {
                   if (opts.structural_method == "factorized") {
-                      const bool a_ok = std::isfinite(a.factor_conjunction_q_by);
-                      const bool b_ok = std::isfinite(b.factor_conjunction_q_by);
+                      const bool a_ok = a.factor_posterior_rank > 0;
+                      const bool b_ok = b.factor_posterior_rank > 0;
                       if (a_ok != b_ok) return a_ok;
-                      if (a_ok && a.factor_conjunction_q_by != b.factor_conjunction_q_by) {
-                          return a.factor_conjunction_q_by < b.factor_conjunction_q_by;
+                      if (a_ok && a.factor_posterior_rank != b.factor_posterior_rank) {
+                          return a.factor_posterior_rank < b.factor_posterior_rank;
                       }
                   }
                   if (a.selection_probability != b.selection_probability) {
@@ -834,6 +855,10 @@ static void build_legacy_sets(std::vector<ProteinData>& proteins,
     int logged = 0;
     int cis_window_bp = opts.cis_window_kb * 1000;
     int overlap_window_bp = opts.clump_window_kb * 1000;
+    const bool factorized_partition = opts.structural_method == "factorized";
+    const double overlap_r2_thresh = factorized_partition
+        ? opts.r2_thresh : opts.proxy_r2_thresh;
+    const int overlap_search_window = factorized_partition ? -1 : overlap_window_bp;
     auto rf_by_chr = build_rf_index(rf_instruments, rf_ss, plink);
     std::map<std::pair<int, int>, double> ld_r2_cache;
     std::map<std::pair<int, int>, double> ld_r_cache;
@@ -885,8 +910,9 @@ static void build_legacy_sets(std::vector<ProteinData>& proteins,
             auto ca_it = cancer_ss.find(rsid);
             if (used_cis.count(rsid) || pq_snp == pq_it->second.end() || ca_it == cancer_ss.end()) continue;
             ProxyMatch proxy = best_rf_proxy_for_cis(plink, ld_r_cache, rf_by_chr, pq_snp->second,
-                                                     opts.proxy_r2_thresh, overlap_window_bp);
-            if (!proxy.found || consumed_rf.count(proxy.rsid)) continue;
+                                                     overlap_r2_thresh, overlap_search_window);
+            if (!proxy.found ||
+                (!factorized_partition && consumed_rf.count(proxy.rsid))) continue;
             auto rf_it = rf_ss.find(proxy.rsid);
             if (rf_it == rf_ss.end()) continue;
             prot.setC_rsid.push_back(rsid);
@@ -908,6 +934,24 @@ static void build_legacy_sets(std::vector<ProteinData>& proteins,
             auto ca_it = cancer_ss.find(rsid);
             if (rf_it == rf_ss.end() || ca_it == cancer_ss.end()) continue;
             auto pq_snp = pq_it->second.find(rsid);
+            const bool in_cis_region =
+                rf_it->second.chr == prot.gene_chr &&
+                rf_it->second.bp >= prot.gene_start - cis_window_bp &&
+                rf_it->second.bp <= prot.gene_end + cis_window_bp;
+            if (factorized_partition && in_cis_region) {
+                if (pq_snp != pq_it->second.end()) {
+                    prot.setC_rsid.push_back(rsid);
+                    prot.setC_gamma.push_back(rf_it->second.beta);
+                    prot.setC_se_gamma.push_back(rf_it->second.se);
+                    prot.setC_alpha.push_back(pq_snp->second.beta);
+                    prot.setC_se_alpha.push_back(pq_snp->second.se);
+                    prot.setC_alpha_reliability.push_back(1.0);
+                    prot.setC_Gamma.push_back(ca_it->second.beta);
+                    prot.setC_se_Gamma.push_back(ca_it->second.se);
+                    prot.nC_exact++;
+                }
+                continue;
+            }
             double alpha_val = std::numeric_limits<double>::quiet_NaN();
             double se_alpha_val = std::numeric_limits<double>::quiet_NaN();
             bool alpha_observed = false;
@@ -985,6 +1029,10 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
     int total_heidi_removed = 0;
     int processed = 0;
     int overlap_window_bp = opts.clump_window_kb * 1000;
+    const bool factorized_partition = opts.structural_method == "factorized";
+    const double overlap_r2_thresh = factorized_partition
+        ? opts.r2_thresh : opts.proxy_r2_thresh;
+    const int overlap_search_window = factorized_partition ? -1 : overlap_window_bp;
     auto rf_by_chr = build_rf_index(rf_instruments, rf_ss, plink);
     std::map<std::pair<int, int>, double> ld_r2_cache;
     std::map<std::pair<int, int>, double> ld_r_cache;
@@ -1059,8 +1107,9 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
             auto ca_it = cancer_ss.find(rsid);
             if (used_cis.count(rsid) || pq_snp == pq_it->second.end() || ca_it == cancer_ss.end()) continue;
             ProxyMatch proxy = best_rf_proxy_for_cis(plink, ld_r_cache, rf_by_chr, pq_snp->second,
-                                                     opts.proxy_r2_thresh, overlap_window_bp);
-            if (!proxy.found || consumed_rf.count(proxy.rsid)) continue;
+                                                     overlap_r2_thresh, overlap_search_window);
+            if (!proxy.found ||
+                (!factorized_partition && consumed_rf.count(proxy.rsid))) continue;
             auto rf_it = rf_ss.find(proxy.rsid);
             if (rf_it == rf_ss.end()) continue;
             prot.setC_rsid.push_back(rsid);
@@ -1082,6 +1131,24 @@ static void build_full_sets(std::vector<ProteinData>& proteins,
             auto ca_it = cancer_ss.find(rsid);
             if (rf_it == rf_ss.end() || ca_it == cancer_ss.end()) continue;
             auto pq_snp = pq_it->second.find(rsid);
+            const bool in_cis_region =
+                rf_it->second.chr == prot.gene_chr &&
+                rf_it->second.bp >= prot.gene_start - cis_window_bp &&
+                rf_it->second.bp <= prot.gene_end + cis_window_bp;
+            if (factorized_partition && in_cis_region) {
+                if (pq_snp != pq_it->second.end()) {
+                    prot.setC_rsid.push_back(rsid);
+                    prot.setC_gamma.push_back(rf_it->second.beta);
+                    prot.setC_se_gamma.push_back(rf_it->second.se);
+                    prot.setC_alpha.push_back(pq_snp->second.beta);
+                    prot.setC_se_alpha.push_back(pq_snp->second.se);
+                    prot.setC_alpha_reliability.push_back(1.0);
+                    prot.setC_Gamma.push_back(ca_it->second.beta);
+                    prot.setC_se_Gamma.push_back(ca_it->second.se);
+                    prot.nC_exact++;
+                }
+                continue;
+            }
             double alpha_val = std::numeric_limits<double>::quiet_NaN();
             double se_alpha_val = std::numeric_limits<double>::quiet_NaN();
             bool alpha_observed = false;
@@ -1165,9 +1232,11 @@ void run_legacy_pipeline(const Options& opts) {
         std::cout << "Reading summary statistics...\n";
         std::map<std::string, SumStat> rf_ss;
         std::map<std::string, double> rf_pval;
-        read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval);
+        read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval,
+                                opts.factor_independent_selection);
         PqtlData pqtl;
-        read_pqtl_sumstats(opts.pqtl_sumstat_file, pqtl.ss_by_protein, pqtl.pval_by_protein);
+        read_pqtl_sumstats(opts.pqtl_sumstat_file, pqtl.ss_by_protein,
+                           pqtl.pval_by_protein, opts.factor_independent_selection);
         std::vector<ProteinData> proteins;
         read_protein_info(opts.protein_info_file, proteins);
         auto needed_outcome_rsids = collect_needed_outcome_rsids(rf_pval, pqtl, opts.p_thresh_rf);
@@ -1201,10 +1270,12 @@ void run_legacy_pipeline(const Options& opts) {
     std::cout << "\nReading summary statistics...\n";
     std::map<std::string, SumStat> rf_ss;
     std::map<std::string, double> rf_pval;
-    read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval);
+    read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval,
+                            opts.factor_independent_selection);
 
     PqtlData pqtl;
-    read_pqtl_sumstats(opts.pqtl_sumstat_file, pqtl.ss_by_protein, pqtl.pval_by_protein);
+    read_pqtl_sumstats(opts.pqtl_sumstat_file, pqtl.ss_by_protein,
+                       pqtl.pval_by_protein, opts.factor_independent_selection);
 
     std::vector<ProteinData> proteins;
     read_protein_info(opts.protein_info_file, proteins);
@@ -1245,7 +1316,8 @@ void run_full_pipeline(const Options& opts) {
     std::cout << "\nReading summary statistics...\n";
     std::map<std::string, SumStat> rf_ss;
     std::map<std::string, double> rf_pval;
-    read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval);
+    read_sumstats_with_pval(opts.rf_sumstat_file, rf_ss, rf_pval,
+                            opts.factor_independent_selection);
 
     PqtlData pqtl = read_protein_gwas_manifest(opts.protein_gwas_list_file, opts);
 

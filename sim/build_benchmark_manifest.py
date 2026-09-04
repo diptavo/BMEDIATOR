@@ -32,7 +32,12 @@ def main() -> None:
                 )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["benchmark", "cell", "replicate"], delimiter="\t")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["benchmark", "cell", "replicate"],
+            delimiter="\t",
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row in rows:
             writer.writerow(row)

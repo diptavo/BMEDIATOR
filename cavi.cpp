@@ -1315,6 +1315,8 @@ ProteinResult analyze_protein(const ProteinData& prot,
     res.regional_protein_signals = prot.regional_protein_signals;
     res.regional_outcome_signals = prot.regional_outcome_signals;
     res.regional_signal_pair_count = static_cast<int>(prot.regional_signal_pairs.size());
+    res.regional_independent_shared_signals =
+        prot.regional_independent_shared_signals;
     res.regional_max_credible_set_pair_r2 = prot.regional_best_cs_pair_r2;
     res.regional_signal_pairs = prot.regional_signal_pairs;
     if (!prot.ld_reference_used) {
@@ -1322,18 +1324,22 @@ ProteinResult analyze_protein(const ProteinData& prot,
     } else if (prot.regional_multisignal_evaluated) {
         const std::string& interpretation = prot.regional_multisignal_interpretation;
         if (interpretation == "SHARED_SIGNAL_SUPPORTED") {
-            if (n_rf_to_pp >= 2 && prot.nB() >= 1) {
+            if (n_rf_to_pp >= 2 && prot.nB() >= 2 &&
+                prot.regional_independent_shared_signals >= 2) {
                 res.mediation_identifiability =
-                    "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
-            } else if (n_rf_to_pp < 2 && prot.nB() < 1) {
+                    "OVERIDENTIFIED_SHARED_SIGNALS_ASSUMPTION_CONDITIONAL";
+            } else if (n_rf_to_pp < 2 && prot.nB() < 2) {
                 res.mediation_identifiability =
                     "UNRESOLVED_INSUFFICIENT_RF_AND_CIS_INSTRUMENTS";
             } else if (n_rf_to_pp < 2) {
                 res.mediation_identifiability =
                     "UNRESOLVED_INSUFFICIENT_RF_INSTRUMENTS";
-            } else {
+            } else if (prot.nB() < 2) {
                 res.mediation_identifiability =
                     "UNRESOLVED_INSUFFICIENT_CIS_INSTRUMENTS";
+            } else {
+                res.mediation_identifiability =
+                    "UNRESOLVED_SINGLE_SHARED_SIGNAL";
             }
         } else if (interpretation == "DISTINCT_SIGNALS_HIGH_LD" ||
                    interpretation == "DISTINCT_SIGNALS_LOW_MODERATE_LD") {
@@ -1352,18 +1358,20 @@ ProteinResult analyze_protein(const ProteinData& prot,
     } else if (regional.pp_shared + regional.pp_distinct < opts.regional_min_both) {
         res.mediation_identifiability = "UNRESOLVED_WEAK_REGIONAL_EVIDENCE";
     } else if (regional.shared_given_both >= opts.regional_min_shared) {
-        if (n_rf_to_pp >= 2 && prot.nB() >= 1) {
-            res.mediation_identifiability =
-                "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
-        } else if (n_rf_to_pp < 2 && prot.nB() < 1) {
+        if (n_rf_to_pp < 2 && prot.nB() < 2) {
             res.mediation_identifiability =
                 "UNRESOLVED_INSUFFICIENT_RF_AND_CIS_INSTRUMENTS";
         } else if (n_rf_to_pp < 2) {
             res.mediation_identifiability =
                 "UNRESOLVED_INSUFFICIENT_RF_INSTRUMENTS";
-        } else {
+        } else if (prot.nB() < 2) {
             res.mediation_identifiability =
                 "UNRESOLVED_INSUFFICIENT_CIS_INSTRUMENTS";
+        } else {
+            // The compatibility model has only one regional causal signal.
+            // H4 cannot distinguish mediation from same-variant pleiotropy.
+            res.mediation_identifiability =
+                "UNRESOLVED_SINGLE_SHARED_SIGNAL";
         }
     } else if (regional.shared_given_both <= 1.0 - opts.regional_min_shared) {
         res.mediation_identifiability = "LD_DISTINCT_SUPPORTED";
@@ -1650,7 +1658,7 @@ ProteinResult analyze_protein(const ProteinData& prot,
     res.target_local_fdr = 1.0 - res.prob_protein_disease;
     finalize_direction_metrics(res);
     bool ld_resolved = res.mediation_identifiability ==
-                       "LD_RESOLVED_SHARED_SIGNAL_ASSUMPTION_CONDITIONAL";
+                       "OVERIDENTIFIED_SHARED_SIGNALS_ASSUMPTION_CONDITIONAL";
     res.prob_mediator_ld_resolved = ld_resolved ? res.prob_M1 : 0.0;
     res.prob_mediator_identified = res.prob_mediator_ld_resolved;
     res.selection_probability = selection_probability_for_mode(res, opts);

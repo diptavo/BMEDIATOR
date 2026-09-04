@@ -9,6 +9,7 @@
 
 # BMEDIATOR outputs
 *.mediation
+*.regional
 *.hyp
 *.instruments
 *.joint.tsv
@@ -45,4 +46,3 @@ __pycache__/
 ._*
 *.swp
 *.swo
-

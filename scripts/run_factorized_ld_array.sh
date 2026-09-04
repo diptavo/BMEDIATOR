@@ -1,0 +1,32 @@
+#!/bin/bash
+set -euo pipefail
+
+source /etc/profile.d/modules.sh || true
+
+: "${MANIFEST:?}"
+: "${BMEDIATOR_DIR:?}"
+: "${OUT_ROOT:?}"
+: "${BLOCK_SIZE:?}"
+
+start=$(( (SLURM_ARRAY_TASK_ID - 1) * BLOCK_SIZE + 1 ))
+end=$(( SLURM_ARRAY_TASK_ID * BLOCK_SIZE ))
+
+for idx in $(seq "$start" "$end"); do
+  row=$(awk -F '\t' -v idx="$idx" 'NR > 1 && NR - 1 == idx {print; exit}' "$MANIFEST")
+  if [[ -z "$row" ]]; then
+    continue
+  fi
+  IFS=$'\t' read -r cell scenario replicate <<<"$row"
+  task_metrics="$OUT_ROOT/$cell/$scenario/$(printf 'rep_%04d' "$replicate")/task_metrics.tsv"
+  if [[ -s "$task_metrics" ]]; then
+    echo "Skipping completed task: $task_metrics"
+    continue
+  fi
+  cd "$BMEDIATOR_DIR"
+  python3 sim/run_factorized_ld_task.py \
+    --binary "$BMEDIATOR_DIR/bmediator" \
+    --outdir "$OUT_ROOT" \
+    --cell "$cell" \
+    --scenario "$scenario" \
+    --replicate "$replicate"
+done

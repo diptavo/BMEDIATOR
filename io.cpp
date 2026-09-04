@@ -10,7 +10,7 @@ static void print_banner() {
     std::cout << "*******************************************************************\n";
     std::cout << "* BMEDIATOR (Bayesian Mediation MR)\n";
     std::cout << "* Version 1.2.0-dev\n";
-    std::cout << "* Bayesian framework for identifying mediating plasma proteins\n";
+    std::cout << "* Bayesian framework for evaluating candidate plasma-protein mediators\n";
     std::cout << "* between risk factors and disease outcomes using summary statistics\n";
     std::cout << "*******************************************************************\n";
 }
@@ -51,10 +51,20 @@ static void print_usage() {
     std::cout << "  --sampling-corr-rf-pqtl <val> Correlation of RF/pQTL estimation errors (default 0)\n";
     std::cout << "  --sampling-corr-rf-outcome <val> Correlation of RF/outcome estimation errors (default 0)\n";
     std::cout << "  --sampling-corr-pqtl-outcome <val> Correlation of pQTL/outcome estimation errors (default 0)\n";
-    std::cout << "  --factor-min-set-a <int> Minimum observed Set A instruments (default 2)\n";
-    std::cout << "  --factor-min-set-b <int> Minimum independent Set B instruments (default 2)\n";
+    std::cout << "  --factor-min-set-a <int> Minimum observed Set A instruments (default 3)\n";
+    std::cout << "  --factor-min-set-b <int> Minimum independent Set B instruments (default 3)\n";
     std::cout << "  --factor-alpha <val> Per-analysis and BY-FDR threshold (default 0.05)\n";
+    std::cout << "  --factor-prior-xm <val> Prior probability of RF-to-mediator effect (default 0.5)\n";
+    std::cout << "  --factor-prior-my <val> Prior probability of mediator-to-outcome effect (default 0.25)\n";
+    std::cout << "  --factor-prior-directional <val> Prior probability of oriented pleiotropy (default 0.1)\n";
+    std::cout << "  --factor-directional-variance <val> Prior variance of oriented pleiotropy (default 0.01)\n";
+    std::cout << "  --factor-independent-selection Require independent discovery P_SELECT columns\n";
     std::cout << "  --factor-bf-threshold <val> Minimum BF required for each mediation leg (default 10)\n";
+    std::cout << "  --factor-pleio-sd-xm <val> Half-normal SD prior for RF->protein heterogeneity (default 0.1)\n";
+    std::cout << "  --factor-pleio-sd-my <val> Half-normal SD prior for protein->outcome heterogeneity (default 0.1)\n";
+    std::cout << "  --factor-pleio-sd-xy <val> Half-normal SD prior for residual RF->outcome heterogeneity (default 0.1)\n";
+    std::cout << "  --factor-quadrature-points <int> Effect-prior grid points (default 161)\n";
+    std::cout << "  --factor-pleio-quadrature-points <int> Heterogeneity-prior grid points (default 41)\n";
     std::cout << "  --max-cavi-iter <int>    Max CAVI iterations per scenario (default 200)\n";
     std::cout << "  --elbo-tol      <val>    ELBO convergence tolerance (default 1e-6)\n";
     std::cout << "  --max-eb-iter   <int>    Max empirical Bayes iterations when enabled (default 20)\n";
@@ -169,8 +179,26 @@ void parse_args(int argc, char* argv[], Options& opts) {
             opts.factor_alpha = std::atof(argv[++i]);
         else if (flag == "--factor-bf-threshold" && i + 1 < argc)
             opts.factor_bf_threshold = std::atof(argv[++i]);
+        else if (flag == "--factor-prior-xm" && i + 1 < argc)
+            opts.factor_prior_xm = std::atof(argv[++i]);
+        else if (flag == "--factor-prior-my" && i + 1 < argc)
+            opts.factor_prior_my = std::atof(argv[++i]);
+        else if (flag == "--factor-prior-directional" && i + 1 < argc)
+            opts.factor_prior_directional = std::atof(argv[++i]);
+        else if (flag == "--factor-directional-variance" && i + 1 < argc)
+            opts.factor_directional_variance = std::atof(argv[++i]);
+        else if (flag == "--factor-independent-selection")
+            opts.factor_independent_selection = true;
         else if (flag == "--factor-quadrature-points" && i + 1 < argc)
             opts.factor_quadrature_points = std::atoi(argv[++i]);
+        else if (flag == "--factor-pleio-sd-xm" && i + 1 < argc)
+            opts.factor_pleio_sd_xm = std::atof(argv[++i]);
+        else if (flag == "--factor-pleio-sd-my" && i + 1 < argc)
+            opts.factor_pleio_sd_my = std::atof(argv[++i]);
+        else if (flag == "--factor-pleio-sd-xy" && i + 1 < argc)
+            opts.factor_pleio_sd_xy = std::atof(argv[++i]);
+        else if (flag == "--factor-pleio-quadrature-points" && i + 1 < argc)
+            opts.factor_pleio_quadrature_points = std::atoi(argv[++i]);
         else if (flag == "--max-cavi-iter" && i + 1 < argc)
             opts.max_cavi_iter = std::atoi(argv[++i]);
         else if (flag == "--elbo-tol" && i + 1 < argc)
@@ -354,8 +382,34 @@ void parse_args(int argc, char* argv[], Options& opts) {
         std::cerr << "Error: --factor-bf-threshold must be finite and positive\n";
         ok = false;
     }
+    if (!(opts.factor_prior_xm > 0.0 && opts.factor_prior_xm < 1.0) ||
+        !std::isfinite(opts.factor_prior_xm) ||
+        !(opts.factor_prior_my > 0.0 && opts.factor_prior_my < 1.0) ||
+        !std::isfinite(opts.factor_prior_my)) {
+        std::cerr << "Error: factorized causal-leg priors must be finite and in (0, 1)\n";
+        ok = false;
+    }
+    if (!(opts.factor_prior_directional > 0.0 &&
+          opts.factor_prior_directional < 1.0) ||
+        !std::isfinite(opts.factor_prior_directional) ||
+        !(opts.factor_directional_variance > 0.0) ||
+        !std::isfinite(opts.factor_directional_variance)) {
+        std::cerr << "Error: directional pleiotropy prior must be in (0, 1) "
+                     "and its variance must be finite and positive\n";
+        ok = false;
+    }
     if (opts.factor_quadrature_points < 41) {
         std::cerr << "Error: --factor-quadrature-points must be at least 41\n";
+        ok = false;
+    }
+    if (!(opts.factor_pleio_sd_xm > 0.0) || !std::isfinite(opts.factor_pleio_sd_xm) ||
+        !(opts.factor_pleio_sd_my > 0.0) || !std::isfinite(opts.factor_pleio_sd_my) ||
+        !(opts.factor_pleio_sd_xy > 0.0) || !std::isfinite(opts.factor_pleio_sd_xy)) {
+        std::cerr << "Error: factorized pleiotropy-prior SDs must be finite and positive\n";
+        ok = false;
+    }
+    if (opts.factor_pleio_quadrature_points < 21) {
+        std::cerr << "Error: --factor-pleio-quadrature-points must be at least 21\n";
         ok = false;
     }
     if (opts.direction_mode != "report" &&
@@ -482,6 +536,19 @@ void parse_args(int argc, char* argv[], Options& opts) {
                   << "/" << opts.factor_min_set_b << "\n";
         std::cout << "  Factorized alpha:            " << opts.factor_alpha << "\n";
         std::cout << "  Factorized BF threshold:     " << opts.factor_bf_threshold << "\n";
+        std::cout << "  Factorized causal priors:    XM=" << opts.factor_prior_xm
+                  << ", MY=" << opts.factor_prior_my << "\n";
+        std::cout << "  Directional pleio prior:     probability="
+                  << opts.factor_prior_directional << ", variance="
+                  << opts.factor_directional_variance << "\n";
+        std::cout << "  Instrument selection design: "
+                  << (opts.factor_independent_selection
+                      ? "independent discovery" : "same summary statistics") << "\n";
+        std::cout << "  Factorized pleio prior SD:   ("
+                  << opts.factor_pleio_sd_xm << ", "
+                  << opts.factor_pleio_sd_xy << ", "
+                  << opts.factor_pleio_sd_my << ")\n";
+        std::cout << "  Safe-e method:               fixed Student-t density mixture\n";
         std::cout << "  Sampling error corr (XM/XY/MY): ("
                   << opts.sampling_corr_rf_pqtl << ", "
                   << opts.sampling_corr_rf_outcome << ", "
@@ -555,7 +622,8 @@ void read_sumstats(const std::string& file, std::map<std::string, SumStat>& ss) 
 
 void read_sumstats_with_pval(const std::string& file,
                              std::map<std::string, SumStat>& ss,
-                             std::map<std::string, double>& pvals) {
+                             std::map<std::string, double>& pvals,
+                             bool use_selection_p) {
     std::ifstream fin(file);
     if (!fin.is_open()) {
         std::cerr << "Error: cannot open file " << file << "\n";
@@ -564,15 +632,51 @@ void read_sumstats_with_pval(const std::string& file,
 
     std::string line;
     std::getline(fin, line);
+    std::vector<std::string> header;
+    {
+        std::istringstream header_stream(line);
+        std::string field;
+        while (header_stream >> field) header.push_back(field);
+    }
+    int selection_column = -1;
+    if (use_selection_p) {
+        for (int i = 0; i < static_cast<int>(header.size()); ++i) {
+            if (header[i] == "P_SELECT" || header[i] == "SELECT_P") {
+                selection_column = i;
+                break;
+            }
+        }
+        if (selection_column < 0) {
+            std::cerr << "Error: --factor-independent-selection requires a "
+                      << "P_SELECT column in " << file << "\n";
+            std::exit(1);
+        }
+    }
 
     int n = 0;
     while (std::getline(fin, line)) {
         if (line.empty()) continue;
         std::istringstream iss(line);
+        std::vector<std::string> fields;
+        std::string field;
+        while (iss >> field) fields.push_back(field);
+        if (fields.size() < 9 ||
+            (selection_column >= 0 && selection_column >= static_cast<int>(fields.size()))) {
+            continue;
+        }
         SumStat s;
-        double pval;
-        if (!(iss >> s.rsid >> s.a1 >> s.a2 >> s.freq
-                  >> s.beta >> s.se >> pval >> s.chr >> s.bp)) {
+        double pval = 1.0;
+        try {
+            s.rsid = fields[0];
+            s.a1 = fields[1];
+            s.a2 = fields[2];
+            s.freq = std::stod(fields[3]);
+            s.beta = std::stod(fields[4]);
+            s.se = std::stod(fields[5]);
+            pval = std::stod(selection_column >= 0 ? fields[selection_column] : fields[6]);
+            s.chr = std::stoi(fields[7]);
+            s.bp = std::stoi(fields[8]);
+        } catch (const std::exception&) {
             continue;
         }
         for (auto& c : s.a1) c = toupper(c);
@@ -674,7 +778,8 @@ struct PqtlEntry {
 
 void read_pqtl_sumstats(const std::string& file,
                         std::map<std::string, std::map<std::string, SumStat>>& pqtl_by_protein,
-                        std::map<std::string, std::map<std::string, double>>& pqtl_pval) {
+                        std::map<std::string, std::map<std::string, double>>& pqtl_pval,
+                        bool use_selection_p) {
     std::ifstream fin(file);
     if (!fin.is_open()) {
         std::cerr << "Error: cannot open file " << file << "\n";
@@ -683,6 +788,33 @@ void read_pqtl_sumstats(const std::string& file,
 
     std::string line;
     std::getline(fin, line); // header
+    std::vector<std::string> header;
+    {
+        std::istringstream header_stream(line);
+        std::string field;
+        while (header_stream >> field) header.push_back(field);
+    }
+    std::map<std::string, int> column;
+    for (int i = 0; i < static_cast<int>(header.size()); ++i) column[header[i]] = i;
+    const std::vector<std::string> required = {
+        "PROTEIN", "SNP", "A1", "A2", "FREQ", "BETA", "SE", "P", "CHR", "BP"
+    };
+    for (const auto& key : required) {
+        if (!column.count(key)) {
+            std::cerr << "Error: missing column '" << key << "' in " << file << "\n";
+            std::exit(1);
+        }
+    }
+    int pval_column = column["P"];
+    if (use_selection_p) {
+        if (column.count("P_SELECT")) pval_column = column["P_SELECT"];
+        else if (column.count("SELECT_P")) pval_column = column["SELECT_P"];
+        else {
+            std::cerr << "Error: --factor-independent-selection requires a "
+                      << "P_SELECT column in " << file << "\n";
+            std::exit(1);
+        }
+    }
 
     int n = 0;
     while (std::getline(fin, line)) {
@@ -691,28 +823,22 @@ void read_pqtl_sumstats(const std::string& file,
         std::vector<std::string> toks;
         std::string tok;
         while (iss >> tok) toks.push_back(tok);
-        if (toks.size() < 10) {
+        if (toks.size() < header.size()) {
             continue;
         }
-        std::string prot_id = toks[0];
+        std::string prot_id = toks[column["PROTEIN"]];
         SumStat s;
         double pval = 1.0;
         try {
-            s.rsid = toks[1];
-            s.a1 = toks[2];
-            s.a2 = toks[3];
-            s.freq = std::stod(toks[4]);
-            s.beta = std::stod(toks[5]);
-            s.se = std::stod(toks[6]);
-            pval = std::stod(toks[7]);
-            // Support both legacy 10-column format and the newer 11-column format with N.
-            if (toks.size() >= 11) {
-                s.chr = std::stoi(toks[9]);
-                s.bp = std::stoi(toks[10]);
-            } else {
-                s.chr = std::stoi(toks[8]);
-                s.bp = std::stoi(toks[9]);
-            }
+            s.rsid = toks[column["SNP"]];
+            s.a1 = toks[column["A1"]];
+            s.a2 = toks[column["A2"]];
+            s.freq = std::stod(toks[column["FREQ"]]);
+            s.beta = std::stod(toks[column["BETA"]]);
+            s.se = std::stod(toks[column["SE"]]);
+            pval = std::stod(toks[pval_column]);
+            s.chr = std::stoi(toks[column["CHR"]]);
+            s.bp = std::stoi(toks[column["BP"]]);
         } catch (const std::exception&) {
             continue;
         }
@@ -903,7 +1029,8 @@ void write_results(const std::vector<ProteinResult>& results,
          << "regional_n_variants\tregional_PP_shared\tregional_PP_distinct\t"
          << "regional_shared_given_both\tregional_method\t"
          << "regional_protein_signals\tregional_outcome_signals\t"
-         << "regional_signal_pairs\tregional_max_credible_set_pair_r2\t"
+         << "regional_signal_pairs\tregional_independent_shared_signals\t"
+         << "regional_max_credible_set_pair_r2\t"
          << "mediation_identifiability\t"
          << "beta1\tse_beta1\tbeta2\tse_beta2\tbeta3\tse_beta3\t"
          << "ivw_rf_to_pp_beta\tivw_rf_to_pp_se\tivw_rf_to_pp_p\t"
@@ -913,14 +1040,44 @@ void write_results(const std::vector<ProteinResult>& results,
          << "direction_consistency_prob\tproportion_mediated\tdirectional_mediator_prob\t"
          << "selection_probability\tselection_local_fdr\tselection_cum_fdr\tselection_rank\t"
          << "posterior_local_fdr\ttarget_local_fdr\tposterior_cum_fdr\tposterior_cum_fdr5\tmediation_rank\tselected_fdr10\tselected_fdr5\tevidence_tier\t"
-         << "factor_beta1\tfactor_beta1_se\tfactor_p_XM\tfactor_log_BF_XM\t"
-         << "factor_beta2\tfactor_beta2_se\tfactor_p_MY\tfactor_log_BF_MY\t"
-         << "factor_beta3\tfactor_beta3_se\tfactor_p_XY\tfactor_log_BF_XY\t"
-         << "factor_indirect\tfactor_indirect_se\tfactor_conjunction_p\t"
-         << "factor_conjunction_q_BY\tfactor_min_log_BF\t"
+         << "factor_beta1\tfactor_beta1_se\tfactor_p_XM\tfactor_p_XM_strict\t"
+         << "factor_log_BF_XM\tfactor_beta1_ci_lower\tfactor_beta1_ci_upper\t"
+         << "factor_beta2\tfactor_beta2_se\tfactor_p_MY\tfactor_p_MY_strict\t"
+         << "factor_log_BF_MY\tfactor_beta2_ci_lower\tfactor_beta2_ci_upper\t"
+         << "factor_beta3\tfactor_beta3_se\tfactor_p_XY\tfactor_p_XY_strict\t"
+         << "factor_log_BF_XY\t"
+         << "factor_log_BF_heterogeneity_XM\t"
+         << "factor_log_BF_heterogeneity_MY\t"
+         << "factor_log_BF_heterogeneity_XY\t"
+         << "factor_log_BF_directional_XM\tfactor_log_BF_directional_MY\t"
+         << "factor_log_BF_slope_only_XM\tfactor_log_BF_directional_only_XM\t"
+         << "factor_log_BF_slope_directional_XM\t"
+         << "factor_log_BF_slope_only_MY\tfactor_log_BF_directional_only_MY\t"
+         << "factor_log_BF_slope_directional_MY\t"
+         << "factor_PP_directional_XM\tfactor_PP_directional_MY\t"
+         << "factor_directional_intercept_XM\tfactor_directional_intercept_XM_se\t"
+         << "factor_directional_intercept_MY\tfactor_directional_intercept_MY_se\t"
+         << "factor_directional_collinearity_XM\t"
+         << "factor_directional_collinearity_MY\t"
+         << "factor_cross_set_max_r2\t"
+         << "factor_log_e_XM\tfactor_log_e_MY\tfactor_log_e_XY\t"
+         << "factor_tau_XM\tfactor_tau_MY\tfactor_tau_XY\t"
+         << "factor_indirect\tfactor_indirect_se\tfactor_indirect_ci_lower\t"
+         << "factor_indirect_ci_upper\tfactor_conjunction_p\t"
+         << "factor_conjunction_q_BY\tfactor_strict_conjunction_p\t"
+         << "factor_strict_conjunction_q_BY\tfactor_min_log_BF\t"
+         << "factor_log_e_mediation\tfactor_e_q_EBH\t"
+         << "factor_log_e_p2e_mediation\tfactor_e_q_p2e_EBH\t"
+         << "factor_PP_XM\tfactor_PP_MY\tfactor_PP_two_stage\t"
+         << "factor_posterior_local_fdr\tfactor_posterior_cum_fdr\t"
+         << "factor_posterior_rank\t"
          << "factor_pleiotropy_rho\tfactor_pleiotropy_p\t"
-         << "factor_nA\tfactor_nB\tfactor_ld_source\tfactor_pattern\tfactor_mediation_status\t"
-         << "factor_frequentist_status\t"
+         << "factor_nA\tfactor_nB\tfactor_ld_source\tfactor_selection_design\t"
+         << "factor_effect_estimator\t"
+         << "factor_pattern\t"
+         << "factor_two_stage_status\tfactor_mediation_status\t"
+         << "factor_frequentist_status\tfactor_strict_status\t"
+         << "factor_p2e_status\tfactor_ebh_status\tfactor_posterior_status\t"
          << "mediated_effect\tse_mediated\t"
          << "ELBO_M0\tELBO_M1\tELBO_M2\tELBO_M3\tELBO_M4\tELBO_M5\t"
          << "converged\n";
@@ -946,6 +1103,7 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.regional_protein_signals << "\t"
              << r.regional_outcome_signals << "\t"
              << r.regional_signal_pair_count << "\t"
+             << r.regional_independent_shared_signals << "\t"
              << r.regional_max_credible_set_pair_r2 << "\t"
              << r.mediation_identifiability << "\t"
              << r.beta1_est << "\t" << r.beta1_se << "\t"
@@ -974,18 +1132,64 @@ void write_results(const std::vector<ProteinResult>& results,
              << (r.selected_fdr_5 ? "YES" : "NO") << "\t"
              << r.evidence_tier << "\t"
              << r.factor_beta1 << "\t" << r.factor_beta1_se << "\t"
-             << r.factor_p_xm << "\t" << r.factor_log_bf_xm << "\t"
+             << r.factor_p_xm << "\t" << r.factor_p_xm_strict << "\t"
+             << r.factor_log_bf_xm << "\t"
+             << r.factor_beta1_ci_lower << "\t" << r.factor_beta1_ci_upper << "\t"
              << r.factor_beta2 << "\t" << r.factor_beta2_se << "\t"
-             << r.factor_p_my << "\t" << r.factor_log_bf_my << "\t"
+             << r.factor_p_my << "\t" << r.factor_p_my_strict << "\t"
+             << r.factor_log_bf_my << "\t"
+             << r.factor_beta2_ci_lower << "\t" << r.factor_beta2_ci_upper << "\t"
              << r.factor_beta3 << "\t" << r.factor_beta3_se << "\t"
-             << r.factor_p_xy << "\t" << r.factor_log_bf_xy << "\t"
+             << r.factor_p_xy << "\t" << r.factor_p_xy_strict << "\t"
+             << r.factor_log_bf_xy << "\t"
+             << r.factor_log_bf_heterogeneity_xm << "\t"
+             << r.factor_log_bf_heterogeneity_my << "\t"
+             << r.factor_log_bf_heterogeneity_xy << "\t"
+             << r.factor_log_bf_directional_xm << "\t"
+             << r.factor_log_bf_directional_my << "\t"
+             << r.factor_log_bf_slope_only_xm << "\t"
+             << r.factor_log_bf_directional_only_xm << "\t"
+             << r.factor_log_bf_slope_directional_xm << "\t"
+             << r.factor_log_bf_slope_only_my << "\t"
+             << r.factor_log_bf_directional_only_my << "\t"
+             << r.factor_log_bf_slope_directional_my << "\t"
+             << r.factor_pp_directional_xm << "\t"
+             << r.factor_pp_directional_my << "\t"
+             << r.factor_directional_intercept_xm << "\t"
+             << r.factor_directional_intercept_xm_se << "\t"
+             << r.factor_directional_intercept_my << "\t"
+             << r.factor_directional_intercept_my_se << "\t"
+             << r.factor_directional_collinearity_xm << "\t"
+             << r.factor_directional_collinearity_my << "\t"
+             << r.factor_cross_set_max_r2 << "\t"
+             << r.factor_log_e_xm << "\t" << r.factor_log_e_my << "\t"
+             << r.factor_log_e_xy << "\t"
+             << r.factor_tau_xm << "\t" << r.factor_tau_my << "\t"
+             << r.factor_tau_xy << "\t"
              << r.factor_indirect << "\t" << r.factor_indirect_se << "\t"
+             << r.factor_indirect_ci_lower << "\t"
+             << r.factor_indirect_ci_upper << "\t"
              << r.factor_conjunction_p << "\t" << r.factor_conjunction_q_by << "\t"
+             << r.factor_strict_conjunction_p << "\t"
+             << r.factor_strict_conjunction_q_by << "\t"
              << r.factor_min_log_bf << "\t"
+             << r.factor_log_e_mediation << "\t" << r.factor_e_q_ebh << "\t"
+             << r.factor_log_e_p2e_mediation << "\t"
+             << r.factor_e_q_p2e_ebh << "\t"
+             << r.factor_pp_xm << "\t" << r.factor_pp_my << "\t"
+             << r.factor_pp_two_stage << "\t"
+             << r.factor_posterior_local_fdr << "\t"
+             << r.factor_posterior_cum_fdr << "\t"
+             << r.factor_posterior_rank << "\t"
              << r.factor_pleiotropy_rho << "\t" << r.factor_pleiotropy_p << "\t"
              << r.factor_nA << "\t" << r.factor_nB << "\t"
-             << r.factor_ld_source << "\t" << r.factor_pattern << "\t"
+             << r.factor_ld_source << "\t" << r.factor_selection_design << "\t"
+             << r.factor_effect_estimator << "\t"
+             << r.factor_pattern << "\t"
+             << r.factor_two_stage_status << "\t"
              << r.factor_mediation_status << "\t" << r.factor_frequentist_status << "\t"
+             << r.factor_strict_status << "\t" << r.factor_p2e_status << "\t"
+             << r.factor_ebh_status << "\t" << r.factor_posterior_status << "\t"
              << r.mediated_effect << "\t" << r.mediated_effect_se << "\t"
              << r.elbo_M0 << "\t" << r.elbo_M1 << "\t"
              << r.elbo_M2 << "\t" << r.elbo_M3 << "\t"
@@ -1069,7 +1273,24 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "factor_min_set_b\t" << opts.factor_min_set_b << "\n";
     hout << "factor_alpha\t" << opts.factor_alpha << "\n";
     hout << "factor_bf_threshold\t" << opts.factor_bf_threshold << "\n";
+    hout << "factor_prior_xm\t" << opts.factor_prior_xm << "\n";
+    hout << "factor_prior_my\t" << opts.factor_prior_my << "\n";
+    hout << "factor_prior_directional\t"
+         << opts.factor_prior_directional << "\n";
+    hout << "factor_directional_variance\t"
+         << opts.factor_directional_variance << "\n";
     hout << "factor_quadrature_points\t" << opts.factor_quadrature_points << "\n";
+    hout << "factor_pleio_sd_xm\t" << opts.factor_pleio_sd_xm << "\n";
+    hout << "factor_pleio_sd_my\t" << opts.factor_pleio_sd_my << "\n";
+    hout << "factor_pleio_sd_xy\t" << opts.factor_pleio_sd_xy << "\n";
+    hout << "factor_pleio_quadrature_points\t"
+         << opts.factor_pleio_quadrature_points << "\n";
+    hout << "factor_e_method\tstudent-t-density-ratio-mixture\n";
+    hout << "factor_e_shift_grid\t2,4,6\n";
+    hout << "factor_e_scale_grid\t2,4,8\n";
+    hout << "factor_p2e_calibrator\tmixture(0.10,0.25,0.50,0.75)\n";
+    hout << "factor_independent_selection\t"
+         << (opts.factor_independent_selection ? "YES" : "NO") << "\n";
     hout << "direction_mode\t" << opts.direction_mode << "\n";
     hout << "direction_weight\t" << opts.direction_weight << "\n";
     hout << "direction_min_prob\t" << opts.direction_min_prob << "\n";
@@ -1082,31 +1303,62 @@ void write_results(const std::vector<ProteinResult>& results,
     int n_targets = 0;
     int n_fdr10 = 0, n_fdr5 = 0;
     int n_factor_supported = 0;
+    int n_factor_posterior_supported = 0;
+    int n_factor_two_stage = 0;
+    int n_factor_frequentist_supported = 0;
+    int n_factor_ebh_supported = 0;
     for (auto& r : results) {
         if (r.prob_M1 > 0.5) n_mediators++;
         if (r.prob_mediator_ld_resolved > 0.5) n_conditionally_identified++;
         if (r.prob_protein_disease > 0.5) n_targets++;
         if (r.selected_fdr_10) n_fdr10++;
         if (r.selected_fdr_5) n_fdr5++;
-        if (r.factor_mediation_status == "SUPPORTED_CONDITIONAL") n_factor_supported++;
+        if (r.factor_mediation_status ==
+            "SUPPORTED_EXCLUSION_RESTRICTION_CONDITIONAL") n_factor_supported++;
+        if (r.factor_two_stage_status == "TWO_STAGE_EVIDENCE") {
+            n_factor_two_stage++;
+        }
+        if (r.factor_frequentist_status ==
+            "SUPPORTED_SCALAR_DISPERSION_EXCLUSION_CONDITIONAL") {
+            n_factor_frequentist_supported++;
+        }
+        if (r.factor_ebh_status ==
+            "SUPPORTED_EXCLUSION_RESTRICTION_CONDITIONAL") {
+            n_factor_ebh_supported++;
+        }
+        if (r.factor_posterior_status ==
+            "SUPPORTED_BAYES_POSTERIOR_FDR_ASSUMPTION_CONDITIONAL") {
+            n_factor_posterior_supported++;
+        }
     }
     std::cout << "\nSummary:\n";
     std::cout << "  Total proteins analyzed:     " << results.size() << "\n";
-    std::cout << "  Proteins with P(M1) > 0.5:   " << n_mediators << "\n";
-    std::cout << "  LD-resolved conditional P(M1) > 0.5: "
-              << n_conditionally_identified << "\n";
-    std::cout << "  Proteins with P(M1+M4) > 0.5:" << n_targets << "\n";
-    std::cout << "  Proteins selected at 5% mode-specific FDR:  " << n_fdr5 << "\n";
-    std::cout << "  Proteins selected at 10% mode-specific FDR: " << n_fdr10 << "\n";
-    std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
     if (opts.structural_method == "factorized") {
+        std::cout << "  Proteins with two-leg Bayesian evidence: "
+                  << n_factor_two_stage << "\n";
         std::cout << "  Factorized conditional mediators with both BFs >= "
                   << opts.factor_bf_threshold << ": " << n_factor_supported << "\n";
+        std::cout << "  Factorized conditional mediators selected by BY: "
+                  << n_factor_frequentist_supported << "\n";
+        std::cout << "  Factorized conditional mediators selected by e-BH: "
+                  << n_factor_ebh_supported << "\n";
+        std::cout << "  Factorized conditional mediators at posterior FDR <= "
+                  << opts.factor_alpha << ": " << n_factor_posterior_supported << "\n";
+    } else {
+        std::cout << "  Proteins with P(M1) > 0.5:   " << n_mediators << "\n";
+        std::cout << "  LD-resolved conditional P(M1) > 0.5: "
+                  << n_conditionally_identified << "\n";
+        std::cout << "  Proteins with P(M1+M4) > 0.5:" << n_targets << "\n";
+        std::cout << "  Proteins selected at 5% mode-specific FDR:  "
+                  << n_fdr5 << "\n";
+        std::cout << "  Proteins selected at 10% mode-specific FDR: "
+                  << n_fdr10 << "\n";
+        std::cout << "  Direction mode:              " << opts.direction_mode << "\n";
+        std::cout << "  Final prior (p0,p1,p2,p3,p4,p5): ("
+                  << hyp.p0 << ", " << hyp.p1 << ", "
+                  << hyp.p2 << ", " << hyp.p3 << ", "
+                  << hyp.p4 << ", " << hyp.p5 << ")\n";
     }
-    std::cout << "  Final prior (p0,p1,p2,p3,p4,p5): ("
-              << hyp.p0 << ", " << hyp.p1 << ", "
-              << hyp.p2 << ", " << hyp.p3 << ", "
-              << hyp.p4 << ", " << hyp.p5 << ")\n";
 }
 
 } // namespace bmediator
