@@ -324,7 +324,8 @@ struct ProteinResult {
     // mean-zero (InSIDE) pleiotropy. The adaptive e-value retains the oriented
     // intercept but treats the reported outcome covariance as known.
     double factor_p_xm_balanced, factor_p_my_balanced;
-    double factor_balanced_conjunction_p, factor_balanced_conjunction_q_by;
+    double factor_balanced_conjunction_p, factor_balanced_conjunction_q_bh;
+    double factor_balanced_conjunction_q_by;
     double factor_balanced_conjunction_q_adafilter;
     double factor_log_e_xm_balanced, factor_log_e_my_balanced;
     double factor_log_e_mediation_balanced, factor_e_q_balanced_ebh;
@@ -355,6 +356,7 @@ struct ProteinResult {
     std::string factor_p2e_status;
     std::string factor_ebh_status;
     std::string factor_balanced_status;
+    std::string factor_balanced_bh_status;
     std::string factor_adafilter_status;
     std::string factor_balanced_ebh_status;
     std::string factor_balanced_p2e_status;

@@ -1044,6 +1044,7 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_log_e_mediation = result.factor_e_q_ebh = nan;
     result.factor_p_xm_balanced = result.factor_p_my_balanced = nan;
     result.factor_balanced_conjunction_p = nan;
+    result.factor_balanced_conjunction_q_bh = nan;
     result.factor_balanced_conjunction_q_by = nan;
     result.factor_balanced_conjunction_q_adafilter = nan;
     result.factor_log_e_xm_balanced = result.factor_log_e_my_balanced = nan;
@@ -1078,6 +1079,7 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_p2e_status = "NOT_RUN";
     result.factor_ebh_status = "NOT_RUN";
     result.factor_balanced_status = "NOT_RUN";
+    result.factor_balanced_bh_status = "NOT_RUN";
     result.factor_adafilter_status = "NOT_RUN";
     result.factor_balanced_ebh_status = "NOT_RUN";
     result.factor_balanced_p2e_status = "NOT_RUN";
@@ -1340,6 +1342,9 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_balanced_status = evidence_gate(
         balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
         "PENDING_MULTIPLE_TESTING");
+    result.factor_balanced_bh_status = evidence_gate(
+        balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
+        "PENDING_MULTIPLE_TESTING");
     result.factor_adafilter_status = evidence_gate(
         balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
         "PENDING_MULTIPLE_TESTING");
@@ -1396,6 +1401,8 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
                 std::numeric_limits<double>::quiet_NaN();
             result.factor_e_q_ebh = std::numeric_limits<double>::quiet_NaN();
             result.factor_e_q_p2e_ebh = std::numeric_limits<double>::quiet_NaN();
+            result.factor_balanced_conjunction_q_bh =
+                std::numeric_limits<double>::quiet_NaN();
             result.factor_balanced_conjunction_q_by =
                 std::numeric_limits<double>::quiet_NaN();
             result.factor_balanced_conjunction_q_adafilter =
@@ -1414,6 +1421,9 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
             }
             if (result.factor_balanced_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_balanced_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_balanced_bh_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_balanced_bh_status = "UNRESOLVED_SAMPLE_OVERLAP";
             }
             if (result.factor_adafilter_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_adafilter_status = "UNRESOLVED_SAMPLE_OVERLAP";
@@ -1501,6 +1511,26 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
                results[b].factor_balanced_conjunction_p;
     });
     const int balanced_m = static_cast<int>(balanced_order.size());
+    double balanced_bh_running = 1.0;
+    for (int rank = balanced_m; rank >= 1; --rank) {
+        ProteinResult& result = results[balanced_order[rank - 1]];
+        const double raw = result.factor_balanced_conjunction_p * balanced_m / rank;
+        balanced_bh_running = std::min(
+            balanced_bh_running, std::min(1.0, raw));
+        result.factor_balanced_conjunction_q_bh = balanced_bh_running;
+    }
+    for (auto& result : results) {
+        if (result.factor_balanced_bh_status != "PENDING_MULTIPLE_TESTING") continue;
+        if (!(std::isfinite(result.factor_balanced_conjunction_q_bh) &&
+              result.factor_balanced_conjunction_q_bh <= opts.factor_alpha)) {
+            result.factor_balanced_bh_status = "NOT_SELECTED_BY_BALANCED_BH";
+            continue;
+        }
+        result.factor_balanced_bh_status = identification_gate(
+            result, opts, "TWO_STAGE_EVIDENCE",
+            "SUPPORTED_BALANCED_BH_PRDS_EXCLUSION_CONDITIONAL");
+    }
+
     double balanced_harmonic = 0.0;
     for (int i = 1; i <= balanced_m; ++i) balanced_harmonic += 1.0 / i;
     double balanced_running = 1.0;

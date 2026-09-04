@@ -1070,7 +1070,8 @@ void write_results(const std::vector<ProteinResult>& results,
          << "factor_strict_conjunction_q_BY\tfactor_min_log_BF\t"
          << "factor_log_e_mediation\tfactor_e_q_EBH\t"
          << "factor_p_XM_balanced\tfactor_p_MY_balanced\t"
-         << "factor_balanced_conjunction_p\tfactor_balanced_conjunction_q_BY\t"
+         << "factor_balanced_conjunction_p\tfactor_balanced_conjunction_q_BH\t"
+         << "factor_balanced_conjunction_q_BY\t"
          << "factor_balanced_conjunction_q_AdaFilter\t"
          << "factor_log_e_XM_balanced\tfactor_log_e_MY_balanced\t"
          << "factor_log_e_mediation_balanced\tfactor_e_q_balanced_EBH\t"
@@ -1089,7 +1090,8 @@ void write_results(const std::vector<ProteinResult>& results,
          << "factor_two_stage_status\tfactor_mediation_status\t"
          << "factor_frequentist_status\tfactor_strict_status\t"
          << "factor_p2e_status\tfactor_ebh_status\t"
-         << "factor_balanced_status\tfactor_adafilter_status\t"
+         << "factor_balanced_status\tfactor_balanced_bh_status\t"
+         << "factor_adafilter_status\t"
          << "factor_balanced_ebh_status\t"
          << "factor_balanced_p2e_status\t"
          << "factor_adaptive_ebh_status\tfactor_posterior_status\t"
@@ -1192,6 +1194,7 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.factor_p_xm_balanced << "\t"
              << r.factor_p_my_balanced << "\t"
              << r.factor_balanced_conjunction_p << "\t"
+             << r.factor_balanced_conjunction_q_bh << "\t"
              << r.factor_balanced_conjunction_q_by << "\t"
              << r.factor_balanced_conjunction_q_adafilter << "\t"
              << r.factor_log_e_xm_balanced << "\t"
@@ -1221,6 +1224,7 @@ void write_results(const std::vector<ProteinResult>& results,
              << r.factor_strict_status << "\t" << r.factor_p2e_status << "\t"
              << r.factor_ebh_status << "\t"
              << r.factor_balanced_status << "\t"
+             << r.factor_balanced_bh_status << "\t"
              << r.factor_adafilter_status << "\t"
              << r.factor_balanced_ebh_status << "\t"
              << r.factor_balanced_p2e_status << "\t"
@@ -1326,6 +1330,7 @@ void write_results(const std::vector<ProteinResult>& results,
     hout << "factor_e_scale_grid\t2,4,8\n";
     hout << "factor_balanced_model\tmean-zero-InSIDE-scalar-dispersion\n";
     hout << "factor_balanced_e_method\tstudent-t-density-ratio-mixture\n";
+    hout << "factor_balanced_bh_assumption\tindependent-or-PRDS-across-proteins\n";
     hout << "factor_adafilter_method\t2-of-2-AdaFilter-BH\n";
     hout << "factor_adafilter_assumption\tindependent-legs-weak-across-protein-dependence\n";
     hout << "factor_balanced_p2e_method\tfixed-p-to-e-conjunction-eBH\n";

@@ -342,6 +342,15 @@ with `n-1` degrees of freedom. The 2-of-2 mediation p-value remains the maximum
 of the two leg p-values. BY adjustment supplies an arbitrary-dependence result
 when the base p-values are valid under this balanced/InSIDE model.
 
+We additionally apply ordinary BH directly to these protein-level
+partial-conjunction p-values. The maximum is super-uniform under the mediation
+union null whenever either null leg p-value is valid, regardless of dependence
+between the two legs. BH therefore controls FDR under independence or PRDS
+across proteins, while BY remains the reported arbitrary-dependence analysis.
+The BH decision is kept separate from AdaFilter because it requires no
+data-dependent filtering and weaker assumptions about dependence between the
+two causal legs.
+
 The two-leg hypothesis is also a partial-conjunction hypothesis. For protein
 `j`, define filtering and selection p-values
 

@@ -41,6 +41,21 @@ def ebh_q(rows: list[dict[str, str]], log_e_column: str) -> dict[str, float]:
     return {row["Protein"]: value for row, value in zip(eligible, adjusted)}
 
 
+def bh_q(rows: list[dict[str, str]], p_column: str) -> dict[str, float]:
+    eligible = [row for row in rows if finite(row[p_column])]
+    eligible.sort(key=lambda row: float(row[p_column]))
+    raw = [
+        float(row[p_column]) * len(eligible) / rank
+        for rank, row in enumerate(eligible, start=1)
+    ]
+    adjusted = [1.0] * len(raw)
+    running = 1.0
+    for index in range(len(raw) - 1, -1, -1):
+        running = min(running, raw[index])
+        adjusted[index] = min(1.0, running)
+    return {row["Protein"]: value for row, value in zip(eligible, adjusted)}
+
+
 def read_rows(path: Path) -> list[dict[str, str]]:
     with path.open() as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
@@ -109,6 +124,7 @@ def main() -> None:
         raise SystemExit(f"adaptive e-value null expectation is {total}, expected 1")
 
     rows = read_rows(Path(sys.argv[1]))
+    expected_balanced_bh = bh_q(rows, "factor_balanced_conjunction_p")
     expected_adafilter = adafilter_q(rows)
     expected_balanced_t_ebh = ebh_q(rows, "factor_log_e_mediation_balanced")
     expected_balanced_ebh = ebh_q(rows, "factor_log_e_p2e_balanced_mediation")
@@ -121,6 +137,9 @@ def main() -> None:
         conjunction = float(row["factor_balanced_conjunction_p"])
         if not close(conjunction, max(p_xm, p_my)):
             raise SystemExit("balanced conjunction is not max(p_XM, p_MY)")
+        reported_bh = float(row["factor_balanced_conjunction_q_BH"])
+        if not close(reported_bh, expected_balanced_bh[row["Protein"]]):
+            raise SystemExit("balanced BH adjusted value does not match its definition")
         reported = float(row["factor_balanced_conjunction_q_AdaFilter"])
         if not close(reported, expected_adafilter[row["Protein"]]):
             raise SystemExit("AdaFilter adjusted value does not match its definition")
@@ -160,6 +179,9 @@ def main() -> None:
         if row["factor_adafilter_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
             if finite(row["factor_balanced_conjunction_q_AdaFilter"]):
                 raise SystemExit("AdaFilter value must fail closed under sample overlap")
+        if row["factor_balanced_bh_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
+            if finite(row["factor_balanced_conjunction_q_BH"]):
+                raise SystemExit("balanced BH value must fail closed under sample overlap")
         if row["factor_balanced_p2e_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
             if finite(row["factor_e_q_p2e_balanced_EBH"]):
                 raise SystemExit("balanced p-to-e e-BH value must fail closed under sample overlap")

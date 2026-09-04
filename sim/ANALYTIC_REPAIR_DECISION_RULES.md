@@ -25,6 +25,20 @@ same valid-model and robustness-cell FDR criteria. The broad and narrow power
 targets remain 0.80 and 0.50, respectively, and no grid or threshold may be
 changed after this point.
 
+After those results showed valid but inadequate power, ordinary BH applied to
+the balanced partial-conjunction p-value was frozen as a separate candidate
+before any BH result was generated. Its theorem requires independence or PRDS
+across protein hypotheses, but it does not require independence between the
+two leg p-values. It uses no estimated calibration map, filtering threshold,
+or tunable effect grid. The new-seed run uses 200 families in each mixed or
+robustness cell and 1,000 families in each pure-null cell. The mixed-cell
+criteria remain mean FDP no greater than 0.05, `mean FDP + 1.96*MCSE` no
+greater than 0.06, broad power at least 0.80, and narrow power at least 0.50.
+For each pure-null cell, the point FDR estimate must not exceed 0.05 and the
+one-sided 95% Wilson upper bound must not exceed 0.065. Stress cells retain the
+mean-FDP criterion of 0.05. No rule or threshold may be changed after this
+paragraph is committed to the validation snapshot.
+
 ## Valid-model cells
 
 The following cells evaluate the stated balanced/InSIDE working model:

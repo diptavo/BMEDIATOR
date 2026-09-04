@@ -119,7 +119,8 @@ instruments for a confirmatory call by default. The key new output columns are
 `factor_PP_two_stage`, `factor_posterior_cum_fdr`,
 `factor_log_BF_directional_XM`, `factor_log_BF_directional_MY`,
 `factor_directional_collinearity_XM`, `factor_directional_collinearity_MY`,
-`factor_balanced_conjunction_p`, `factor_balanced_conjunction_q_AdaFilter`,
+`factor_balanced_conjunction_p`, `factor_balanced_conjunction_q_BH`,
+`factor_balanced_conjunction_q_AdaFilter`,
 `factor_log_e_XM_balanced`, `factor_log_e_MY_balanced`,
 `factor_log_e_mediation_balanced`, `factor_e_q_balanced_EBH`,
 `factor_log_e_p2e_balanced_mediation`, `factor_e_q_p2e_balanced_EBH`,
@@ -361,7 +362,7 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_min_log_BF | Smaller of the two causal-leg log Bayes factors; not a joint BF |
 | factor_log_e_mediation, factor_e_q_EBH | Minimum causal-leg log e-value and proteome-wide e-BH adjusted value |
 | factor_p_XM_balanced, factor_p_MY_balanced | Experimental residual-scaled leg p-values under mean-zero pleiotropy/InSIDE |
-| factor_balanced_conjunction_p, factor_balanced_conjunction_q_BY | Experimental 2-of-2 balanced-pleiotropy p-value and arbitrary-dependence BY adjustment |
+| factor_balanced_conjunction_p, factor_balanced_conjunction_q_BH, factor_balanced_conjunction_q_BY | Experimental 2-of-2 balanced-pleiotropy p-value, independence/PRDS BH adjustment, and arbitrary-dependence BY adjustment |
 | factor_balanced_conjunction_q_AdaFilter | Experimental AdaFilter-BH adjustment; conditional on independent legs and weak cross-protein dependence |
 | factor_log_e_XM_balanced, factor_log_e_MY_balanced, factor_log_e_mediation_balanced, factor_e_q_balanced_EBH | Balanced/InSIDE Student-t density-ratio e-values and arbitrary-dependence e-BH adjustment |
 | factor_log_e_p2e_balanced_mediation, factor_e_q_p2e_balanced_EBH | Fixed p-to-e calibration of the balanced 2-of-2 p-value and arbitrary-dependence e-BH adjustment |
@@ -380,7 +381,7 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_mediation_status | Bayesian two-leg evidence plus instrument and regional identification gates |
 | factor_frequentist_status | Conjunction/BY evidence plus the same identification gates |
 | factor_ebh_status | Safe-e/e-BH evidence plus the same identification gates |
-| factor_balanced_status, factor_adafilter_status, factor_balanced_ebh_status, factor_balanced_p2e_status, factor_adaptive_ebh_status | Assumption-labeled decisions for the experimental analytical calibration tracks |
+| factor_balanced_status, factor_balanced_bh_status, factor_adafilter_status, factor_balanced_ebh_status, factor_balanced_p2e_status, factor_adaptive_ebh_status | Assumption-labeled decisions for the experimental analytical calibration tracks |
 | factor_posterior_status | Fixed-prior posterior expected-FDR selection plus identification gates |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |

@@ -143,17 +143,20 @@ changing the preceding outputs:
    Student t reference with `n-1` degrees of freedom under covariance
    proportional to the declared LD-aware covariance. BMEDIATOR applies BY to
    `max(p_XM_balanced,p_MY_balanced)` for arbitrary cross-protein dependence.
-5. AdaFilter-BH treats the two legs as a 2-of-2 partial conjunction, with
+5. Ordinary BH is also applied to the balanced partial-conjunction p-value.
+   It does not require independence between the leg p-values and controls FDR
+   under independence or PRDS across the protein-level p-values.
+6. AdaFilter-BH treats the two legs as a 2-of-2 partial conjunction, with
    `F=min(p_XM_balanced,p_MY_balanced)` and
    `S=max(p_XM_balanced,p_MY_balanced)`. This can reduce the multiplicity cost
    of proteins for which neither leg is plausible, but its guarantee requires
    independent base studies and independence or weak within-study dependence
    across proteins. It is reported as assumption-conditional.
-6. A fixed p-to-e calibrator is applied directly to the balanced 2-of-2
+7. A fixed p-to-e calibrator is applied directly to the balanced 2-of-2
    p-value, followed by e-BH. This retains the balanced/InSIDE and scalar
    covariance assumptions of the base p-value, but does not require
    independence between legs or across proteins.
-7. A fixed Student t density-ratio e-value is also computed directly from each
+8. A fixed Student t density-ratio e-value is also computed directly from each
    balanced residual-scaled leg statistic. The minimum leg e-value is passed to
    e-BH. This preserves the same mean-zero/InSIDE and scalar-dispersion model
    while permitting arbitrary dependence between legs and across proteins.

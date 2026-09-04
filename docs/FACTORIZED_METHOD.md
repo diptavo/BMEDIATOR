@@ -213,8 +213,13 @@ required to verify finite-sample behavior and power under departures from the
 working assumptions.
 
 For the separate balanced/InSIDE track, BMEDIATOR forms the 2-of-2 p-value
-`p_balanced=max(p_XM_balanced,p_MY_balanced)` and applies the same frozen
-calibrator mixture directly to that valid union-null p-value. The resulting
+`p_balanced=max(p_XM_balanced,p_MY_balanced)`. Ordinary BH is reported as
+`factor_balanced_conjunction_q_BH` when independence or PRDS across proteins
+is defensible; BY remains the arbitrary-dependence result. Neither procedure
+requires the two causal-leg p-values themselves to be independent.
+
+BMEDIATOR also applies the frozen calibrator mixture directly to that valid
+union-null p-value. The resulting
 `factor_log_e_p2e_balanced_mediation` is passed to e-BH across proteins and
 reported as `factor_e_q_p2e_balanced_EBH`. This route does not require
 independence between the two legs or across proteins, but it does require the
@@ -341,6 +346,12 @@ a separate FDR theorem for the post-gate status subset.
 `factor_balanced_ebh_status` applies the same interpretation to the direct
 balanced Student-t e-value. Its formal guarantee likewise belongs to the
 pre-gate family selected by `factor_e_q_balanced_EBH`.
+
+`factor_balanced_bh_status` applies the regional identification gates after
+balanced partial-conjunction BH selection. BH requires independence or PRDS
+across protein-level p-values. Its theorem applies to the pre-gate family
+selected by `factor_balanced_conjunction_q_BH`, not automatically to the
+post-gate subset.
 
 `factor_posterior_status` reports the fixed-prior posterior expected-FDR rule
 and then applies the same regional and heterogeneity interpretation gates.

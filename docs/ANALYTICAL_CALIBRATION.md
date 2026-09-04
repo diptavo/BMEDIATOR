@@ -8,7 +8,8 @@ calibration map from simulations or real data. The direct balanced
 Student-t/e-BH and balanced p-to-e/e-BH rules passed the frozen FDR checks in
 the tested identifiable cells, but both failed the prespecified power targets.
 AdaFilter retained substantially more power but failed its all-null FDR
-endpoint. None is designated as a production primary method.
+endpoint. Ordinary balanced partial-conjunction BH is undergoing a frozen
+new-seed validation. None is designated as a production primary method.
 
 ## Hypothesis
 
@@ -108,6 +109,23 @@ regional identification gate adds biological interpretation but is not itself
 part of the e-BH theorem; `factor_balanced_p2e_status` must therefore be read as
 an exclusion-restriction-conditional status rather than as a separately proven
 FDR-controlled regional subset.
+
+## Balanced partial-conjunction BH
+
+The same valid union-null p-value `max(p_XM,p_MY)` can be entered directly into
+the Benjamini-Hochberg procedure across proteins. This does not require the two
+leg p-values to be independent: under the mediation union null, at least one
+leg p-value is super-uniform, and their maximum is therefore super-uniform.
+BH controls FDR when the resulting protein-level p-values are independent or
+satisfy positive regression dependency on each null statistic (PRDS).
+
+The output is `factor_balanced_conjunction_q_BH`; the corresponding gated
+interpretation is `factor_balanced_bh_status`. The BH theorem concerns the
+pre-gate family of two-leg hypotheses. The later regional H3/H4 gate is a
+causal-identification diagnostic, not part of that FDR theorem. For arbitrary
+cross-protein dependence, use `factor_balanced_conjunction_q_BY`; for designs
+that justify stronger leg and cross-protein independence assumptions,
+AdaFilter is retained as a separate comparison.
 
 ## AdaFilter partial-conjunction FDR
 

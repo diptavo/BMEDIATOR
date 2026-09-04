@@ -299,6 +299,15 @@ tables are retained under `sim/results/analytic_repair_main_20260904_v1/` and
 tables are under
 `sim/results/analytic_repair_balanced_e_main_20260904_v1/`.
 
+Ordinary BH on the balanced partial-conjunction p-value was subsequently
+specified as a new candidate before examining any BH results. Unlike
+AdaFilter, it does not filter on the companion leg p-value and does not require
+independence between causal legs. Its FDR theorem requires independence or
+PRDS across protein-level p-values. The frozen new-seed design and automated
+decision criteria are recorded in `sim/configs/analytic_bh_validation.json`,
+`sim/ANALYTIC_REPAIR_DECISION_RULES.md`, and
+`sim/evaluate_analytic_bh_validation.py`. Results are pending.
+
 ## Release interpretation
 
 - The historical single-signal gate controls the tested distinct-LD failure well

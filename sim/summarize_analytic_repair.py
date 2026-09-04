@@ -13,6 +13,7 @@ from pathlib import Path
 METHODS = {
     "directional_BY": "factor_conjunction_q_BY",
     "balanced_BY": "factor_balanced_conjunction_q_BY",
+    "balanced_BH": "factor_balanced_conjunction_q_BH",
     "balanced_AdaFilter": "factor_balanced_conjunction_q_AdaFilter",
     "balanced_eBH": "factor_e_q_balanced_EBH",
     "balanced_p2e_eBH": "factor_e_q_p2e_balanced_EBH",

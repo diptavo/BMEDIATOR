@@ -29,7 +29,9 @@ def main() -> None:
     for benchmark in benchmarks:
         bench_cfg = config[benchmark]
         for cell in bench_cfg["cells"]:
-            replicates = args.replicates or int(bench_cfg["replicates"])
+            replicates = args.replicates or int(
+                cell.get("replicates", bench_cfg["replicates"])
+            )
             for rep in range(1, replicates + 1):
                 rows.append(
                     {
