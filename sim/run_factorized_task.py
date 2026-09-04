@@ -53,7 +53,12 @@ def factorized_options(global_cfg: dict, cell: dict) -> dict:
         raise ValueError("factorized calibration requires binary_options to be a JSON object")
     options = dict(configured)
     options["structural_method"] = "factorized"
-    rf_pqtl, rf_outcome, pqtl_outcome = sampling_error_correlations(cell)
+    analysis_overlap = cell.get("analysis_sample_overlap")
+    if analysis_overlap is None:
+        overlap_cell = cell
+    else:
+        overlap_cell = {"sample_overlap": analysis_overlap}
+    rf_pqtl, rf_outcome, pqtl_outcome = sampling_error_correlations(overlap_cell)
     options["sampling_corr_rf_pqtl"] = rf_pqtl
     options["sampling_corr_rf_outcome"] = rf_outcome
     options["sampling_corr_pqtl_outcome"] = pqtl_outcome

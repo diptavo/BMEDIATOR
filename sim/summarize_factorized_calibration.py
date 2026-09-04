@@ -425,7 +425,8 @@ def validate_complete_run(input_dir: Path, config_path: Path) -> None:
         else:
             rows_per_task = int(section["proteins_per_replicate"])
         for cell in section["cells"]:
-            for replicate in range(1, int(section["replicates"]) + 1):
+            replicates = int(cell.get("replicates", section["replicates"]))
+            for replicate in range(1, replicates + 1):
                 expected[(benchmark, str(cell["name"]), f"rep_{replicate:04d}")] = rows_per_task
 
     observed: dict[tuple[str, str, str], Path] = {}

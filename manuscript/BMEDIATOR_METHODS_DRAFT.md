@@ -174,12 +174,14 @@ of the two leg-specific log Bayes factors is reported as
 `factor_min_log_BF`; this is an evidence summary and is not described as a
 Bayes factor for the composite union null.
 
-Numerical validity of the integrated evidence and of the joint
-slope/intercept point estimate are assessed separately. If the joint profile
-curvature is not positive definite, the software retains well-defined
-projected tests and integrated evidence but withholds the effect estimate and
-indirect-effect interval. It does not substitute a zero-intercept estimate,
-and the causal identification status is `UNRESOLVED_EFFECT_ESTIMATION`.
+Numerical validity of the integrated evidence, balanced effect estimate, and
+joint directional sensitivity fit are assessed separately. The reported
+confirmatory effect is the balanced/InSIDE adjusted-profile slope. The joint
+slope/oriented-intercept fit supplies a separate directional-pleiotropy
+diagnostic; its collinearity does not make the balanced slope unavailable. If
+balanced profile curvature is invalid, the software retains well-defined
+projected tests and integrated evidence but withholds the ordinary effect
+estimate and assigns `UNRESOLVED_EFFECT_ESTIMATION`.
 
 ### Fixed-prior Bayesian posterior FDR
 
@@ -462,7 +464,22 @@ The mediated effect is `beta_1j beta_2j`; its SE includes the second-order
 product-of-variance term. Its confidence interval is the range of the four
 corner products from Bonferroni simultaneous t intervals for the two legs,
 using `n-2` degrees of freedom on each leg. This interval is deliberately
-conservative. A positive status is a conditional causal conclusion under the stated
+conservative.
+
+For confidence statements restricted to proteins selected by balanced
+partial-conjunction testing, let `R` be the number selected among `m` tested
+proteins at family level `q`. Under independent protein vectors, BMEDIATOR
+constructs each selected protein's simultaneous two-leg confidence set with
+total noncoverage `qR/m`. Each leg receives half this budget by Bonferroni, and
+the indirect-effect set is the corresponding corner-product range. The
+arbitrary-dependence version replaces this budget by `qR/(mH_m)`, where `H_m`
+is the `m`th harmonic number. These are false-coverage-rate adjustments in the
+sense of Benjamini and Yekutieli. A selected protein with unstable effect
+curvature receives an unbounded set and remains in the FCR denominator. The
+claim is conditional on valid marginal adjusted-profile intervals; these are
+not weak-instrument-exact confidence sets.
+
+A positive status is a conditional causal conclusion under the stated
 instrument and regional assumptions, not assumption-free proof of biological
 mediation.
 
@@ -537,3 +554,10 @@ Society: Series B* 57, 289-300 (1995).
 
 Benjamini Y, Yekutieli D. The control of the false discovery rate in multiple
 testing under dependency. *Annals of Statistics* 29, 1165-1188 (2001).
+
+Benjamini Y, Yekutieli D. False discovery rate-adjusted multiple confidence
+intervals for selected parameters. *Journal of the American Statistical
+Association* 100, 71-81 (2005).
+
+Wang S, Kang H. Weak-instrument robust tests in two-sample summary-data
+Mendelian randomization. *Biometrics* 78, 1699-1713 (2022).

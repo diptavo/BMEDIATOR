@@ -336,6 +336,14 @@ struct ProteinResult {
     double factor_tau_xm, factor_tau_my, factor_tau_xy;
     double factor_indirect, factor_indirect_se;
     double factor_indirect_ci_lower, factor_indirect_ci_upper;
+    double factor_fcr_alpha_bh;
+    double factor_beta1_fcr_ci_lower_bh, factor_beta1_fcr_ci_upper_bh;
+    double factor_beta2_fcr_ci_lower_bh, factor_beta2_fcr_ci_upper_bh;
+    double factor_indirect_fcr_ci_lower_bh, factor_indirect_fcr_ci_upper_bh;
+    double factor_fcr_alpha_by;
+    double factor_beta1_fcr_ci_lower_by, factor_beta1_fcr_ci_upper_by;
+    double factor_beta2_fcr_ci_lower_by, factor_beta2_fcr_ci_upper_by;
+    double factor_indirect_fcr_ci_lower_by, factor_indirect_fcr_ci_upper_by;
     double factor_conjunction_p, factor_conjunction_q_by;
     double factor_strict_conjunction_p, factor_strict_conjunction_q_by;
     double factor_min_log_bf;
@@ -357,6 +365,8 @@ struct ProteinResult {
     std::string factor_ebh_status;
     std::string factor_balanced_status;
     std::string factor_balanced_bh_status;
+    std::string factor_fcr_bh_status;
+    std::string factor_fcr_by_status;
     std::string factor_adafilter_status;
     std::string factor_balanced_ebh_status;
     std::string factor_balanced_p2e_status;

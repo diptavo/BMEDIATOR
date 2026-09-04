@@ -171,6 +171,60 @@ def main() -> None:
     if checked == 0:
         raise SystemExit("no eligible analytical calibration rows were checked")
 
+    balanced_rows = [
+        row for row in rows if finite(row["factor_balanced_conjunction_p"])
+    ]
+    m = len(balanced_rows)
+    harmonic = sum(1.0 / rank for rank in range(1, m + 1))
+    selected_bh = [
+        row for row in balanced_rows
+        if float(row["factor_balanced_conjunction_q_BH"]) <= 0.05
+    ]
+    selected_by = [
+        row for row in balanced_rows
+        if float(row["factor_balanced_conjunction_q_BY"]) <= 0.05
+    ]
+    for method, selected, q_column, alpha_column, status_column, suffix in (
+        ("BH", selected_bh, "factor_balanced_conjunction_q_BH",
+         "factor_fcr_alpha_BH", "factor_fcr_bh_status", "BH"),
+        ("BY", selected_by, "factor_balanced_conjunction_q_BY",
+         "factor_fcr_alpha_BY", "factor_fcr_by_status", "BY"),
+    ):
+        expected_alpha = 0.05 * len(selected) / m if selected else math.nan
+        if method == "BY" and selected:
+            expected_alpha /= harmonic
+        for row in balanced_rows:
+            is_selected = float(row[q_column]) <= 0.05
+            if not is_selected:
+                if finite(row[alpha_column]):
+                    raise SystemExit(f"{method}-FCR alpha reported for unselected row")
+                continue
+            if not close(float(row[alpha_column]), expected_alpha):
+                raise SystemExit(f"{method}-FCR alpha does not equal q*R/m adjustment")
+            expected_status = (
+                "PROFILE_FCR_BH_INDEPENDENCE_CONDITIONAL"
+                if method == "BH"
+                else "PROFILE_FCR_BY_DEPENDENCE_CONDITIONAL"
+            )
+            if row[status_column] != expected_status:
+                raise SystemExit(f"unexpected {method}-FCR status")
+            b1_lo = float(row[f"factor_beta1_fcr_ci_lower_{suffix}"])
+            b1_hi = float(row[f"factor_beta1_fcr_ci_upper_{suffix}"])
+            b2_lo = float(row[f"factor_beta2_fcr_ci_lower_{suffix}"])
+            b2_hi = float(row[f"factor_beta2_fcr_ci_upper_{suffix}"])
+            indirect_lo = float(row[f"factor_indirect_fcr_ci_lower_{suffix}"])
+            indirect_hi = float(row[f"factor_indirect_fcr_ci_upper_{suffix}"])
+            if not b1_lo <= float(row["factor_beta1"]) <= b1_hi:
+                raise SystemExit(f"{method}-FCR beta1 interval misses its estimate")
+            if not b2_lo <= float(row["factor_beta2"]) <= b2_hi:
+                raise SystemExit(f"{method}-FCR beta2 interval misses its estimate")
+            products = (b1_lo * b2_lo, b1_lo * b2_hi,
+                        b1_hi * b2_lo, b1_hi * b2_hi)
+            if not close(indirect_lo, min(products)) or not close(
+                indirect_hi, max(products)
+            ):
+                raise SystemExit(f"{method}-FCR indirect interval is not the corner product")
+
     overlap_rows = read_rows(Path(sys.argv[2]))
     for row in overlap_rows:
         if row["factor_adaptive_ebh_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
@@ -188,6 +242,12 @@ def main() -> None:
         if row["factor_balanced_ebh_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
             if finite(row["factor_e_q_balanced_EBH"]):
                 raise SystemExit("balanced Student-t e-BH value must fail closed under sample overlap")
+        if row["factor_fcr_bh_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
+            if finite(row["factor_fcr_alpha_BH"]):
+                raise SystemExit("BH-FCR intervals must fail closed under sample overlap")
+        if row["factor_fcr_by_status"] == "UNRESOLVED_SAMPLE_OVERLAP":
+            if finite(row["factor_fcr_alpha_BY"]):
+                raise SystemExit("BY-FCR intervals must fail closed under sample overlap")
 
 
 if __name__ == "__main__":

@@ -222,12 +222,24 @@ The heterogeneity Bayes factor compares the effect model integrated over
 withholds a mediation interpretation but does not negate evidence for two
 genetic slopes.
 
-Integrated evidence and joint effect estimation have separate numerical
-validity checks. If the slope/intercept profile curvature is not positive
-definite, calibrated evidence may still be reported, but the effect estimate
-and indirect-effect interval are unavailable and the identification gate
-returns `UNRESOLVED_EFFECT_ESTIMATION`. The software does not substitute a
-zero-intercept estimate.
+Integrated evidence, balanced effect estimation, and directional sensitivity
+analysis have separate numerical validity checks. Confirmatory effect estimates
+use the balanced/InSIDE adjusted-profile slope and do not require an oriented
+directional intercept to be identifiable. The joint slope/intercept fit is
+reported separately as a sensitivity diagnostic. If balanced profile curvature
+is invalid, the ordinary effect estimate is unavailable and the identification
+gate returns `UNRESOLVED_EFFECT_ESTIMATION`.
+
+For effect statements made after balanced partial-conjunction selection, the
+software reports FCR-adjusted joint confidence sets. With `R` selections among
+`m` tested proteins, the BH version assigns total noncoverage `qR/m` to each
+selected protein; the BY version uses `qR/(mH_m)`. That budget is split between
+the two leg intervals, and the indirect-effect interval is the range of their
+four endpoint products. An unstable selected estimate receives an explicitly
+unbounded set instead of being removed from the selected-family denominator.
+These constructions are conditional on validity of the underlying marginal
+profile intervals. BH-FCR requires independent protein vectors; the harmonic
+version is the arbitrary-dependence procedure.
 
 ## LD and Causal Identification
 
@@ -270,7 +282,8 @@ Every molecular trait must report, separately:
 - residual heterogeneity estimates and heterogeneity Bayes factors;
 - directional-component BFs/posteriors and slope-intercept collinearity;
 - maximum retained Set A/Set B cross-LD `r²`;
-- joint adjusted-profile directional-intercept estimates and uncertainty;
+- balanced/InSIDE adjusted-profile effect estimates and uncertainty, with the
+  joint directional-intercept fit reported separately as a diagnostic;
 - H3/H4 evidence and independent matched-shared-signal count;
 - `factor_two_stage_status`, which makes no mediation claim;
 - `factor_mediation_status`, which applies identification gates and names the
@@ -280,6 +293,8 @@ Every molecular trait must report, separately:
 - family-level BY and e-BH decisions when their assumptions are met.
 - balanced partial-conjunction BH q-values and statuses when cross-protein
   independence or PRDS is defensible.
+- BH- and BY-adjusted selected-protein confidence sets, their per-protein
+  noncoverage level, and explicit bounded/unbounded status.
 
 Legacy M0-M5 probabilities may be emitted for compatibility but are not part
 of confirmatory factorized inference.

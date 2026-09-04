@@ -183,7 +183,7 @@ if ! awk -F '\t' '
         $(h["factor_log_e_mediation"]) == "nan" ||
         $(h["factor_ld_source"]) != "reference" ||
         $(h["factor_selection_design"]) != "independent-discovery" ||
-        $(h["factor_effect_estimator"]) != "joint-directional-generalized-adjusted-profile-score" ||
+        $(h["factor_effect_estimator"]) != "balanced-generalized-adjusted-profile-score" ||
         $(h["factor_beta1_ci_lower"]) > $(h["factor_beta1"]) ||
         $(h["factor_beta1_ci_upper"]) < $(h["factor_beta1"]) ||
         $(h["factor_beta2_ci_lower"]) > $(h["factor_beta2"]) ||
@@ -577,5 +577,7 @@ fi
 python3 "$ROOT/test/check_analytic_calibration.py" \
   "${FULL_FACTOR_PREFIX}.mediation" \
   "${FULL_FACTOR_OVERLAP_PREFIX}.mediation"
+
+python3 "$ROOT/test/check_effect_validation_helpers.py"
 
 echo "BMEDIATOR smoke test passed."

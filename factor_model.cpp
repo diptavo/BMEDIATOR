@@ -689,8 +689,11 @@ FactorFit fit_eiv(const std::vector<double>& x,
     best_ll = final_tau_fit.second;
     result.tau = best_tau;
 
-    // Joint adjusted-profile slope and oriented intercept. This aligns the
-    // reported point estimate with the nuisance-projected score test.
+    // Fit the oriented-intercept model as a diagnostic sensitivity analysis.
+    // The confirmatory effect estimate below remains the balanced/InSIDE
+    // adjusted-profile slope: forcing the directional intercept into that
+    // estimate makes slope and intercept nonidentifiable when instrument
+    // magnitudes are similar.
     bool joint_fit = false;
     double joint_eta = 0.0;
     double joint_beta_se = std::numeric_limits<double>::quiet_NaN();
@@ -761,20 +764,17 @@ FactorFit fit_eiv(const std::vector<double>& x,
             std::isfinite(determinant)) {
             joint_beta_se = std::sqrt(hee / determinant);
             joint_eta_se = std::sqrt(hbb / determinant);
-            best_beta = jb;
-            best_tau = jt;
             joint_eta = je;
-            result.tau = jt;
             joint_fit = std::isfinite(joint_beta_se) &&
                         std::isfinite(joint_eta_se);
         }
     }
 
     if (joint_fit) {
-        result.se = joint_beta_se;
         result.directional_intercept = joint_eta;
         result.directional_intercept_se = joint_eta_se;
-    } else if (independent_errors) {
+    }
+    if (independent_errors) {
         double score_variance = 0.0;
         double sensitivity = 0.0;
         const double tau2 = best_tau * best_tau;
@@ -924,8 +924,8 @@ FactorFit fit_eiv(const std::vector<double>& x,
     result.log_bf_heterogeneity = log_alternative - log_no_heterogeneity;
     result.log_e = score.log_e;
     result.log_e_adaptive = score.log_e_adaptive;
-    result.effect_valid = joint_fit && std::isfinite(result.beta) &&
-                          std::isfinite(result.se);
+    result.effect_valid = std::isfinite(result.beta) &&
+                          std::isfinite(result.se) && result.se > 0.0;
     result.valid = std::isfinite(result.p) && std::isfinite(result.p_strict) &&
                    std::isfinite(result.log_bf) &&
                    std::isfinite(result.log_bf_heterogeneity) &&
@@ -1003,6 +1003,62 @@ std::string identification_gate(const ProteinResult& result,
     return supported_status;
 }
 
+struct JointLegProductInterval {
+    double beta1_lower = std::numeric_limits<double>::quiet_NaN();
+    double beta1_upper = std::numeric_limits<double>::quiet_NaN();
+    double beta2_lower = std::numeric_limits<double>::quiet_NaN();
+    double beta2_upper = std::numeric_limits<double>::quiet_NaN();
+    double indirect_lower = std::numeric_limits<double>::quiet_NaN();
+    double indirect_upper = std::numeric_limits<double>::quiet_NaN();
+    bool valid = false;
+};
+
+JointLegProductInterval joint_leg_product_interval(
+        const ProteinResult& result, double protein_alpha) {
+    JointLegProductInterval interval;
+    if (!(protein_alpha > 0.0 && protein_alpha < 1.0) ||
+        !std::isfinite(result.factor_beta1) ||
+        !std::isfinite(result.factor_beta1_se) ||
+        !std::isfinite(result.factor_beta2) ||
+        !std::isfinite(result.factor_beta2_se) ||
+        !(result.factor_beta1_se > 0.0) ||
+        !(result.factor_beta2_se > 0.0) ||
+        result.factor_nA <= 2 || result.factor_nB <= 2) {
+        return interval;
+    }
+
+    // Split each protein's noncoverage budget across its two causal legs.
+    // The corner-product interval then covers beta1*beta2 whenever both leg
+    // intervals cover, without requiring independence between the legs.
+    const double leg_alpha = 0.5 * protein_alpha;
+    const double critical_a =
+        student_t_critical(leg_alpha, result.factor_nA - 2.0);
+    const double critical_b =
+        student_t_critical(leg_alpha, result.factor_nB - 2.0);
+    if (!std::isfinite(critical_a) || !std::isfinite(critical_b)) {
+        return interval;
+    }
+    interval.beta1_lower =
+        result.factor_beta1 - critical_a * result.factor_beta1_se;
+    interval.beta1_upper =
+        result.factor_beta1 + critical_a * result.factor_beta1_se;
+    interval.beta2_lower =
+        result.factor_beta2 - critical_b * result.factor_beta2_se;
+    interval.beta2_upper =
+        result.factor_beta2 + critical_b * result.factor_beta2_se;
+    const std::vector<double> products = {
+        interval.beta1_lower * interval.beta2_lower,
+        interval.beta1_lower * interval.beta2_upper,
+        interval.beta1_upper * interval.beta2_lower,
+        interval.beta1_upper * interval.beta2_upper};
+    interval.indirect_lower =
+        *std::min_element(products.begin(), products.end());
+    interval.indirect_upper =
+        *std::max_element(products.begin(), products.end());
+    interval.valid = true;
+    return interval;
+}
+
 } // namespace
 
 void run_factorized_inference(const ProteinData& prot,
@@ -1056,6 +1112,20 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_tau_xm = result.factor_tau_my = result.factor_tau_xy = nan;
     result.factor_indirect = result.factor_indirect_se = nan;
     result.factor_indirect_ci_lower = result.factor_indirect_ci_upper = nan;
+    result.factor_fcr_alpha_bh = nan;
+    result.factor_beta1_fcr_ci_lower_bh =
+        result.factor_beta1_fcr_ci_upper_bh = nan;
+    result.factor_beta2_fcr_ci_lower_bh =
+        result.factor_beta2_fcr_ci_upper_bh = nan;
+    result.factor_indirect_fcr_ci_lower_bh =
+        result.factor_indirect_fcr_ci_upper_bh = nan;
+    result.factor_fcr_alpha_by = nan;
+    result.factor_beta1_fcr_ci_lower_by =
+        result.factor_beta1_fcr_ci_upper_by = nan;
+    result.factor_beta2_fcr_ci_lower_by =
+        result.factor_beta2_fcr_ci_upper_by = nan;
+    result.factor_indirect_fcr_ci_lower_by =
+        result.factor_indirect_fcr_ci_upper_by = nan;
     result.factor_conjunction_p = result.factor_conjunction_q_by = nan;
     result.factor_strict_conjunction_p = result.factor_strict_conjunction_q_by = nan;
     result.factor_min_log_bf = nan;
@@ -1070,7 +1140,7 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_selection_design = opts.factor_independent_selection
         ? "independent-discovery" : "same-sample";
     result.factor_effect_estimator =
-        "joint-directional-generalized-adjusted-profile-score";
+        "balanced-generalized-adjusted-profile-score";
     result.factor_pattern = "NOT_RUN";
     result.factor_two_stage_status = "NOT_RUN";
     result.factor_mediation_status = "NOT_RUN";
@@ -1080,6 +1150,8 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_ebh_status = "NOT_RUN";
     result.factor_balanced_status = "NOT_RUN";
     result.factor_balanced_bh_status = "NOT_RUN";
+    result.factor_fcr_bh_status = "NOT_RUN";
+    result.factor_fcr_by_status = "NOT_RUN";
     result.factor_adafilter_status = "NOT_RUN";
     result.factor_balanced_ebh_status = "NOT_RUN";
     result.factor_balanced_p2e_status = "NOT_RUN";
@@ -1129,7 +1201,7 @@ void run_factorized_inference(const ProteinData& prot,
         opts.factor_directional_variance);
     if (!stage1.effect_valid || !stage2.effect_valid) {
         result.factor_effect_estimator =
-            "unresolved-joint-directional-curvature";
+            "unresolved-balanced-profile-curvature";
     }
 
     if (stage1.valid) {
@@ -1345,6 +1417,8 @@ void run_factorized_inference(const ProteinData& prot,
     result.factor_balanced_bh_status = evidence_gate(
         balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
         "PENDING_MULTIPLE_TESTING");
+    result.factor_fcr_bh_status = result.factor_balanced_bh_status;
+    result.factor_fcr_by_status = result.factor_balanced_status;
     result.factor_adafilter_status = evidence_gate(
         balanced_evidence, "NO_TWO_STAGE_BALANCED_EVIDENCE",
         "PENDING_MULTIPLE_TESTING");
@@ -1424,6 +1498,12 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
             }
             if (result.factor_balanced_bh_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_balanced_bh_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_fcr_bh_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_fcr_bh_status = "UNRESOLVED_SAMPLE_OVERLAP";
+            }
+            if (result.factor_fcr_by_status == "PENDING_MULTIPLE_TESTING") {
+                result.factor_fcr_by_status = "UNRESOLVED_SAMPLE_OVERLAP";
             }
             if (result.factor_adafilter_status == "PENDING_MULTIPLE_TESTING") {
                 result.factor_adafilter_status = "UNRESOLVED_SAMPLE_OVERLAP";
@@ -1551,6 +1631,100 @@ void finalize_factorized_multiple_testing(std::vector<ProteinResult>& results,
             result, opts, "TWO_STAGE_EVIDENCE",
             "SUPPORTED_BALANCED_INSIDE_EXCLUSION_CONDITIONAL");
     }
+
+    // False-coverage-rate adjustment for effect statements made after
+    // protein selection. For each selected protein, q*R/m is its total
+    // noncoverage budget under independent protein vectors. Dividing once
+    // more by the harmonic number gives the arbitrary-dependence version.
+    // Each protein budget is split across the two leg intervals; their corner
+    // product is consequently a valid simultaneous product interval whenever
+    // the underlying profile intervals have their stated marginal coverage.
+    auto assign_fcr_family = [&](bool use_by) {
+        std::vector<int> selected;
+        std::vector<char> selected_flag(results.size(), 0);
+        for (int index : balanced_order) {
+            const double q_value = use_by
+                ? results[index].factor_balanced_conjunction_q_by
+                : results[index].factor_balanced_conjunction_q_bh;
+            if (std::isfinite(q_value) && q_value <= opts.factor_alpha) {
+                selected.push_back(index);
+                selected_flag[index] = 1;
+            }
+        }
+        for (int index : balanced_order) {
+            ProteinResult& result = results[index];
+            std::string& status = use_by
+                ? result.factor_fcr_by_status : result.factor_fcr_bh_status;
+            if (!selected_flag[index]) {
+                if (status == "PENDING_MULTIPLE_TESTING") {
+                    status = use_by ? "NOT_SELECTED_BY_BALANCED_BY"
+                                    : "NOT_SELECTED_BY_BALANCED_BH";
+                }
+            }
+        }
+        if (selected.empty()) return;
+
+        double protein_alpha = opts.factor_alpha *
+            static_cast<double>(selected.size()) /
+            static_cast<double>(std::max(1, balanced_m));
+        if (use_by) protein_alpha /= std::max(balanced_harmonic, 1.0);
+        for (int index : selected) {
+            ProteinResult& result = results[index];
+            const JointLegProductInterval interval =
+                joint_leg_product_interval(result, protein_alpha);
+            std::string& status = use_by
+                ? result.factor_fcr_by_status : result.factor_fcr_bh_status;
+            if (!interval.valid) {
+                // A selected parameter must remain in the FCR denominator.
+                // When curvature estimation fails, the whole real line is a
+                // valid (uninformative) confidence set and preserves coverage.
+                const double negative_infinity =
+                    -std::numeric_limits<double>::infinity();
+                const double positive_infinity =
+                    std::numeric_limits<double>::infinity();
+                if (use_by) {
+                    result.factor_fcr_alpha_by = protein_alpha;
+                    result.factor_beta1_fcr_ci_lower_by = negative_infinity;
+                    result.factor_beta1_fcr_ci_upper_by = positive_infinity;
+                    result.factor_beta2_fcr_ci_lower_by = negative_infinity;
+                    result.factor_beta2_fcr_ci_upper_by = positive_infinity;
+                    result.factor_indirect_fcr_ci_lower_by = negative_infinity;
+                    result.factor_indirect_fcr_ci_upper_by = positive_infinity;
+                } else {
+                    result.factor_fcr_alpha_bh = protein_alpha;
+                    result.factor_beta1_fcr_ci_lower_bh = negative_infinity;
+                    result.factor_beta1_fcr_ci_upper_bh = positive_infinity;
+                    result.factor_beta2_fcr_ci_lower_bh = negative_infinity;
+                    result.factor_beta2_fcr_ci_upper_bh = positive_infinity;
+                    result.factor_indirect_fcr_ci_lower_bh = negative_infinity;
+                    result.factor_indirect_fcr_ci_upper_bh = positive_infinity;
+                }
+                status = "UNBOUNDED_FCR_EFFECT_SET";
+                continue;
+            }
+            if (use_by) {
+                result.factor_fcr_alpha_by = protein_alpha;
+                result.factor_beta1_fcr_ci_lower_by = interval.beta1_lower;
+                result.factor_beta1_fcr_ci_upper_by = interval.beta1_upper;
+                result.factor_beta2_fcr_ci_lower_by = interval.beta2_lower;
+                result.factor_beta2_fcr_ci_upper_by = interval.beta2_upper;
+                result.factor_indirect_fcr_ci_lower_by = interval.indirect_lower;
+                result.factor_indirect_fcr_ci_upper_by = interval.indirect_upper;
+                status = "PROFILE_FCR_BY_DEPENDENCE_CONDITIONAL";
+            } else {
+                result.factor_fcr_alpha_bh = protein_alpha;
+                result.factor_beta1_fcr_ci_lower_bh = interval.beta1_lower;
+                result.factor_beta1_fcr_ci_upper_bh = interval.beta1_upper;
+                result.factor_beta2_fcr_ci_lower_bh = interval.beta2_lower;
+                result.factor_beta2_fcr_ci_upper_bh = interval.beta2_upper;
+                result.factor_indirect_fcr_ci_lower_bh = interval.indirect_lower;
+                result.factor_indirect_fcr_ci_upper_bh = interval.indirect_upper;
+                status = "PROFILE_FCR_BH_INDEPENDENCE_CONDITIONAL";
+            }
+        }
+    };
+    assign_fcr_family(false);
+    assign_fcr_family(true);
 
     // AdaFilter-BH for the 2-of-2 partial conjunction. Here F=min(p_XM,p_MY)
     // and S=max(p_XM,p_MY). Its FDR guarantee requires independence between

@@ -354,6 +354,8 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_beta1, factor_beta1_se, factor_p_XM, factor_log_BF_XM | Factorized RF-to-protein adjusted-profile estimate and oriented-intercept-adjusted evidence |
 | factor_beta2, factor_beta2_se, factor_p_MY, factor_log_BF_MY | Factorized protein-to-outcome adjusted-profile estimate and oriented-intercept-adjusted evidence from Set B only |
 | factor_beta1_ci_lower/upper, factor_beta2_ci_lower/upper | Approximate finite-instrument t intervals with `n-2` degrees of freedom |
+| factor_fcr_alpha_BH, factor_beta1/beta2/indirect_fcr_ci_*_BH | Selected-protein confidence sets targeting 5% FCR under independent protein vectors |
+| factor_fcr_alpha_BY, factor_beta1/beta2/indirect_fcr_ci_*_BY | Harmonic-adjusted selected-protein confidence sets for arbitrary cross-protein dependence |
 | factor_beta3, factor_beta3_se, factor_p_XY, factor_log_BF_XY | Factorized residual RF-to-outcome estimate and evidence |
 | factor_log_e_XM, factor_log_e_MY, factor_log_e_XY | Safe log e-values from a fixed Student t density-ratio mixture after eliminating common scale and oriented-intercept nuisance terms |
 | factor_tau_XM, factor_tau_MY, factor_tau_XY | Profile estimates of residual heterogeneity SD for each leg |
@@ -382,7 +384,7 @@ Tab-delimited, one row per protein. Legacy mode sorts by
 | factor_mediation_status | Bayesian two-leg evidence plus instrument and regional identification gates |
 | factor_frequentist_status | Conjunction/BY evidence plus the same identification gates |
 | factor_ebh_status | Safe-e/e-BH evidence plus the same identification gates |
-| factor_balanced_status, factor_balanced_bh_status, factor_adafilter_status, factor_balanced_ebh_status, factor_balanced_p2e_status, factor_adaptive_ebh_status | Assumption-labeled decisions for the experimental analytical calibration tracks |
+| factor_balanced_status, factor_balanced_bh_status, factor_fcr_bh_status, factor_fcr_by_status, factor_adafilter_status, factor_balanced_ebh_status, factor_balanced_p2e_status, factor_adaptive_ebh_status | Assumption-labeled decisions for the experimental analytical calibration and selected-confidence-set tracks |
 | factor_posterior_status | Fixed-prior posterior expected-FDR selection plus identification gates |
 | mediated_effect | β₁×β₂ |
 | se_mediated | Delta-method SE for mediated effect |
@@ -581,10 +583,9 @@ For the one-protein command, `bmi_chd_il6r.mediation` contains one protein row:
 
 IL6R has strong protein-to-CHD evidence in this analysis, but no corresponding
 BMI-to-IL6R leg (`factor_p_XM=0.535829`). It is therefore not supported as a BMI
-mediator. Its regional configuration is also ambiguous. The joint
-slope/intercept effect estimate is unavailable and is explicitly labeled
-`unresolved-joint-directional-curvature`; no zero-intercept estimate is
-substituted.
+mediator. Its regional configuration is also ambiguous. Factorized effect
+estimates use the balanced/InSIDE adjusted-profile model; the oriented
+directional-intercept fit is reported separately as a sensitivity diagnostic.
 
 For the five-protein command, `bmi_chd_ukb_ppp_all5.mediation` contains:
 
