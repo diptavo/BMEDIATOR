@@ -622,6 +622,27 @@ analysis, IL6R and ANGPTL3 lack evidence for both causal legs, while PCSK9 has
 two-leg evidence but remains nonidentifiable at a single shared signal. No
 example protein is a confirmed mediator, and none is selected by e-BH.
 
+### Frozen post-selection effect validation
+
+The post-selection confidence-set procedure was evaluated without post hoc
+tuning at commit `bc5d8f1`. The held-out design contained 2,700 simulated
+families of 500 proteins (1.35 million analyses). All 87 prespecified component
+criteria passed. BH mean false coverage proportion was 0.01157 with strong
+instruments, 0.00165 with moderate instruments, 0 with four instruments, and
+0.02801 under balanced heterogeneity. BY mean false coverage proportion was
+0.00027 with strong instruments, 0.00114 under balanced heterogeneity, and
+0.00033 under dense cross-protein dependence. Every selected effect family was
+complete and none was unbounded. Declared sample overlap failed closed for all
+39,923 tested proteins without emitting a finite selected confidence set.
+
+This is an assumption-conditional, finite-grid validation. BH mean false
+coverage proportion rose to 0.29491 under directional pleiotropy, which
+violates the balanced/InSIDE model. The near-threshold weak-instrument cell
+made no selections and therefore does not validate weak-instrument coverage.
+The underlying Student-t profile intervals are not weak-instrument-exact.
+Full provenance and compact summaries are in
+`sim/results/factorized_effect_validation_20260906_v1/`.
+
 ---
 
 ## Interpreting Results

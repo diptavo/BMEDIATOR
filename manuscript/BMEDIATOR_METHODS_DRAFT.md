@@ -536,6 +536,34 @@ BH rule is therefore the leading confirmatory statistical procedure under its
 stated assumptions, while regional H3/H4 evidence, heterogeneity, and external
 replication remain separate causal-identification checks.
 
+### Frozen post-selection effect-estimation result
+
+We separately froze a validation of first-stage, second-stage, and indirect
+effect inference after balanced partial-conjunction selection. The held-out
+seed comprised 2,700 simulated proteomes of 500 proteins each, for 1.35 million
+protein analyses. All 87 prespecified component criteria passed. For BH-selected
+families, mean FCP was 0.01157 with strong instruments, 0.00165 with moderate
+instruments, 0 with four instruments, and 0.02801 under balanced heterogeneity.
+For BY-selected families, mean FCP was 0.00027 with strong instruments, 0.00114
+under balanced heterogeneity, and 0.00033 under dense cross-protein dependence.
+All selected confidence-set families were complete and none was unbounded.
+
+Among true-M1 proteins in the four independent confirmatory cells, estimates
+of both causal legs and their product were available in every analysis. The
+minimum nominal causal-leg coverage was 0.94487, and the largest absolute bias
+relative to empirical standard deviation among BH-selected M1 effects was
+0.18997. In the declared-overlap cell, no finite selected confidence set was
+emitted for any of 39,923 tested proteins, as prespecified.
+
+This effect-validation result is conditional on valid balanced/InSIDE marginal
+profile intervals. Under directional pleiotropy, BH mean FCP was 0.29491. The
+near-threshold weak-instrument cell made no selections, and the current
+finite-instrument Student-t intervals are not weak-instrument-exact. BY was
+highly conservative in moderate and four-instrument cells, while same-sample
+selection produced too few calls for confirmatory evaluation. These outcomes
+define the scope of the effect-calibration claim rather than extending it to
+violated assumptions.
+
 ## Methodological references
 
 Wasserman L, Ramdas A, Balakrishnan S. Universal inference. *Proceedings of

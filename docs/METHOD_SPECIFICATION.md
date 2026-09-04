@@ -327,3 +327,25 @@ completes the statistical-family criterion only under balanced/InSIDE leg
 validity and cross-protein independence/PRDS. It does not complete the other
 release criteria above, establish arbitrary-dependence control, or identify
 exactly proportional pleiotropy.
+
+A second held-out validation at commit `bc5d8f1` evaluated the reported
+`beta1`, `beta2`, and indirect-effect confidence sets after proteome-wide
+selection. The frozen design contained 2,700 families of 500 proteins (1.35
+million analyses), and all 87 component criteria passed. BH mean FCP was
+0.01157, 0.00165, 0, and 0.02801 in the strong, moderate, four-instrument, and
+balanced-heterogeneity confirmatory cells. BY mean FCP was 0.00027 under strong
+instruments, 0.00114 under balanced heterogeneity, and 0.00033 under dense
+cross-protein dependence. Selected interval families were complete with no
+unbounded sets. True-M1 marginal effect availability was 100%; causal-leg
+coverage was at least 0.94487; and the largest absolute standardized bias among
+BH-selected M1 effects was 0.18997. Declared overlap emitted no finite selected
+sets for 39,923 tested proteins.
+
+This result does not remove the release requirements above. Directional
+pleiotropy produced BH mean FCP 0.29491, demonstrating failure when the
+balanced/InSIDE condition is violated. The near-threshold cell made no
+discoveries, so weak-instrument-exact inference remains unresolved. BY was too
+conservative for a confirmatory claim in the moderate and four-instrument
+cells, and same-sample selection yielded too few calls for a strong conclusion.
+The complete frozen decision and provenance are in
+`sim/results/factorized_effect_validation_20260906_v1/`.
