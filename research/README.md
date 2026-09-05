@@ -24,6 +24,17 @@ Rscript research/evaluate_joint_graph_adversarial.R
 Its scenarios and interpretation rules are fixed in
 `docs/JOINT_GRAPH_V0_1_ADVERSARIAL_PLAN.md`.
 
+The frozen full-run outputs are:
+
+```text
+joint_graph_v0_1_adversarial_summary.tsv
+joint_graph_v0_1_adversarial_summary_replicates.tsv
+```
+
+See `docs/JOINT_GRAPH_V0_1_ADVERSARIAL_RESULTS.md` for interpretation. The
+evaluation rejects JG-0.1 as a production engine; the files are retained to
+prevent the development failures from being hidden by later model changes.
+
 The evaluator accepts a tab-delimited file with columns:
 
 ```text

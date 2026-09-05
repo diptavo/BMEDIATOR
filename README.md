@@ -36,7 +36,11 @@ Version 1.2.0-dev
 > implementations agree on locked development fixtures. This prototype is not
 > connected to the production command-line analysis and is not calibrated for
 > real data. See [JG-0.1 specification](docs/JOINT_GRAPH_MODEL_V0_1.md) and
-> [development results](docs/JOINT_GRAPH_V0_1_RESULTS.md).
+> [development results](docs/JOINT_GRAPH_V0_1_RESULTS.md). A frozen 1,000-dataset
+> [adversarial evaluation](docs/JOINT_GRAPH_V0_1_ADVERSARIAL_RESULTS.md) found
+> blocking failures for off-grid effects, aligned/directional pleiotropy, and
+> misspecified role variances. JG-0.1 must therefore not be used for real-data
+> inference.
 
 ---
 

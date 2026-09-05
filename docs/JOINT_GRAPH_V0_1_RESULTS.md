@@ -80,5 +80,7 @@ but is not a formal proteome-scale runtime benchmark.
   global molecular-outcome slope.
 - The prototype is not wired into the main `bmediator` executable.
 
-The next methodological phase is therefore model extension and adversarial
-validation, not application to real proteins.
+The next methodological phase was the frozen adversarial evaluation described
+in `JOINT_GRAPH_V0_1_ADVERSARIAL_PLAN.md`. Its results are reported in
+`JOINT_GRAPH_V0_1_ADVERSARIAL_RESULTS.md` and reject JG-0.1 as a production
+engine. Real-protein application remains premature.
