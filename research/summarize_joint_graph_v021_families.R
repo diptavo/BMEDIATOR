@@ -1,17 +1,25 @@
 #!/usr/bin/env Rscript
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 2L) {
-    stop("usage: summarize_joint_graph_v021_families.R INPUT_ROOT OUTPUT.tsv")
+if (!length(args) %in% c(2L, 3L)) {
+    stop(paste(
+        "usage: summarize_joint_graph_v021_families.R",
+        "INPUT_ROOT OUTPUT.tsv [REPLICATES_PER_SCENARIO]"
+    ))
 }
+replicates <- if (length(args) == 3L) as.integer(args[[3]]) else 50L
+if (!is.finite(replicates) || replicates < 1L) stop("invalid replicate count")
 paths <- list.files(args[[1]], pattern = "^summary\\.tsv$", recursive = TRUE,
                     full.names = TRUE)
 if (!length(paths)) stop("no family summary files found")
 families <- do.call(rbind, lapply(paths, read.delim, stringsAsFactors = FALSE,
                                  check.names = FALSE))
-expected <- 10L * 50L
+expected <- 10L * replicates
 if (nrow(families) != expected) {
     stop("expected ", expected, " family summaries, found ", nrow(families))
+}
+if (any(families$model_version != "JG-0.2.5")) {
+    stop("family outputs contain an unexpected model version")
 }
 
 scenario_order <- c(
@@ -62,7 +70,7 @@ decisions <- data.frame(
         all(summaries$complete_families[
             summaries$scenario %in% c("baseline", "rare", "composite_null",
                                       "mixed", "strong_ld")
-        ] >= 49L)
+        ] >= if (replicates == 50L) 49L else replicates)
     ),
     stringsAsFactors = FALSE
 )

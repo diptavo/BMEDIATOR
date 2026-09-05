@@ -76,6 +76,7 @@ struct JointGraphV02Result {
     double max_relevant_quadrature_difference = 0.0;
     double estimated_quadrature_posterior_error = 0.0;
     int max_quadrature_order = 3;
+    int posterior_aware_refinements = 0;
     JointGraphV02Options options;
 };
 

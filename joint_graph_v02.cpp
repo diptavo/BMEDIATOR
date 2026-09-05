@@ -674,6 +674,42 @@ std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
                  0.0012074599927193862, 0.000020430360402707091,
                  0.000000048257318500731258}};
     }
+    if (order == 15) {
+        return {{-4.4999907073093919, -3.6699503734044523,
+                 -2.9671669279056032, -2.3257324861738575,
+                 -1.7199925751864888, -1.1361155852109206,
+                 -0.56506958325557577, 0.0, 0.56506958325557577,
+                 1.1361155852109206, 1.7199925751864888,
+                 2.3257324861738575, 2.9671669279056032,
+                 3.6699503734044523, 4.4999907073093919},
+                {1.5224758042535114e-09, 1.0591155477110646e-06,
+                 0.0001000044412324998, 0.0027780688429127759,
+                 0.030780033872546089, 0.15848891579593566,
+                 0.41202868749889859, 0.56410030872641725,
+                 0.41202868749889859, 0.15848891579593566,
+                 0.030780033872546089, 0.0027780688429127759,
+                 0.0001000044412324998, 1.0591155477110646e-06,
+                 1.5224758042535114e-09}};
+    }
+    if (order == 17) {
+        return {{-4.8713451936744034, -4.0619466758754745,
+                 -3.3789320911414942, -2.7577629157038888,
+                 -2.173502826666621, -1.6129243142212313,
+                 -1.0676487257434506, -0.53163300134265479, 0.0,
+                 0.53163300134265479, 1.0676487257434506,
+                 1.6129243142212313, 2.173502826666621,
+                 2.7577629157038888, 3.3789320911414942,
+                 4.0619466758754745, 4.8713451936744034},
+                {4.5805789307986096e-11, 4.9770789816307699e-08,
+                 7.1122891400212932e-06, 0.00029864328669775312,
+                 0.0050673499576275195, 0.040920034149756292,
+                 0.17264829767009698, 0.40182646947041206,
+                 0.5309179376248635, 0.40182646947041206,
+                 0.17264829767009698, 0.040920034149756292,
+                 0.0050673499576275195, 0.00029864328669775312,
+                 7.1122891400212932e-06, 4.9770789816307699e-08,
+                 4.5805789307986096e-11}};
+    }
     throw std::invalid_argument("unsupported adaptive quadrature order");
 }
 
@@ -756,47 +792,42 @@ StateFit integrate_state(
     return result;
 }
 
+int next_quadrature_order(int order) {
+    switch (order) {
+        case 3: return 5;
+        case 5: return 7;
+        case 7: return 9;
+        case 9: return 11;
+        case 11: return 13;
+        case 13: return 15;
+        case 15: return 17;
+        default: return order;
+    }
+}
+
+bool refine_state_once(
+    StateFit& fit, const StateDefinition& state, const PreparedData& data,
+    const JointGraphV02Options& options, int maximum_order) {
+    const int order = next_quadrature_order(fit.quadrature_order);
+    if (order == fit.quadrature_order || order > maximum_order) return false;
+    const double evidence = adaptive_log_evidence(
+        fit, state, data, options, order);
+    fit.quadrature_difference = std::fabs(evidence - fit.log_evidence);
+    fit.log_evidence = evidence;
+    fit.quadrature_order = order;
+    return true;
+}
+
 void refine_state_quadrature(
     StateFit& fit, const StateDefinition& state, const PreparedData& data,
     const JointGraphV02Options& options, int maximum_order) {
     if (fit.quadrature_order == 3) {
-        const double evidence5 = adaptive_log_evidence(
-            fit, state, data, options, 5);
-        fit.quadrature_difference = std::fabs(evidence5 - fit.log_evidence);
-        fit.log_evidence = evidence5;
-        fit.quadrature_order = 5;
+        refine_state_once(fit, state, data, options, maximum_order);
     }
-    if (maximum_order >= 7 &&
-        fit.quadrature_difference > options.quadrature_escalation_threshold) {
-        const double evidence7 = adaptive_log_evidence(fit, state, data, options, 7);
-        fit.quadrature_difference = std::fabs(evidence7 - fit.log_evidence);
-        fit.log_evidence = evidence7;
-        fit.quadrature_order = 7;
-        if (maximum_order >= 9 &&
-            fit.quadrature_difference > options.quadrature_escalation_threshold) {
-            const double evidence9 = adaptive_log_evidence(
-                fit, state, data, options, 9);
-            fit.quadrature_difference = std::fabs(evidence9 - fit.log_evidence);
-            fit.log_evidence = evidence9;
-            fit.quadrature_order = 9;
-            if (maximum_order >= 11 &&
-                fit.quadrature_difference > options.quadrature_escalation_threshold) {
-                const double evidence11 = adaptive_log_evidence(
-                    fit, state, data, options, 11);
-                fit.quadrature_difference = std::fabs(evidence11 - fit.log_evidence);
-                fit.log_evidence = evidence11;
-                fit.quadrature_order = 11;
-                if (maximum_order >= 13 && fit.quadrature_difference >
-                    options.quadrature_escalation_threshold) {
-                    const double evidence13 = adaptive_log_evidence(
-                        fit, state, data, options, 13);
-                    fit.quadrature_difference =
-                        std::fabs(evidence13 - fit.log_evidence);
-                    fit.log_evidence = evidence13;
-                    fit.quadrature_order = 13;
-                }
-            }
-        }
+    while (fit.quadrature_order < maximum_order &&
+           fit.quadrature_difference >
+               options.quadrature_escalation_threshold) {
+        if (!refine_state_once(fit, state, data, options, maximum_order)) break;
     }
 }
 
@@ -852,6 +883,16 @@ double posterior_corner_perturbation(
         maximum_tv = std::max(maximum_tv, 0.5 * tv);
     }
     return maximum_tv;
+}
+
+std::array<double, 16> normalized_state_probabilities(
+    const std::vector<double>& log_joint) {
+    const double normalizer = log_sum_exp(log_joint);
+    std::array<double, 16> probabilities{};
+    for (int i = 0; i < 16; ++i) {
+        probabilities[i] = std::exp(log_joint[i] - normalizer);
+    }
+    return probabilities;
 }
 
 void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
@@ -1119,9 +1160,39 @@ JointGraphV02Result fit_joint_graph_v02(
         if (!refined) break;
     }
 
+    int posterior_aware_refinements = 0;
+    for (int pass = 0; pass < 32; ++pass) {
+        const auto probabilities = normalized_state_probabilities(log_joint);
+        if (posterior_corner_perturbation(probabilities, fits) <=
+            options.max_quadrature_posterior_error) {
+            break;
+        }
+        int candidate = -1;
+        double largest_contribution = -1.0;
+        for (int i = 0; i < 16; ++i) {
+            if (probabilities[i] <= 1e-6 || fits[i].quadrature_order >= 17) {
+                continue;
+            }
+            const double contribution =
+                probabilities[i] * fits[i].quadrature_difference;
+            if (contribution > largest_contribution) {
+                largest_contribution = contribution;
+                candidate = i;
+            }
+        }
+        if (candidate < 0 || !refine_state_once(
+                fits[candidate], states[candidate], data, options, 17)) {
+            break;
+        }
+        log_joint[candidate] = fits[candidate].log_evidence +
+            state_log_prior(states[candidate], options);
+        ++posterior_aware_refinements;
+    }
+
     JointGraphV02Result result;
     result.log_evidence = log_sum_exp(log_joint);
     result.options = options;
+    result.posterior_aware_refinements = posterior_aware_refinements;
     result.max_ignored_ld = data.max_ignored_ld;
     result.n_blocks = static_cast<int>(data.blocks.size());
     std::map<char, std::set<std::string>> role_blocks;
@@ -1254,6 +1325,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tmax_relevant_evidence_difference"
            << "\tmax_relevant_quadrature_difference"
            << "\testimated_quadrature_posterior_error\tmax_quadrature_order"
+           << "\tposterior_aware_refinements"
            << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional"
            << "\tprior_sd_a\tprior_sd_b\tprior_sd_c\tprior_sd_lambda"
            << "\tprior_sd_eta\tq_alpha\tq_beta\tmax_cross_block_ld"
@@ -1261,7 +1333,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tquadrature_escalation_threshold"
            << "\tmax_quadrature_posterior_error\tmin_role_blocks"
            << "\toptimizer_iterations\toptimizer_tolerance\n";
-    output << "JG-0.2.4\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.5\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     for (double value : result.state_quadrature_difference) output << '\t' << value;
@@ -1289,6 +1361,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.max_relevant_quadrature_difference
            << '\t' << result.estimated_quadrature_posterior_error
            << '\t' << result.max_quadrature_order
+           << '\t' << result.posterior_aware_refinements
            << '\t' << result.options.pi_xm
            << '\t' << result.options.pi_my
            << '\t' << result.options.pi_sparse

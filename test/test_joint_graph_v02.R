@@ -30,7 +30,8 @@ scenarios <- list(
                         a = 0.40, b = 0.40),
     curved_strong_ld = list(seed = 20915038, ld_rho = 0.70,
                             a = 0.40, b = 0.40),
-    small_weight_curvature_null = list(seed = 41401056)
+    small_weight_curvature_null = list(seed = 41401056),
+    posterior_accumulation_null = list(seed = 50504004)
 )
 
 rows <- vector("list", length(scenarios))
@@ -90,7 +91,7 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.4")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.5")) stop("wrong model version")
     if (result$estimated_quadrature_posterior_error > 0.01 + 1e-10 ||
         result$max_relevant_quadrature_difference > 1 + 1e-10) {
         stop("successfully reported posterior failed quadrature stability")
@@ -110,6 +111,7 @@ for (index in seq_along(scenarios)) {
         states_regularized = result$states_regularized,
         estimated_quadrature_posterior_error =
             result$estimated_quadrature_posterior_error,
+        posterior_aware_refinements = result$posterior_aware_refinements,
         elapsed_seconds = timing[["elapsed"]],
         stringsAsFactors = FALSE
     )
@@ -134,6 +136,7 @@ overlap <- row_for("overlap_null")
 ld_mediation <- row_for("ld_mediation")
 curved_strong_ld <- row_for("curved_strong_ld")
 small_weight_curvature_null <- row_for("small_weight_curvature_null")
+posterior_accumulation_null <- row_for("posterior_accumulation_null")
 require_result(null$PP_two_path < 0.20, "null produced two-path support")
 require_result(mediation$PP_two_path > 0.80,
                "off-grid moderate mediation was not recovered")
@@ -155,6 +158,10 @@ require_result(curved_strong_ld$PP_two_path > 0.80,
                "curved strong-LD mediation was not reportable")
 require_result(small_weight_curvature_null$PP_two_path < 0.20,
                "small-weight curved null produced two-path support")
+require_result(posterior_accumulation_null$PP_two_path < 0.20,
+               "historical aggregate-error null produced two-path support")
+require_result(posterior_accumulation_null$posterior_aware_refinements > 0,
+               "historical aggregate-error case did not trigger posterior-aware refinement")
 
 scale_fixture <- jg02_simulate(
     seed = 20263007,
@@ -275,4 +282,4 @@ require_result(!identical(duplicate_input_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.4 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.5 adaptive, LD, overlap, scale, and directional tests passed.\n")
