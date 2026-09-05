@@ -170,7 +170,8 @@ defaults; the fitted posterior was unchanged when convergence was attained.
 
 All priors can be supplied in a tab-delimited key/value configuration file and
 are written into the result. This supports prespecified prior-sensitivity
-analysis without recompilation.
+analysis without recompilation. Reliability options may be made stricter but
+cannot relax the frozen release safeguards.
 
 ## External scale estimation
 
@@ -196,7 +197,14 @@ carried by the number of independent LD blocks, not the raw number of SNPs.
 
 ## Current production boundary
 
-`JG-0.2.4` is not production-ready until it passes its independent frozen
-family calibration and the remaining input-pipeline and competitor gates. The
-exact-alignment exclusion is a permanent interpretation boundary, not a
-software issue that can be removed by additional computation.
+`JG-0.2.4` passed all frozen FDR and power criteria among reportable analyses,
+but failed the frozen numerical-completion criterion: only 38 to 48 of 50
+families were complete in the five confirmatory scenarios. It is therefore not
+a production engine. See the
+[held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
+[production-readiness assessment](PRODUCTION_READINESS.md).
+
+The next numerical revision must replace tensor adaptive Gauss-Hermite
+quadrature, not merely relax the reportability threshold. The exact-alignment
+exclusion is a permanent interpretation boundary, not a software issue that
+can be removed by additional computation.

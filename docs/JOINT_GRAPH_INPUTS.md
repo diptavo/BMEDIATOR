@@ -62,7 +62,7 @@ variant must occur exactly once.
 ```
 
 An optional tab-delimited key/value file can override prespecified priors and
-numerical tolerances:
+make numerical safeguards stricter:
 
 ```bash
 ./bmediator-joint \
@@ -75,7 +75,9 @@ numerical tolerances:
 Every result records the model version, identification scope, role and block
 counts, all priors, numerical settings, posterior state probabilities, and
 quadrature diagnostics. A nonzero exit status means no posterior is
-reportable.
+reportable. Options cannot raise the cross-block LD or numerical-error limits,
+lower the independent-block requirement, or weaken optimizer settings below
+the release defaults.
 
 ## Protein manifest
 
@@ -89,9 +91,14 @@ Rscript research/run_joint_graph_manifest.R \
 
 It writes `results/bmediator_joint.joint.tsv` and
 `results/bmediator_joint.failures.tsv`. The first file preserves manifest
-order and adds `posterior_lfdr`, `posterior_rank`, and `selected_bfdr05`. The
-selection rule controls posterior expected FDR under the fitted model; it does
-not remove violations of the model assumptions.
+order and adds `posterior_lfdr`, `posterior_rank`,
+`posterior_cumulative_fdr`, `family_complete`, `posterior_fdr_status`, and
+`selected_bfdr05`. The runner returns status 2 and leaves
+the family-wide rank, cumulative FDR, and `selected_bfdr05` as `NA` when any
+manifest row fails. Repair and rerun those rows before interpreting family-wide
+selection. The selection rule controls
+posterior expected FDR under the fitted model; it does not remove violations
+of the model assumptions.
 
 ## Interpretation boundary
 

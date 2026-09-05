@@ -946,6 +946,21 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
           options.min_role_blocks >= 2)) {
         throw std::invalid_argument("continuous priors or optimizer options are invalid");
     }
+    const JointGraphV02Options release;
+    if (!(options.max_cross_block_ld >= 0.0 &&
+          options.max_cross_block_ld <= release.max_cross_block_ld &&
+          options.max_evidence_discrepancy <=
+              release.max_evidence_discrepancy &&
+          options.quadrature_escalation_threshold <=
+              release.quadrature_escalation_threshold &&
+          options.max_quadrature_posterior_error <=
+              release.max_quadrature_posterior_error &&
+          options.min_role_blocks >= release.min_role_blocks &&
+          options.optimizer_iterations >= release.optimizer_iterations &&
+          options.optimizer_tolerance <= release.optimizer_tolerance)) {
+        throw std::invalid_argument(
+            "release safeguards may be made stricter but not relaxed");
+    }
 }
 
 }  // namespace
@@ -968,7 +983,11 @@ std::vector<JointGraphV02Observation> read_joint_graph_v02_tsv(
     if (!std::getline(input, line)) throw std::runtime_error("input is empty");
     const auto header = split_tab(line);
     std::unordered_map<std::string, int> column;
-    for (int i = 0; i < static_cast<int>(header.size()); ++i) column[header[i]] = i;
+    for (int i = 0; i < static_cast<int>(header.size()); ++i) {
+        if (!column.emplace(header[i], i).second) {
+            throw std::runtime_error("duplicate input column: " + header[i]);
+        }
+    }
     const std::array<std::string, 17> required{{
         "variant", "ld_block", "role", "beta_x", "se_x", "beta_m", "se_m",
         "beta_y", "se_y", "v_x", "v_m", "v_y", "orientation",
@@ -1162,8 +1181,16 @@ JointGraphV02Result fit_joint_graph_v02(
             options.max_evidence_discrepancy ||
         result.estimated_quadrature_posterior_error >
             options.max_quadrature_posterior_error) {
-        throw std::runtime_error(
-            "adaptive quadrature did not converge; no posterior is reportable");
+        std::ostringstream message;
+        message << std::setprecision(17)
+                << "adaptive quadrature did not converge"
+                << " (posterior_error="
+                << result.estimated_quadrature_posterior_error
+                << ", max_relevant_quadrature_difference="
+                << result.max_relevant_quadrature_difference
+                << ", regularized_states=" << result.states_regularized
+                << "); no posterior is reportable";
+        throw std::runtime_error(message.str());
     }
     return result;
 }

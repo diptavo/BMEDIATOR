@@ -3,17 +3,28 @@
 arguments <- commandArgs(trailingOnly = FALSE)
 script_argument <- grep("^--file=", arguments, value = TRUE)
 if (!length(script_argument)) stop("cannot locate diagnostic script")
-script_path <- normalizePath(sub("^--file=", "", script_argument[[1]]))
-root <- normalizePath(file.path(dirname(script_path), ".."))
-source(file.path(root, "research", "joint_graph_v02_simulation.R"))
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 3L) {
-    stop("usage: diagnose_joint_graph_v021_failures.R BINARY RESULT_ROOT OUTPUT.tsv")
+if (!length(args) %in% c(3L, 4L)) {
+    stop(paste(
+        "usage: diagnose_joint_graph_v021_failures.R",
+        "BINARY RESULT_ROOT OUTPUT.tsv [SEED_BASE]"
+    ))
 }
 binary <- normalizePath(args[[1]])
 result_root <- normalizePath(args[[2]])
 output <- args[[3]]
+seed_base <- if (length(args) == 4L) as.integer(args[[4]]) else 20400000L
+if (!is.finite(seed_base) || seed_base < 1L) stop("SEED_BASE is invalid")
+root_candidates <- c(dirname(binary), file.path(dirname(binary), ".."))
+support_paths <- file.path(
+    root_candidates, "research", "joint_graph_v02_simulation.R"
+)
+support_path <- support_paths[file.exists(support_paths)][1]
+if (is.na(support_path)) {
+    stop("cannot locate research/joint_graph_v02_simulation.R from BINARY")
+}
+source(normalizePath(support_path))
 
 paths <- list.files(result_root, pattern = "proteins\\.tsv$", recursive = TRUE,
                     full.names = TRUE)
@@ -52,7 +63,7 @@ for (i in seq_len(nrow(failed))) {
     x <- failed[i, ]
     scenario_index <- match(x$scenario, scenario_names)
     protein_index <- as.integer(sub("^P", "", x$protein))
-    family_seed <- 20400000L + scenario_index * 100000L +
+    family_seed <- seed_base + scenario_index * 100000L +
         as.integer(x$replicate) * 1000L
     simulation_arguments <- modifyList(
         list(seed = family_seed + protein_index, blocks = 20L,
@@ -89,17 +100,33 @@ for (i in seq_len(nrow(failed))) {
         ""
     }
     relaxed_status <- NA_integer_
-    max_relevant_difference <- NA_real_
+    max_relevant_quadrature_difference <- NA_real_
+    posterior_error <- NA_real_
     pp_two_path <- NA_real_
     if (replay_succeeded) {
         replay_result <- read.delim(result_path, check.names = FALSE)
-        max_relevant_difference <- if (
+        max_relevant_quadrature_difference <- if (
             "max_relevant_quadrature_difference" %in% names(replay_result)
         ) replay_result$max_relevant_quadrature_difference else
             replay_result$max_relevant_evidence_difference
+        if ("estimated_quadrature_posterior_error" %in% names(replay_result)) {
+            posterior_error <- replay_result$estimated_quadrature_posterior_error
+        }
         pp_two_path <- replay_result$PP_two_path
     }
+    numerical_match <- regexec(
+        paste0("posterior_error=([^,]+), ",
+               "max_relevant_quadrature_difference=([^,]+),"),
+        message
+    )
+    numerical_values <- regmatches(message, numerical_match)[[1]]
+    if (length(numerical_values) == 3L) {
+        posterior_error <- as.numeric(numerical_values[[2]])
+        max_relevant_quadrature_difference <-
+            as.numeric(numerical_values[[3]])
+    }
     if (!identical(status, 0L) &&
+        !is.finite(posterior_error) &&
         grepl("adaptive (evidence diagnostic|quadrature did not converge)", message)) {
         options_path <- file.path(temporary, "diagnostic_options.tsv")
         writeLines(c("max_evidence_discrepancy\t100",
@@ -111,7 +138,9 @@ for (i in seq_len(nrow(failed))) {
         )
         if (identical(relaxed_status, 0L) && file.exists(result_path)) {
             relaxed <- read.delim(result_path, check.names = FALSE)
-            max_relevant_difference <- relaxed$max_relevant_evidence_difference
+            max_relevant_quadrature_difference <-
+                relaxed$max_relevant_quadrature_difference
+            posterior_error <- relaxed$estimated_quadrature_posterior_error
             pp_two_path <- relaxed$PP_two_path
         }
     }
@@ -123,7 +152,9 @@ for (i in seq_len(nrow(failed))) {
         replay_status = as.integer(status),
         replay_succeeded = replay_succeeded,
         relaxed_status = relaxed_status,
-        max_relevant_evidence_difference = max_relevant_difference,
+        max_relevant_quadrature_difference =
+            max_relevant_quadrature_difference,
+        estimated_quadrature_posterior_error = posterior_error,
         relaxed_PP_two_path = pp_two_path,
         diagnostic = message,
         stringsAsFactors = FALSE

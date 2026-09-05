@@ -27,12 +27,14 @@ summaries <- do.call(rbind, lapply(scenario_order, function(name) {
         complete_families = sum(x$successful == x$proteins),
         failed_proteins = sum(x$proteins - x$successful),
         max_failed_proteins_per_family = max(x$proteins - x$successful),
-        mean_bfdr05_discoveries = mean(x$bfdr05_discoveries),
-        mean_bfdr05_false_discoveries = mean(x$bfdr05_false_discoveries),
-        families_with_bfdr05_discovery = mean(x$bfdr05_discoveries > 0),
-        mean_bfdr05_fdr = mean(x$bfdr05_fdp),
+        mean_bfdr05_discoveries = mean(x$bfdr05_discoveries, na.rm = TRUE),
+        mean_bfdr05_false_discoveries =
+            mean(x$bfdr05_false_discoveries, na.rm = TRUE),
+        families_with_bfdr05_discovery =
+            mean(x$bfdr05_discoveries > 0, na.rm = TRUE),
+        mean_bfdr05_fdr = mean(x$bfdr05_fdp, na.rm = TRUE),
         mean_bfdr05_power = mean(x$bfdr05_power, na.rm = TRUE),
-        mean_pp80_fdr = mean(x$pp80_fdp),
+        mean_pp80_fdr = mean(x$pp80_fdp, na.rm = TRUE),
         mean_pp80_power = mean(x$pp80_power, na.rm = TRUE),
         median_protein_seconds = median(x$median_seconds),
         stringsAsFactors = FALSE

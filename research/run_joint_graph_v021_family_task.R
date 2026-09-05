@@ -153,20 +153,26 @@ for (protein in seq_len(n_proteins)) {
 protein_results <- do.call(rbind, rows)
 
 bayesian_fdr_selection <- function(pp, alpha = 0.05) {
+    if (any(!is.finite(pp))) return(rep(NA, length(pp)))
     selected <- rep(FALSE, length(pp))
-    valid <- which(is.finite(pp))
-    if (!length(valid)) return(selected)
-    ordered <- valid[order(1 - pp[valid])]
+    ordered <- order(1 - pp)
     acceptable <- which(cumsum(1 - pp[ordered]) / seq_along(ordered) <= alpha)
     if (length(acceptable)) selected[ordered[seq_len(max(acceptable))]] <- TRUE
     selected
 }
 
 protein_results$selected_bfdr05 <- bayesian_fdr_selection(protein_results$PP_two_path)
-protein_results$selected_pp80 <- is.finite(protein_results$PP_two_path) &
+protein_results$selected_pp80 <- if (all(protein_results$success)) {
     protein_results$PP_two_path >= 0.80
+} else {
+    rep(NA, nrow(protein_results))
+}
 
 metric <- function(selected) {
+    if (anyNA(selected)) {
+        return(c(discoveries = NA, true_discoveries = NA,
+                 false_discoveries = NA, fdp = NA, power = NA))
+    }
     discoveries <- sum(selected)
     true_discoveries <- sum(selected & protein_results$true_mediator)
     false_discoveries <- discoveries - true_discoveries
@@ -189,6 +195,7 @@ summary <- data.frame(
     proteins = n_proteins,
     true_mediators = sum(protein_results$true_mediator),
     successful = sum(protein_results$success),
+    family_complete = all(protein_results$success),
     bfdr05_discoveries = bfdr[["discoveries"]],
     bfdr05_true_discoveries = bfdr[["true_discoveries"]],
     bfdr05_false_discoveries = bfdr[["false_discoveries"]],

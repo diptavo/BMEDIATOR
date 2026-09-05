@@ -1,5 +1,12 @@
 # BMEDIATOR: factorized Bayesian inference for two-stage molecular mediation using genetic instruments
 
+> **Historical draft, not current BMEDIATOR methods.** This document describes
+> the factorized two-leg development method retained for audit compatibility.
+> The selected joint Bayesian approach is JG-0.2.4, documented in
+> `docs/JOINT_GRAPH_MODEL_V0_2.md`. JG-0.2.4 failed its frozen numerical
+> completion gate, so neither this draft nor the joint model is ready for a
+> submission claim. See `docs/PRODUCTION_READINESS.md`.
+
 ## Introduction
 
 Molecular traits may transmit part of the effect of an epidemiologic risk

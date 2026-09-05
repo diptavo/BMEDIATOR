@@ -97,7 +97,7 @@ test-regional-stress: $(BIN)
 
 help:
 	@echo "Targets:"
-	@echo "  make              Build bmediator"
+	@echo "  make              Build bmediator and bmediator-joint"
 	@echo "  make install      Install bmediator and bmediator-joint under PREFIX"
 	@echo "  make test         Run the smoke test"
 	@echo "  make test-joint-graph  Compare the JG-0.1 R and C++ reference implementations"

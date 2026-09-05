@@ -1,7 +1,8 @@
 # Joint graph research prototype
 
-The files in this directory implement and test the frozen JG-0.1 reference
-model described in `docs/JOINT_GRAPH_MODEL_V0_1.md`.
+The files in this directory implement and test the historical JG-0.1
+reference model and the current JG-0.2 series. The supported research
+executable is `bmediator-joint`; see `docs/JOINT_GRAPH_INPUTS.md`.
 
 Build the standalone C++ evaluator and run the cross-language fixtures with:
 
@@ -55,10 +56,11 @@ Run the frozen new-seed development matrix with:
 Rscript research/evaluate_joint_graph_v02.R
 ```
 
-The model specification and validation plans are in
-`docs/JOINT_GRAPH_MODEL_V0_2.md` and
-`docs/JOINT_GRAPH_V0_2_1_VALIDATION_PLAN.md`. Patch results are in
-`docs/JOINT_GRAPH_V0_2_1_RESULTS.md`. JG-0.2.1 is not a production mode.
+The model specification is in `docs/JOINT_GRAPH_MODEL_V0_2.md`. The final
+frozen JG-0.2.4 family run passed its FDR and power criteria but failed its
+numerical-completion gate; see
+`docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md`. JG-0.2.4 is not a production
+engine.
 
 The evaluator accepts a tab-delimited file with columns:
 

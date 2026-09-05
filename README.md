@@ -4,56 +4,41 @@
 
 Version 1.2.0-dev 
 
-> **Development status:** The dedicated 36,000-run M1/M5 study found useful
-> pairwise ranking but inadequate six-state classification (M5 recall 32.3%)
-> and probability miscalibration. This version is for research evaluation, not
-> production-calibrated mediation claims. See
-> [Validation Status](docs/VALIDATION.md).
+> **Development status:** The supported research core is `bmediator-joint`
+> (`JG-0.2.4`), a single joint likelihood over RF, protein, and outcome
+> associations. Its frozen 50,000-analysis family validation passed every
+> prespecified FDR and power criterion among reportable fits, but failed the
+> numerical-completion criterion: only 38 to 48 of 50 families were complete
+> across confirmatory scenarios. It is therefore not production-ready and
+> must not be used for definitive mediation claims. See the
+> [held-out results](docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
+> [production-readiness assessment](docs/PRODUCTION_READINESS.md).
 
-> **Current factorized validation:** Balanced partial-conjunction BH passed all
-> frozen criteria in a new-seed 1.8-million-analysis run: broad and narrow
-> power were 0.972 and 0.595, with mean FDP 0.0376 and 0.0298. The
-> least-favorable and global-null family error rates were 0.009 and 0.000 over
-> 1,000 replicates each. This rule requires valid balanced/InSIDE leg tests and
-> independence or PRDS across protein-level p-values. Directional pleiotropy,
-> exact proportional pleiotropy, and LD-reference mismatch remain explicit
-> limitations. Version 1.2.0-dev is not yet a production or publication-ready
-> release.
-
-> **Experimental repair:** `--structural-method factorized` separates the two
-> causal legs, residual RF effect, and pleiotropy instead of forcing them into
-> mutually exclusive M1-M5 states. It reports nuisance-aware fixed-prior
-> Bayes factors, model-conditional conjunction p-values, BY q-values,
-> safe e-values with e-BH, fixed-prior posterior expected-FDR values, and a
-> separate regional H3/H4 identification gate.
-> It is not yet the default. See
-> [Factorized two-stage method](docs/FACTORIZED_METHOD.md).
-
-> **Joint-core research prototype:** `JG-0.1` is the first frozen reference
-> implementation of a replacement joint Bayesian core. It fits one trivariate
-> RF/protein/outcome likelihood over Sets A, B, and C and compares eight
-> factorial pathway/pleiotropy states. Independent base-R and C++
-> implementations agree on locked development fixtures. This prototype is not
-> connected to the production command-line analysis and is not calibrated for
-> real data. See [JG-0.1 specification](docs/JOINT_GRAPH_MODEL_V0_1.md) and
-> [development results](docs/JOINT_GRAPH_V0_1_RESULTS.md). A frozen 1,000-dataset
-> [adversarial evaluation](docs/JOINT_GRAPH_V0_1_ADVERSARIAL_RESULTS.md) found
-> blocking failures for off-grid effects, aligned/directional pleiotropy, and
-> misspecified role variances. JG-0.1 must therefore not be used for real-data
-> inference.
-
-> **Joint-core repair:** `JG-0.2.1` replaces the failed fixed quadrature,
-> adds exact within-block signed LD and declared sampling covariance, requires
-> external role scales, and includes a separate directional-pleiotropy state.
-> Its frozen 1,050-analysis patch matrix passed, including uncertain
-> orientations and prior sensitivity. It remains disconnected from the
-> production command pending larger held-out calibration and competitor
-> benchmarks. See the [JG-0.2 specification](docs/JOINT_GRAPH_MODEL_V0_2.md)
-> and [patch results](docs/JOINT_GRAPH_V0_2_1_RESULTS.md).
+> The older six-state and `--structural-method factorized` workflows remain in
+> `bmediator` for compatibility and audit reproduction. The six-state model is
+> miscalibrated for M1/M5 classification, while the factorized method is a
+> separately validated two-leg procedure rather than the requested joint
+> Bayesian model. Neither is the production fallback for a failed joint fit.
 
 ---
 
-## Overview
+## Joint Model
+
+The current method fits RF (`X`), protein (`M`), and outcome (`Y`) summary
+associations together. It compares 16 factorial states for an `X -> M` path, a
+global `M -> Y` path, sparse block-level pleiotropy, and directional
+pleiotropy while leaving a residual `X -> Y` path free. Signed within-block LD,
+declared GWAS sampling covariance, external role variances, and uncertain
+independent orientations enter the same likelihood.
+
+The primary mediator evidence is `PP_two_path`, the posterior probability that
+both causal paths are active. It is conditional on no exactly aligned
+pleiotropic effect that is observationally identical to `M -> Y`. At least
+three independent A-role and three independent B-role blocks are required.
+See the [model specification](docs/JOINT_GRAPH_MODEL_V0_2.md) and
+[input contract](docs/JOINT_GRAPH_INPUTS.md).
+
+## Legacy Workflow
 
 BMEDIATOR evaluates whether intermediate phenotypes (for example, plasma
 proteins) are compatible with mediating a risk-factor effect on a disease
@@ -75,9 +60,8 @@ RF ---β₁---> PP ---β₂---> Cancer
 ```
 
 In legacy mode, BMEDIATOR computes ELBO-based variational approximate model
-probabilities for six scenarios. These states are retained for compatibility;
-the recommended research workflow in this development release is the
-factorized mode described below.
+probabilities for six scenarios. These states and the factorized mode are
+retained for compatibility and method-development audit only.
 
 | Scenario | Interpretation | Constraints |
 |----------|---------------|-------------|
@@ -232,7 +216,30 @@ generated BMEDIATOR outputs are intentionally excluded; see
 
 ---
 
-## Running BMEDIATOR
+## Running the Joint Model
+
+For one prepared protein:
+
+```bash
+./bmediator-joint \
+    --input protein.joint.tsv \
+    --ld protein.ld.tsv \
+    --out protein.result.tsv
+```
+
+For a manifest with `protein`, `input`, and `ld` columns:
+
+```bash
+Rscript research/run_joint_graph_manifest.R \
+    ./bmediator-joint protein_manifest.tsv results/bmediator_joint 8
+```
+
+The manifest runner writes `.joint.tsv` and `.failures.tsv`. It does not make
+a family-wide posterior-FDR selection unless every protein succeeds. Input
+preparation and interpretation are described in
+[Joint-model inputs](docs/JOINT_GRAPH_INPUTS.md).
+
+## Running the Legacy Compatibility Workflow
 
 ### One protein
 

@@ -2,6 +2,23 @@
 
 ## 1.2.0-dev
 
+- Add the standalone `bmediator-joint` executable for the JG-0.2 factorial
+  joint RF/protein/outcome likelihood over A/B/C blocks, with signed LD,
+  declared sampling covariance, sparse and directional pleiotropy states, and
+  uncertain orientation integration.
+- Integrate the sparse-state probability exactly under its Beta prior and add
+  posterior-scale numerical error gating. The frozen 50,000-analysis JG-0.2.4
+  run passed all FDR/power criteria among reportable fits but failed its
+  completion gate, so the joint engine remains a research implementation.
+- Add strict joint-input validation, a stable named command-line interface,
+  installation support, external-scale input preparation, and a parallel
+  protein-manifest runner.
+- Fail closed on incomplete manifests: preserve per-protein diagnostics but do
+  not report family ranks, cumulative posterior FDR, or selections until every
+  protein succeeds.
+- Prevent user options from weakening frozen LD, identification, optimizer, or
+  quadrature-reportability safeguards, and include actionable numerical values
+  in every quadrature-suppression error.
 - Add an experimental factorized structural engine that estimates RF-to-protein,
   protein-to-outcome, residual RF-to-outcome, and pleiotropy components without
   forcing mutually exclusive M1/M5 labels.

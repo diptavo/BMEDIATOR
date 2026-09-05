@@ -9,6 +9,7 @@ manifest_path <- normalizePath(args[[2]])
 output_prefix <- args[[3]]
 cores <- if (length(args) == 4L) as.integer(args[[4]]) else 1L
 if (!is.finite(cores) || cores < 1L) stop("CORES must be a positive integer")
+if (file.access(binary, mode = 1L) != 0L) stop("BINARY is not executable: ", binary)
 
 manifest <- read.delim(manifest_path, stringsAsFactors = FALSE,
                        check.names = FALSE)
@@ -59,7 +60,13 @@ run_one <- function(index) {
     }
     result <- read.delim(result_path, stringsAsFactors = FALSE,
                          check.names = FALSE)
-    if (nrow(result) != 1L || !identical(result$model_version, "JG-0.2.4")) {
+    required_result <- c("model_version", "PP_two_path")
+    valid_result <- nrow(result) == 1L &&
+        all(required_result %in% names(result)) &&
+        identical(result$model_version, "JG-0.2.4") &&
+        is.finite(result$PP_two_path) &&
+        result$PP_two_path >= 0 && result$PP_two_path <= 1
+    if (!valid_result) {
         return(list(success = FALSE, protein = manifest$protein[[index]],
                     exit_status = 1L, diagnostic = "invalid result schema or model version",
                     elapsed_seconds = elapsed))
@@ -98,16 +105,32 @@ results <- do.call(rbind, lapply(fitted[successful], `[[`, "result"))
 results$posterior_lfdr <- 1 - results$PP_two_path
 order_index <- order(results$posterior_lfdr, results$protein)
 cumulative_fdr <- cumsum(results$posterior_lfdr[order_index]) / seq_along(order_index)
-acceptable <- which(cumulative_fdr <= 0.05)
-results$selected_bfdr05 <- FALSE
 results$posterior_rank <- NA_integer_
-results$posterior_rank[order_index] <- seq_along(order_index)
-if (length(acceptable)) {
-    results$selected_bfdr05[order_index[seq_len(max(acceptable))]] <- TRUE
+results$posterior_cumulative_fdr <- NA_real_
+family_complete <- all(successful)
+results$family_complete <- family_complete
+results$posterior_fdr_status <- if (family_complete) {
+    "AVAILABLE_COMPLETE_MANIFEST"
+} else {
+    "UNAVAILABLE_INCOMPLETE_MANIFEST"
+}
+results$selected_bfdr05 <- NA
+if (family_complete) {
+    results$posterior_rank[order_index] <- seq_along(order_index)
+    results$posterior_cumulative_fdr[order_index] <- cumulative_fdr
+    acceptable <- which(cumulative_fdr <= 0.05)
+    results$selected_bfdr05 <- FALSE
+    if (length(acceptable)) {
+        results$selected_bfdr05[order_index[seq_len(max(acceptable))]] <- TRUE
+    }
 }
 results <- results[match(manifest$protein[manifest$protein %in% results$protein],
                          results$protein), ]
 write.table(results, paste0(output_prefix, ".joint.tsv"), sep = "\t",
             quote = FALSE, row.names = FALSE)
-cat("Completed", nrow(results), "proteins;", nrow(failure_table),
-    "failed;", sum(results$selected_bfdr05), "selected at posterior FDR 5%\n")
+selected_count <- if (family_complete) sum(results$selected_bfdr05) else NA_integer_
+cat("Completed", nrow(results), "proteins;", nrow(failure_table), "failed;",
+    if (family_complete) selected_count else "selection unavailable",
+    if (family_complete) "selected at posterior FDR 5%\n" else
+        "because the manifest is incomplete\n")
+if (!family_complete) quit(save = "no", status = 2L)

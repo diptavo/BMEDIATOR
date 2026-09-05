@@ -1,5 +1,19 @@
 # Validation Status
 
+## Current joint-model status
+
+The supported research implementation is the JG-0.2.4 joint model in
+`bmediator-joint`. Its frozen 50,000-analysis family run passed all
+prespecified FDR and power criteria among reportable fits but failed the
+numerical-completion gate, with only 38 to 48 of 50 complete families in the
+confirmatory scenarios. It is not a production engine. See
+[JG-0.2.4 held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
+[Production readiness](PRODUCTION_READINESS.md).
+
+The sections below retain historical validation results for the legacy and
+factorized implementations. They must not be interpreted as validation of the
+joint model.
+
 ## Historical single-signal LD stress test
 
 On 2026-08-17, the compatibility `single` regional method was tested with

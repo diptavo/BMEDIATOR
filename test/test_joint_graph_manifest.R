@@ -33,9 +33,11 @@ manifest <- data.frame(
 )
 manifest_path <- paste0(output, ".manifest.tsv")
 write.table(manifest, manifest_path, sep = "\t", quote = FALSE, row.names = FALSE)
-status <- system2("Rscript", c(file.path(root, "research", "run_joint_graph_manifest.R"),
-                               binary, manifest_path, output, "2"))
-if (!identical(status, 0L)) stop("joint manifest runner failed")
+status <- suppressWarnings(system2(
+    "Rscript", c(file.path(root, "research", "run_joint_graph_manifest.R"),
+                 binary, manifest_path, output, "2")
+))
+if (!identical(status, 2L)) stop("incomplete manifest did not return status 2")
 result <- read.delim(paste0(output, ".joint.tsv"), check.names = FALSE)
 failures <- read.delim(paste0(output, ".failures.tsv"), check.names = FALSE)
 if (nrow(result) != 2L || nrow(failures) != 1L) stop("unexpected manifest row counts")
@@ -46,5 +48,31 @@ if (failures$protein[[1]] != "BAD_PROTEIN") stop("failed protein was not isolate
 if (any(result$model_version != "JG-0.2.4")) stop("wrong manifest model version")
 if (!(result$PP_two_path[[1]] < 0.01 && result$PP_two_path[[2]] > 0.80)) {
     stop("manifest results do not separate null and mediation fixtures")
+}
+if (any(result$family_complete) ||
+    any(result$posterior_fdr_status != "UNAVAILABLE_INCOMPLETE_MANIFEST") ||
+    any(!is.na(result$selected_bfdr05)) ||
+    any(!is.na(result$posterior_rank)) ||
+    any(!is.na(result$posterior_cumulative_fdr))) {
+    stop("incomplete manifest exposed a family-wide selection")
+}
+
+complete_manifest <- manifest[c(1, 3), ]
+complete_manifest_path <- paste0(output, ".complete.manifest.tsv")
+complete_output <- paste0(output, ".complete")
+write.table(complete_manifest, complete_manifest_path, sep = "\t", quote = FALSE,
+            row.names = FALSE)
+complete_status <- system2(
+    "Rscript", c(file.path(root, "research", "run_joint_graph_manifest.R"),
+                 binary, complete_manifest_path, complete_output, "2")
+)
+if (!identical(complete_status, 0L)) stop("complete joint manifest runner failed")
+complete_result <- read.delim(paste0(complete_output, ".joint.tsv"),
+                              check.names = FALSE)
+if (!all(complete_result$family_complete) ||
+    any(complete_result$posterior_fdr_status != "AVAILABLE_COMPLETE_MANIFEST") ||
+    any(is.na(complete_result$selected_bfdr05)) ||
+    any(!is.finite(complete_result$posterior_cumulative_fdr))) {
+    stop("complete manifest did not expose an auditable family-wide selection")
 }
 cat("JG-0.2.4 manifest runner test passed.\n")

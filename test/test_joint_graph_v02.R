@@ -226,6 +226,52 @@ duplicate_option_status <- suppressWarnings(system2(
 ))
 require_result(!identical(duplicate_option_status, 0L),
                "duplicate option was silently accepted")
+
+unsafe_options <- file.path(output_directory, "unsafe_options.tsv")
+writeLines(c("max_quadrature_posterior_error\t100", "min_role_blocks\t2"),
+           unsafe_options)
+unsafe_option_status <- suppressWarnings(system2(
+    binary,
+    c(file.path(output_directory, "null.tsv"),
+      file.path(output_directory, "null.ld.tsv"),
+      file.path(output_directory, "unsafe_options.result.tsv"), unsafe_options),
+    stdout = FALSE, stderr = FALSE
+))
+require_result(!identical(unsafe_option_status, 0L),
+               "release safeguards were relaxed through the options file")
+
+strict_options <- file.path(output_directory, "strict_options.tsv")
+strict_stderr <- file.path(output_directory, "strict_options.stderr.txt")
+writeLines("max_quadrature_posterior_error\t1e-12", strict_options)
+strict_option_status <- suppressWarnings(system2(
+    binary,
+    c(file.path(output_directory, "null.tsv"),
+      file.path(output_directory, "null.ld.tsv"),
+      file.path(output_directory, "strict_options.result.tsv"), strict_options),
+    stdout = FALSE, stderr = strict_stderr
+))
+strict_message <- paste(readLines(strict_stderr, warn = FALSE), collapse = " ")
+require_result(!identical(strict_option_status, 0L) &&
+               grepl("posterior_error=", strict_message, fixed = TRUE) &&
+               grepl("max_relevant_quadrature_difference=", strict_message,
+                     fixed = TRUE),
+               "suppressed fit did not report actionable numerical diagnostics")
+
+input_lines <- readLines(file.path(output_directory, "null.tsv"))
+input_fields <- strsplit(input_lines, "\t", fixed = TRUE)
+duplicate_input <- vapply(input_fields, function(fields) {
+    paste(c(fields[[1]], fields), collapse = "\t")
+}, character(1))
+duplicate_input_path <- file.path(output_directory, "duplicate_input_column.tsv")
+writeLines(duplicate_input, duplicate_input_path)
+duplicate_input_status <- suppressWarnings(system2(
+    binary,
+    c(duplicate_input_path, file.path(output_directory, "null.ld.tsv"),
+      file.path(output_directory, "duplicate_input_column.result.tsv")),
+    stdout = FALSE, stderr = FALSE
+))
+require_result(!identical(duplicate_input_status, 0L),
+               "duplicate input column was silently accepted")
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
