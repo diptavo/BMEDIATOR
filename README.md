@@ -29,6 +29,15 @@ Version 1.2.0-dev
 > It is not yet the default. See
 > [Factorized two-stage method](docs/FACTORIZED_METHOD.md).
 
+> **Joint-core research prototype:** `JG-0.1` is the first frozen reference
+> implementation of a replacement joint Bayesian core. It fits one trivariate
+> RF/protein/outcome likelihood over Sets A, B, and C and compares eight
+> factorial pathway/pleiotropy states. Independent base-R and C++
+> implementations agree on locked development fixtures. This prototype is not
+> connected to the production command-line analysis and is not calibrated for
+> real data. See [JG-0.1 specification](docs/JOINT_GRAPH_MODEL_V0_1.md) and
+> [development results](docs/JOINT_GRAPH_V0_1_RESULTS.md).
+
 ---
 
 ## Overview
