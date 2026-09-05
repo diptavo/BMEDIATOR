@@ -103,7 +103,7 @@ for (i in seq_len(nrow(failed))) {
         grepl("adaptive (evidence diagnostic|quadrature did not converge)", message)) {
         options_path <- file.path(temporary, "diagnostic_options.tsv")
         writeLines(c("max_evidence_discrepancy\t100",
-                     "max_quadrature_discrepancy\t100"), options_path)
+                     "max_quadrature_posterior_error\t100"), options_path)
         unlink(result_path)
         relaxed_status <- system2(
             binary, c(input, ld_path, result_path, options_path),

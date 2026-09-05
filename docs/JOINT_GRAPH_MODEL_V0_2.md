@@ -26,6 +26,15 @@ model. Adaptive quadrature for the remaining continuous parameters can
 escalate through order 13, and per-state orders and successive-order
 differences are written to every result.
 
+Patch `JG-0.2.4` evaluates quadrature uncertainty on the normalized posterior
+scale. It treats each state's last successive log-evidence difference as a
+symmetric error radius, enumerates all `2^16` corners of that error box, and
+reports the largest total-variation change in the normalized 16-state
+posterior. Reporting requires this value to be at most `0.01` and also retains
+a hard one-log-unit cap for every relevant state. This avoids discarding a
+protein because a numerically difficult state with negligible posterior mass
+changed by slightly more than 10% on its own evidence scale.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -148,8 +157,9 @@ a posterior if:
 
 - any of the 16 state optimizations does not converge;
 - the posterior Hessian requires a ridge;
-- successive adaptive quadrature orders differ by more than `0.10` log units
-  after the allowed escalation;
+- the worst-case normalized-posterior total-variation perturbation over the
+  successive-quadrature error box exceeds `0.01`;
+- any relevant state's last successive log-evidence change exceeds one unit;
 - fewer than three independent A-role or B-role LD blocks are supplied;
 - the LD, scale, orientation, or sampling-correlation inputs are invalid.
 
@@ -186,7 +196,7 @@ carried by the number of independent LD blocks, not the raw number of SNPs.
 
 ## Current production boundary
 
-`JG-0.2.3` is not production-ready until it passes its independent frozen
+`JG-0.2.4` is not production-ready until it passes its independent frozen
 family calibration and the remaining input-pipeline and competitor gates. The
 exact-alignment exclusion is a permanent interpretation boundary, not a
 software issue that can be removed by additional computation.

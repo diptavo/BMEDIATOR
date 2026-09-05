@@ -27,7 +27,10 @@ scenarios <- list(
     overlap_null = list(seed = 20263005,
                         sampling_rho = c(xm = 0.40, xy = 0.30, my = 0.20)),
     ld_mediation = list(seed = 20263006, ld_rho = 0.70,
-                        a = 0.40, b = 0.40)
+                        a = 0.40, b = 0.40),
+    curved_strong_ld = list(seed = 20915038, ld_rho = 0.70,
+                            a = 0.40, b = 0.40),
+    small_weight_curvature_null = list(seed = 41401056)
 )
 
 rows <- vector("list", length(scenarios))
@@ -87,9 +90,10 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.3")) stop("wrong model version")
-    if (result$max_relevant_quadrature_difference > 0.10 + 1e-10) {
-        stop("successfully reported posterior failed quadrature convergence")
+    if (!identical(result$model_version, "JG-0.2.4")) stop("wrong model version")
+    if (result$estimated_quadrature_posterior_error > 0.01 + 1e-10 ||
+        result$max_relevant_quadrature_difference > 1 + 1e-10) {
+        stop("successfully reported posterior failed quadrature stability")
     }
     if (!identical(
         result$identification_scope,
@@ -104,6 +108,8 @@ for (index in seq_along(scenarios)) {
         PP_directional_P = result$PP_directional_P,
         PP_two_path = result$PP_two_path,
         states_regularized = result$states_regularized,
+        estimated_quadrature_posterior_error =
+            result$estimated_quadrature_posterior_error,
         elapsed_seconds = timing[["elapsed"]],
         stringsAsFactors = FALSE
     )
@@ -126,6 +132,8 @@ directional <- row_for("directional_pleiotropy")
 uncertain_directional <- row_for("uncertain_directional")
 overlap <- row_for("overlap_null")
 ld_mediation <- row_for("ld_mediation")
+curved_strong_ld <- row_for("curved_strong_ld")
+small_weight_curvature_null <- row_for("small_weight_curvature_null")
 require_result(null$PP_two_path < 0.20, "null produced two-path support")
 require_result(mediation$PP_two_path > 0.80,
                "off-grid moderate mediation was not recovered")
@@ -143,6 +151,10 @@ require_result(overlap$PP_two_path < 0.20,
                "declared overlap null produced two-path support")
 require_result(ld_mediation$PP_two_path > 0.80,
                "signed-LD mediation was not recovered")
+require_result(curved_strong_ld$PP_two_path > 0.80,
+               "curved strong-LD mediation was not reportable")
+require_result(small_weight_curvature_null$PP_two_path < 0.20,
+               "small-weight curved null produced two-path support")
 
 scale_fixture <- jg02_simulate(
     seed = 20263007,
@@ -189,7 +201,32 @@ under_status <- suppressWarnings(system2(
 ))
 require_result(!identical(under_status, 0L),
                "single-block A/B evidence did not fail closed")
+
+singular <- jg02_simulate(seed = 20263010, blocks = 6L,
+                          variants_per_block = 2L)
+singular$ld[1, 2] <- singular$ld[2, 1] <- 1
+singular_input <- file.path(output_directory, "singular_ld.tsv")
+singular_ld <- file.path(output_directory, "singular_ld.ld.tsv")
+singular_output <- file.path(output_directory, "singular_ld.result.tsv")
+jg02_write_fixture(singular, singular_input, singular_ld)
+singular_status <- suppressWarnings(system2(
+    binary, c(singular_input, singular_ld, singular_output),
+    stdout = FALSE, stderr = FALSE
+))
+require_result(!identical(singular_status, 0L),
+               "singular within-block LD did not fail closed")
+
+duplicate_options <- file.path(output_directory, "duplicate_options.tsv")
+writeLines(c("pi_xm\t0.20", "pi_xm\t0.30"), duplicate_options)
+duplicate_option_status <- suppressWarnings(system2(
+    binary, c(file.path(output_directory, "null.tsv"),
+              file.path(output_directory, "null.ld.tsv"),
+              file.path(output_directory, "duplicate_options.result.tsv"),
+              duplicate_options), stdout = FALSE, stderr = FALSE
+))
+require_result(!identical(duplicate_option_status, 0L),
+               "duplicate option was silently accepted")
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.3 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.4 adaptive, LD, overlap, scale, and directional tests passed.\n")

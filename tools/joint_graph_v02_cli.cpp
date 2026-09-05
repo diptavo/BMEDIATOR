@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -17,6 +18,7 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
     std::ifstream input(path);
     if (!input) throw std::runtime_error("cannot open options file: " + path);
     std::string line;
+    std::set<std::string> seen;
     while (std::getline(input, line)) {
         if (line.empty() || line[0] == '#') continue;
         const size_t tab = line.find('\t');
@@ -24,7 +26,15 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
             throw std::runtime_error("options must be tab-delimited key/value pairs");
         }
         const std::string key = line.substr(0, tab);
-        const double value = std::stod(line.substr(tab + 1));
+        if (!seen.insert(key).second) {
+            throw std::runtime_error("duplicate option: " + key);
+        }
+        const std::string raw_value = line.substr(tab + 1);
+        size_t used = 0;
+        const double value = std::stod(raw_value, &used);
+        if (used != raw_value.size() || !std::isfinite(value)) {
+            throw std::runtime_error("invalid value for option: " + key);
+        }
         if (key == "pi_xm") result.pi_xm = value;
         else if (key == "pi_my") result.pi_my = value;
         else if (key == "pi_sparse") result.pi_sparse = value;
@@ -40,8 +50,8 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
         else if (key == "max_evidence_discrepancy") {
             result.max_evidence_discrepancy = value;
         }
-        else if (key == "max_quadrature_discrepancy") {
-            result.max_quadrature_discrepancy = value;
+        else if (key == "max_quadrature_posterior_error") {
+            result.max_quadrature_posterior_error = value;
         }
         else if (key == "quadrature_escalation_threshold") {
             result.quadrature_escalation_threshold = value;
@@ -90,7 +100,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (argc == 2 && std::string(argv[1]) == "--version") {
-        std::cout << "BMEDIATOR joint model JG-0.2.3\n";
+        std::cout << "BMEDIATOR joint model JG-0.2.4\n";
         return 0;
     }
     if (argc < 2) {

@@ -59,7 +59,7 @@ run_one <- function(index) {
     }
     result <- read.delim(result_path, stringsAsFactors = FALSE,
                          check.names = FALSE)
-    if (nrow(result) != 1L || !identical(result$model_version, "JG-0.2.3")) {
+    if (nrow(result) != 1L || !identical(result$model_version, "JG-0.2.4")) {
         return(list(success = FALSE, protein = manifest$protein[[index]],
                     exit_status = 1L, diagnostic = "invalid result schema or model version",
                     elapsed_seconds = elapsed))
