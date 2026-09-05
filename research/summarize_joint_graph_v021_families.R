@@ -4,7 +4,7 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2L) {
     stop("usage: summarize_joint_graph_v021_families.R INPUT_ROOT OUTPUT.tsv")
 }
-paths <- list.files(args[[1]], pattern = "summary\\.tsv$", recursive = TRUE,
+paths <- list.files(args[[1]], pattern = "^summary\\.tsv$", recursive = TRUE,
                     full.names = TRUE)
 if (!length(paths)) stop("no family summary files found")
 families <- do.call(rbind, lapply(paths, read.delim, stringsAsFactors = FALSE,

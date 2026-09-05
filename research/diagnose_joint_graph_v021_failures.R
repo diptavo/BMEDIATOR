@@ -82,10 +82,28 @@ for (i in seq_len(nrow(failed))) {
     jg02_write_fixture(fixture, input, ld_path)
     status <- system2(binary, c(input, ld_path, result_path), stdout = FALSE,
                       stderr = stderr_path)
+    replay_succeeded <- identical(status, 0L) && file.exists(result_path)
     message <- if (file.exists(stderr_path)) {
         paste(readLines(stderr_path, warn = FALSE), collapse = " ")
     } else {
         ""
+    }
+    relaxed_status <- NA_integer_
+    max_relevant_difference <- NA_real_
+    pp_two_path <- NA_real_
+    if (!identical(status, 0L) && grepl("adaptive evidence diagnostic", message)) {
+        options_path <- file.path(temporary, "diagnostic_options.tsv")
+        writeLines("max_evidence_discrepancy\t100", options_path)
+        unlink(result_path)
+        relaxed_status <- system2(
+            binary, c(input, ld_path, result_path, options_path),
+            stdout = FALSE, stderr = FALSE
+        )
+        if (identical(relaxed_status, 0L) && file.exists(result_path)) {
+            relaxed <- read.delim(result_path, check.names = FALSE)
+            max_relevant_difference <- relaxed$max_relevant_evidence_difference
+            pp_two_path <- relaxed$PP_two_path
+        }
     }
     diagnostics[[i]] <- data.frame(
         scenario = x$scenario,
@@ -93,7 +111,10 @@ for (i in seq_len(nrow(failed))) {
         protein = x$protein,
         truth = x$truth,
         replay_status = as.integer(status),
-        replay_succeeded = identical(status, 0L) && file.exists(result_path),
+        replay_succeeded = replay_succeeded,
+        relaxed_status = relaxed_status,
+        max_relevant_evidence_difference = max_relevant_difference,
+        relaxed_PP_two_path = pp_two_path,
         diagnostic = message,
         stringsAsFactors = FALSE
     )
