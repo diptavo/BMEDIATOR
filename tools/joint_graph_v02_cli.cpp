@@ -35,6 +35,9 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
         else if (key == "q_alpha") result.q_alpha = value;
         else if (key == "q_beta") result.q_beta = value;
         else if (key == "max_cross_block_ld") result.max_cross_block_ld = value;
+        else if (key == "max_evidence_discrepancy") {
+            result.max_evidence_discrepancy = value;
+        }
         else if (key == "optimizer_iterations") {
             result.optimizer_iterations = static_cast<int>(value);
         } else if (key == "optimizer_tolerance") {

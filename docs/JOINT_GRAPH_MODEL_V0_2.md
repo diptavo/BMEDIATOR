@@ -1,4 +1,4 @@
-# BMEDIATOR joint graph model JG-0.2
+# BMEDIATOR joint graph model JG-0.2 series
 
 ## Status
 
@@ -6,6 +6,11 @@
 kept separate from the production `bmediator` command and from the historical
 factorized method. Passing its development tests is necessary but not
 sufficient for a production claim.
+
+Patch `JG-0.2.1` adds exact within-block averaging over uncertain independent
+orientation calls and applies the adaptive-evidence diagnostic only to graph
+states with posterior probability above `1e-6`. The original `JG-0.2` run and
+its failures remain reproducible at commit `efdeee8`.
 
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
@@ -15,7 +20,8 @@ free in every graph.
 
 For every selected variant, the analysis requires aligned effect estimates and
 standard errors for all three traits, an A/B/C role, an LD-block label, and an
-orientation fixed using independent discovery data. It also requires:
+orientation fixed using independent discovery data and its probability of
+being correct. It also requires:
 
 - a signed LD matrix covering the variants in identical allele orientation;
 - externally estimated latent variances `v_x`, `v_m`, and `v_y` for every row;
@@ -45,7 +51,9 @@ m_j = a g_j + d_j
 y_j = c g_j + b m_j + h_j lambda d_j + eta s_j + e_j,
 ```
 
-where `s_j` is the independently fixed orientation vector. The block-level
+where `s_j` is the latent orientation vector informed by independent sign
+probabilities. `JG-0.2.1` exactly averages over possible signs within each LD
+block, with a maximum of 12 uncertain signs per block. The block-level
 indicator `h_j ~ Bernoulli(q)` identifies non-aligned pleiotropic LD signals.
 Moving `h` from SNPs to independent LD blocks makes the likelihood coherent
 under LD and avoids an exponential sum over SNP-level allocations.
@@ -126,7 +134,8 @@ without a posterior if:
 
 - any of the 16 state optimizations does not converge;
 - the posterior Hessian requires a ridge;
-- adaptive and ordinary Laplace log evidence differ by more than one log unit;
+- adaptive and ordinary Laplace log evidence differ by more than one log unit
+  in any state with posterior probability above `1e-6`;
 - the LD, scale, orientation, or sampling-correlation inputs are invalid.
 
 The frozen optimizer limit is 1,500 iterations with a `1e-6` convergence

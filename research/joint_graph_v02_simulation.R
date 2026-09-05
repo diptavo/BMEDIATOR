@@ -79,6 +79,7 @@ jg02_simulate <- function(seed, blocks = 12L, variants_per_block = 3L,
         v_m = variance$v_m * reported_variance_scale / true_variance_scale,
         v_y = variance$v_y * reported_variance_scale / true_variance_scale,
         orientation = reported_orientation,
+        orientation_probability = orientation_accuracy,
         rho_xm = reported_sampling_rho[["xm"]],
         rho_xy = reported_sampling_rho[["xy"]],
         rho_my = reported_sampling_rho[["my"]],
@@ -106,6 +107,10 @@ jg02_log_mvn <- function(observed, mean, covariance) {
 }
 
 jg02_loglik <- function(data, ld, a, b, c_path, lambda, q, eta) {
+    log_sum_exp <- function(value) {
+        maximum <- max(value)
+        maximum + log(sum(exp(value - maximum)))
+    }
     values <- numeric()
     for (current in unique(data$ld_block)) {
         index <- which(data$ld_block == current)
@@ -115,7 +120,6 @@ jg02_loglik <- function(data, ld, a, b, c_path, lambda, q, eta) {
         kd <- r %*% diag(data$v_m[index], n) %*% r
         ky <- r %*% diag(data$v_y[index], n) %*% r
         observed <- c(data$beta_x[index], data$beta_m[index], data$beta_y[index])
-        directional_mean <- as.vector(r %*% data$orientation[index])
         sampling <- matrix(0, 3 * n, 3 * n)
         for (i in seq_len(n)) {
             for (j in seq_len(n)) {
@@ -135,7 +139,7 @@ jg02_loglik <- function(data, ld, a, b, c_path, lambda, q, eta) {
                 sampling[2 * n + j, n + i] <- sampling[n + i, 2 * n + j]
             }
         }
-        component <- function(h) {
+        component <- function(h, actual_orientation) {
             bg <- c_path + a * b
             bd <- b + h * lambda
             covariance <- sampling
@@ -159,16 +163,26 @@ jg02_loglik <- function(data, ld, a, b, c_path, lambda, q, eta) {
             covariance[2 * n + seq_len(n), 2 * n + seq_len(n)] <-
                 covariance[2 * n + seq_len(n), 2 * n + seq_len(n)] +
                 bg^2 * kg + bd^2 * kd + ky
+            directional_mean <- as.vector(r %*% actual_orientation)
             mean <- c(rep(0, 2 * n), eta * directional_mean)
             jg02_log_mvn(observed, mean, covariance)
         }
-        clean <- component(0)
-        contaminated <- component(1)
-        maximum <- max(log1p(-q) + clean, log(q) + contaminated)
-        values <- c(values, maximum + log(
-            exp(log1p(-q) + clean - maximum) +
-            exp(log(q) + contaminated - maximum)
-        ))
+        configurations <- expand.grid(rep(list(c(FALSE, TRUE)), n))
+        orientation_terms <- numeric(nrow(configurations) * 2)
+        position <- 0L
+        for (configuration in seq_len(nrow(configurations))) {
+            correct <- as.logical(configurations[configuration, ])
+            probability <- data$orientation_probability[index]
+            log_weight <- sum(ifelse(correct, log(probability), log1p(-probability)))
+            actual_orientation <- data$orientation[index] * ifelse(correct, 1, -1)
+            position <- position + 1L
+            orientation_terms[position] <- log1p(-q) + log_weight +
+                component(0, actual_orientation)
+            position <- position + 1L
+            orientation_terms[position] <- log(q) + log_weight +
+                component(1, actual_orientation)
+        }
+        values <- c(values, log_sum_exp(orientation_terms))
     }
     sum(values)
 }

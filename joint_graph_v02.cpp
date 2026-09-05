@@ -35,7 +35,8 @@ struct PreparedBlock {
     Matrix ky;
     Matrix sampling;
     std::vector<double> observed;
-    std::vector<double> directional_mean;
+    std::vector<double> orientation;
+    std::vector<double> orientation_probability;
 };
 
 struct PreparedData {
@@ -213,17 +214,18 @@ PreparedData prepare_data(
         block.ky = random_effect_covariance(block.ld, vy);
         block.sampling.assign(3 * m, std::vector<double>(3 * m, 0.0));
         block.observed.assign(3 * m, 0.0);
-        block.directional_mean.assign(m, 0.0);
+        block.orientation.assign(m, 0.0);
+        block.orientation_probability.assign(m, 1.0);
+        int uncertain_orientations = 0;
 
         for (int i = 0; i < m; ++i) {
             const auto& oi = observations[indices[i]];
             block.observed[i] = oi.beta_x;
             block.observed[m + i] = oi.beta_m;
             block.observed[2 * m + i] = oi.beta_y;
-            for (int k = 0; k < m; ++k) {
-                block.directional_mean[i] +=
-                    block.ld[i][k] * observations[indices[k]].orientation;
-            }
+            block.orientation[i] = oi.orientation;
+            block.orientation_probability[i] = oi.orientation_probability;
+            if (oi.orientation_probability < 1.0) ++uncertain_orientations;
             for (int j = 0; j < m; ++j) {
                 const auto& oj = observations[indices[j]];
                 const double r = block.ld[i][j];
@@ -241,6 +243,10 @@ PreparedData prepare_data(
                     block.sampling[m + i][2 * m + j];
             }
         }
+        if (uncertain_orientations > 12) {
+            throw std::invalid_argument(
+                "an LD block has more than 12 uncertain orientations");
+        }
         prepared.blocks.push_back(std::move(block));
     }
     return prepared;
@@ -251,11 +257,9 @@ double block_component_log_likelihood(const PreparedBlock& block,
                                       int pleiotropic) {
     const int n = static_cast<int>(block.ld.size());
     Matrix covariance = block.sampling;
-    std::vector<double> mean(3 * n, 0.0);
     const double bg = parameters.c_path + parameters.a * parameters.b;
     const double bd = parameters.b + pleiotropic * parameters.lambda;
     for (int i = 0; i < n; ++i) {
-        mean[2 * n + i] = parameters.eta * block.directional_mean[i];
         for (int j = 0; j < n; ++j) {
             const double kg = block.kg[i][j];
             const double kd = block.kd[i][j];
@@ -272,7 +276,36 @@ double block_component_log_likelihood(const PreparedBlock& block,
                 bg * bg * kg + bd * bd * kd + block.ky[i][j];
         }
     }
-    return zero_mean_mvn(block.observed, mean, covariance);
+    if (parameters.eta == 0.0) {
+        return zero_mean_mvn(block.observed,
+                             std::vector<double>(3 * n, 0.0), covariance);
+    }
+
+    std::vector<double> log_terms;
+    std::vector<double> actual_orientation = block.orientation;
+    std::function<void(int, double)> visit = [&](int position, double log_weight) {
+        if (position < n) {
+            const double probability = block.orientation_probability[position];
+            actual_orientation[position] = block.orientation[position];
+            visit(position + 1, log_weight + std::log(probability));
+            if (probability < 1.0) {
+                actual_orientation[position] = -block.orientation[position];
+                visit(position + 1, log_weight + std::log1p(-probability));
+            }
+            return;
+        }
+        std::vector<double> mean(3 * n, 0.0);
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                mean[2 * n + i] += parameters.eta * block.ld[i][j] *
+                                   actual_orientation[j];
+            }
+        }
+        log_terms.push_back(log_weight +
+                            zero_mean_mvn(block.observed, mean, covariance));
+    };
+    visit(0, 0.0);
+    return log_sum_exp(log_terms);
 }
 
 double model_log_likelihood(const PreparedData& data,
@@ -681,6 +714,11 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
             throw std::invalid_argument(
                 "orientation must be -1 or 1 and derived independently");
         }
+        if (!(observation.orientation_probability >= 0.5 &&
+              observation.orientation_probability <= 1.0)) {
+            throw std::invalid_argument(
+                "orientation_probability must be in [0.5,1]");
+        }
         if (std::fabs(ld[i][i] - 1.0) > 1e-6) {
             throw std::invalid_argument("LD diagonal must equal one");
         }
@@ -721,7 +759,8 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
     if (!(options.prior_sd_a > 0.0 && options.prior_sd_b > 0.0 &&
           options.prior_sd_c > 0.0 && options.prior_sd_lambda > 0.0 &&
           options.prior_sd_eta > 0.0 && options.optimizer_iterations >= 100 &&
-          options.optimizer_tolerance > 0.0)) {
+          options.optimizer_tolerance > 0.0 &&
+          options.max_evidence_discrepancy > 0.0)) {
         throw std::invalid_argument("continuous priors or optimizer options are invalid");
     }
 }
@@ -747,10 +786,10 @@ std::vector<JointGraphV02Observation> read_joint_graph_v02_tsv(
     const auto header = split_tab(line);
     std::unordered_map<std::string, int> column;
     for (int i = 0; i < static_cast<int>(header.size()); ++i) column[header[i]] = i;
-    const std::array<std::string, 16> required{{
+    const std::array<std::string, 17> required{{
         "variant", "ld_block", "role", "beta_x", "se_x", "beta_m", "se_m",
-        "beta_y", "se_y", "v_x", "v_m", "v_y", "orientation", "rho_xm",
-        "rho_xy", "rho_my"
+        "beta_y", "se_y", "v_x", "v_m", "v_y", "orientation",
+        "orientation_probability", "rho_xm", "rho_xy", "rho_my"
     }};
     for (const auto& name : required) {
         if (!column.count(name)) throw std::runtime_error("missing column: " + name);
@@ -783,6 +822,8 @@ std::vector<JointGraphV02Observation> read_joint_graph_v02_tsv(
         observation.v_y = parse_double(fields[column["v_y"]], "v_y");
         observation.orientation =
             parse_double(fields[column["orientation"]], "orientation");
+        observation.orientation_probability = parse_double(
+            fields[column["orientation_probability"]], "orientation_probability");
         observation.rho_xm = parse_double(fields[column["rho_xm"]], "rho_xm");
         observation.rho_xy = parse_double(fields[column["rho_xy"]], "rho_xy");
         observation.rho_my = parse_double(fields[column["rho_my"]], "rho_my");
@@ -869,6 +910,11 @@ JointGraphV02Result fit_joint_graph_v02(
         result.max_adaptive_laplace_difference = std::max(
             result.max_adaptive_laplace_difference,
             fits[i].adaptive_laplace_difference);
+        if (result.state_pp[i] > 1e-6) {
+            result.max_relevant_evidence_difference = std::max(
+                result.max_relevant_evidence_difference,
+                fits[i].adaptive_laplace_difference);
+        }
         if (states[i].z_xm) result.pp_xm += result.state_pp[i];
         if (states[i].z_my) result.pp_global_my += result.state_pp[i];
         if (states[i].z_sparse) result.pp_sparse_pleio += result.state_pp[i];
@@ -886,7 +932,7 @@ JointGraphV02Result fit_joint_graph_v02(
         throw std::runtime_error("one or more graph-state optimizations did not converge");
     }
     if (result.states_regularized != 0 ||
-        result.max_adaptive_laplace_difference > 1.0) {
+        result.max_relevant_evidence_difference > options.max_evidence_discrepancy) {
         throw std::runtime_error(
             "adaptive evidence diagnostic failed; no posterior is reportable");
     }
@@ -926,8 +972,9 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tPP_any_P\tPP_two_path\tlog_evidence\tn_blocks"
            << "\tmax_block_size\tmax_ignored_ld\tstates_converged"
            << "\tstates_regularized\tmax_adaptive_laplace_difference"
+           << "\tmax_relevant_evidence_difference"
            << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional\n";
-    output << "JG-0.2\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.1\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     output << '\t' << result.pp_xm
@@ -943,6 +990,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.states_converged
            << '\t' << result.states_regularized
            << '\t' << result.max_adaptive_laplace_difference
+           << '\t' << result.max_relevant_evidence_difference
            << '\t' << result.options.pi_xm
            << '\t' << result.options.pi_my
            << '\t' << result.options.pi_sparse

@@ -21,6 +21,7 @@ struct JointGraphV02Observation {
     double v_m = 0.0;
     double v_y = 0.0;
     double orientation = 0.0;
+    double orientation_probability = 1.0;
     double rho_xm = 0.0;
     double rho_xy = 0.0;
     double rho_my = 0.0;
@@ -39,6 +40,7 @@ struct JointGraphV02Options {
     double q_alpha = 2.0;
     double q_beta = 2.0;
     double max_cross_block_ld = 0.05;
+    double max_evidence_discrepancy = 1.0;
     int optimizer_iterations = 1500;
     double optimizer_tolerance = 1e-6;
 };
@@ -59,6 +61,7 @@ struct JointGraphV02Result {
     int states_converged = 0;
     int states_regularized = 0;
     double max_adaptive_laplace_difference = 0.0;
+    double max_relevant_evidence_difference = 0.0;
     JointGraphV02Options options;
 };
 

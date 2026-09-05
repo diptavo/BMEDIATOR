@@ -9,7 +9,7 @@ source(file.path(root, "research", "joint_graph_v02_simulation.R"))
 
 trailing <- commandArgs(trailingOnly = TRUE)
 output <- if (length(trailing) >= 1L) trailing[[1]] else
-    file.path(root, "research", "joint_graph_v0_2_development_summary.tsv")
+    file.path(root, "research", "joint_graph_v0_2_1_development_summary.tsv")
 replicates_per_cell <- if (length(trailing) >= 2L) as.integer(trailing[[2]]) else 50L
 requested_cores <- if (length(trailing) >= 3L) as.integer(trailing[[3]]) else
     min(8L, max(1L, parallel::detectCores(logical = FALSE) - 1L))
@@ -34,8 +34,11 @@ scenarios <- list(
     scenario("directional_pleiotropy", "directional", a = 0.60, eta = 0.40),
     scenario("two_pleiotropy", "two_pleiotropy", a = 0.60,
              lambda = 0.70, q = 0.35, eta = 0.40),
-    scenario("mediation_sparse", "mediation_sparse", a = 0.40, b = 0.40,
-             lambda = 0.70, q = 0.35),
+    scenario("mediation_sparse_20_blocks", seed_group = 7L,
+             a = 0.40, b = 0.40, lambda = 0.70, q = 0.35),
+    scenario("mediation_sparse_30_blocks", "mediation_sparse",
+             seed_group = 7L, blocks = 30L, variants_per_block = 2L,
+             a = 0.40, b = 0.40, lambda = 0.70, q = 0.35),
     scenario("declared_overlap_null", "null",
              sampling_rho = c(xm = 0.40, xy = 0.30, my = 0.20)),
     scenario("undeclared_overlap_null",
@@ -52,7 +55,7 @@ scenarios <- list(
              a = 0.60, lambda = 0.70, q = 0.35),
     scenario("near_aligned_pleiotropy", a = 0.60, lambda = 0.70, q = 0.90),
     scenario("exact_aligned_pleiotropy", a = 0.60, lambda = 0.70, q = 1),
-    scenario("orientation_70pct", a = 0.60, eta = 0.40,
+    scenario("orientation_70pct", "directional", a = 0.60, eta = 0.40,
              orientation_accuracy = 0.70),
     scenario("skeptical_prior_mediation", "mediation", "skeptical", 2L,
              a = 0.40, b = 0.40),
@@ -109,7 +112,7 @@ jobs <- do.call(rbind, lapply(seq_along(scenarios), function(index) {
     seed_group <- if (is.na(scenarios[[index]]$seed_group)) index else
         scenarios[[index]]$seed_group
     data.frame(scenario_index = index, replicate = seq_len(replicates_per_cell),
-               seed = 20264000L + 1000L * seed_group + seq_len(replicates_per_cell))
+               seed = 20285000L + 1000L * seed_group + seq_len(replicates_per_cell))
 }))
 
 run_job <- function(job_index) {
@@ -139,6 +142,7 @@ run_job <- function(job_index) {
             PP_XM = NA, PP_global_MY = NA, PP_sparse_P = NA,
             PP_directional_P = NA, PP_any_P = NA, PP_two_path = NA,
             max_adaptive_laplace_difference = NA,
+            max_relevant_evidence_difference = NA,
             elapsed_seconds = timing[["elapsed"]], stringsAsFactors = FALSE
         ))
     }
@@ -154,6 +158,7 @@ run_job <- function(job_index) {
         PP_directional_P = result$PP_directional_P,
         PP_any_P = result$PP_any_P, PP_two_path = result$PP_two_path,
         max_adaptive_laplace_difference = result$max_adaptive_laplace_difference,
+        max_relevant_evidence_difference = result$max_relevant_evidence_difference,
         elapsed_seconds = timing[["elapsed"]], stringsAsFactors = FALSE
     )
 }
@@ -186,6 +191,8 @@ summaries <- do.call(rbind, lapply(scenarios, function(specification) {
         mean_PP_directional_P = mean(x$PP_directional_P[valid]),
         mean_PP_two_path = mean(x$PP_two_path[valid]),
         max_evidence_difference = max(x$max_adaptive_laplace_difference[valid]),
+        max_relevant_evidence_difference =
+            max(x$max_relevant_evidence_difference[valid]),
         median_elapsed_seconds = median(x$elapsed_seconds),
         stringsAsFactors = FALSE
     )

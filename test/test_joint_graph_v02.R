@@ -22,6 +22,8 @@ scenarios <- list(
     sparse_pleiotropy = list(seed = 20263003, a = 0.60,
                              lambda = 0.70, q = 0.35),
     directional_pleiotropy = list(seed = 20263004, a = 0.60, eta = 0.40),
+    uncertain_directional = list(seed = 20263009, a = 0.60, eta = 0.40,
+                                 orientation_accuracy = 0.70),
     overlap_null = list(seed = 20263005,
                         sampling_rho = c(xm = 0.40, xy = 0.30, my = 0.20)),
     ld_mediation = list(seed = 20263006, ld_rho = 0.70,
@@ -55,7 +57,7 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.1")) stop("wrong model version")
     if (!identical(
         result$identification_scope,
         "CONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
@@ -88,6 +90,7 @@ null <- row_for("null")
 mediation <- row_for("moderate_mediation")
 sparse <- row_for("sparse_pleiotropy")
 directional <- row_for("directional_pleiotropy")
+uncertain_directional <- row_for("uncertain_directional")
 overlap <- row_for("overlap_null")
 ld_mediation <- row_for("ld_mediation")
 require_result(null$PP_two_path < 0.20, "null produced two-path support")
@@ -100,6 +103,9 @@ require_result(sparse$PP_sparse_P > 0.70 && sparse$PP_global_MY < 0.30,
 require_result(directional$PP_directional_P > 0.70 &&
                directional$PP_global_MY < 0.30,
                "directional pleiotropy was not separated from the global path")
+require_result(uncertain_directional$PP_directional_P > 0.70 &&
+               uncertain_directional$PP_global_MY < 0.30,
+               "uncertain orientation was not integrated correctly")
 require_result(overlap$PP_two_path < 0.20,
                "declared overlap null produced two-path support")
 require_result(ld_mediation$PP_two_path > 0.80,
@@ -138,4 +144,4 @@ require_result(!identical(bad_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.1 adaptive, LD, overlap, scale, and directional tests passed.\n")
