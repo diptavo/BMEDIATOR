@@ -19,6 +19,13 @@ of the numerical integral and retains the Laplace difference only as an audit
 diagnostic. It also requires at least three independent A-role blocks and
 three independent B-role blocks by default.
 
+Patch `JG-0.2.3` integrates the sparse-state contamination probability `q`
+exactly under its Beta prior by dynamic programming across LD blocks. This
+removes one curved numerical dimension without changing the intended marginal
+model. Adaptive quadrature for the remaining continuous parameters can
+escalate through order 13, and per-state orders and successive-order
+differences are written to every result.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -130,13 +137,13 @@ the unchanged exact-alignment exclusion.
 
 Default inclusion probabilities are `0.25`, `0.10`, `0.10`, and `0.10`.
 Normal prior standard deviations are `0.70` for `a`, `b`, `lambda`, and `eta`,
-and `0.175` for `c`. Active `q` has a `Beta(2,2)` prior and is optimized on the
-logit scale with the Jacobian included.
+and `0.175` for `c`. Active `q` has a `Beta(2,2)` prior. In `JG-0.2.3`, its
+marginalization is exact rather than quadrature-based.
 
 Every state is optimized from multiple deterministic starts. Its marginal
 likelihood is calculated with mode-centered adaptive Gauss-Hermite quadrature
 using the numerical posterior Hessian. Relevant states are refined from order
-3 to order 5 and, when needed, to orders 7 and 9. The executable fails without
+3 to order 5 and, when needed, to orders 7, 9, 11, and 13. The executable fails without
 a posterior if:
 
 - any of the 16 state optimizations does not converge;
@@ -179,7 +186,7 @@ carried by the number of independent LD blocks, not the raw number of SNPs.
 
 ## Current production boundary
 
-`JG-0.2.2` is not production-ready until it passes its independent frozen
+`JG-0.2.3` is not production-ready until it passes its independent frozen
 family calibration and the remaining input-pipeline and competitor gates. The
 exact-alignment exclusion is a permanent interpretation boundary, not a
 software issue that can be removed by additional computation.

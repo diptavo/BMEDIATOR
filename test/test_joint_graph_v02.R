@@ -53,11 +53,41 @@ for (index in seq_along(scenarios)) {
         stop(name, " fixed likelihood R/C++ difference is ",
              abs(r_loglik - cpp_loglik))
     }
+    if (name == "sparse_pleiotropy") {
+        fixed_without_q <- fixed[names(fixed) != "q"]
+        q_grid <- seq(0.01, 0.99, length.out = 99)
+        grid_loglik <- vapply(q_grid, function(q) {
+            do.call(jg02_loglik, c(
+                list(data = fixture$data, ld = fixture$ld),
+                as.list(fixed_without_q), list(q = q)
+            ))
+        }, numeric(1))
+        center <- max(grid_loglik)
+        integrand <- Vectorize(function(q) {
+            exp(do.call(jg02_loglik, c(
+                list(data = fixture$data, ld = fixture$ld),
+                as.list(fixed_without_q), list(q = q)
+            )) - center) * dbeta(q, 2, 2)
+        })
+        r_integrated <- log(integrate(
+            integrand, 0, 1, rel.tol = 1e-9, subdivisions = 500L
+        )$value) + center
+        cpp_integrated <- as.numeric(system2(
+            binary,
+            c("--loglik-integrated-q", input, ld_path,
+              format(fixed_without_q, digits = 17)),
+            stdout = TRUE
+        ))
+        if (abs(r_integrated - cpp_integrated) > 1e-7) {
+            stop("exact q marginalization R/C++ difference is ",
+                 abs(r_integrated - cpp_integrated))
+        }
+    }
     timing <- system.time(status <- system2(binary, c(input, ld_path, output)))
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.2")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.3")) stop("wrong model version")
     if (result$max_relevant_quadrature_difference > 0.10 + 1e-10) {
         stop("successfully reported posterior failed quadrature convergence")
     }
@@ -162,4 +192,4 @@ require_result(!identical(under_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.2 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.3 adaptive, LD, overlap, scale, and directional tests passed.\n")

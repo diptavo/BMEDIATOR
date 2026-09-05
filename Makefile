@@ -30,6 +30,7 @@ CXXFLAGS ?= $(BASE_CXXFLAGS)
 LDFLAGS  ?= $(BASE_LDFLAGS)
 
 BIN       = bmediator
+JOINT_BIN = bmediator-joint
 BUILD_DIR = build
 HDRS      = bmediator.h plink_ld.h gsmr_qc.h regional_ld.h
 SRCS      = main.cpp io.cpp cavi.cpp factor_model.cpp plink_ld.cpp pipeline.cpp gsmr_qc.cpp regional_ld.cpp
@@ -42,12 +43,15 @@ OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/gsmr_qc.o \
             $(BUILD_DIR)/regional_ld.o
 
-.PHONY: all clean test test-joint-graph test-joint-graph-v02 test-joint-adversarial test-regional-stress joint-graph-prototype joint-graph-v02-prototype help
+.PHONY: all clean install test test-joint-graph test-joint-graph-v02 test-joint-adversarial test-regional-stress joint-graph-prototype joint-graph-v02-prototype help
 
-all: $(BIN)
+all: $(BIN) $(JOINT_BIN)
 
 $(BIN): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(BIN) $(OBJS) $(LDFLAGS)
+
+$(JOINT_BIN): joint_graph_v02.cpp joint_graph_v02.h tools/joint_graph_v02_cli.cpp
+	$(CXX) $(CXXFLAGS) joint_graph_v02.cpp tools/joint_graph_v02_cli.cpp -o $@ $(LDFLAGS)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -56,12 +60,18 @@ $(BUILD_DIR)/%.o: %.cpp $(HDRS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BUILD_DIR) $(BIN)
+	rm -rf $(BUILD_DIR) $(BIN) $(JOINT_BIN)
 
-test: $(BIN) $(BUILD_DIR)/joint_graph_cli $(BUILD_DIR)/joint_graph_v02_cli
+PREFIX ?= /usr/local
+install: all
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(BIN) $(JOINT_BIN) $(DESTDIR)$(PREFIX)/bin/
+
+test: $(BIN) $(JOINT_BIN) $(BUILD_DIR)/joint_graph_cli $(BUILD_DIR)/joint_graph_v02_cli
 	bash test/run_test.sh
 	Rscript test/test_joint_graph_reference.R
 	Rscript test/test_joint_graph_v02.R
+	Rscript test/test_joint_graph_manifest.R
 
 joint-graph-prototype: $(BUILD_DIR)/joint_graph_cli
 
@@ -88,6 +98,7 @@ test-regional-stress: $(BIN)
 help:
 	@echo "Targets:"
 	@echo "  make              Build bmediator"
+	@echo "  make install      Install bmediator and bmediator-joint under PREFIX"
 	@echo "  make test         Run the smoke test"
 	@echo "  make test-joint-graph  Compare the JG-0.1 R and C++ reference implementations"
 	@echo "  make test-joint-graph-v02  Test adaptive JG-0.2 inference and covariance handling"

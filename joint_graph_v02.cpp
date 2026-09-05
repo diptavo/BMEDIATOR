@@ -331,6 +331,43 @@ double model_log_likelihood(const PreparedData& data,
     return result;
 }
 
+double model_log_likelihood_integrated_q(
+    const PreparedData& data, const DecodedParameters& parameters,
+    const JointGraphV02Options& options) {
+    const int blocks = static_cast<int>(data.blocks.size());
+    std::vector<double> coefficients(
+        blocks + 1, -std::numeric_limits<double>::infinity());
+    coefficients[0] = 0.0;
+    int processed = 0;
+    for (const auto& block : data.blocks) {
+        const double clean = block_component_log_likelihood(block, parameters, 0);
+        const double contaminated =
+            block_component_log_likelihood(block, parameters, 1);
+        std::vector<double> next(
+            blocks + 1, -std::numeric_limits<double>::infinity());
+        for (int count = 0; count <= processed; ++count) {
+            next[count] = log_add_exp(next[count], coefficients[count] + clean);
+            next[count + 1] = log_add_exp(
+                next[count + 1], coefficients[count] + contaminated);
+        }
+        coefficients.swap(next);
+        ++processed;
+    }
+    const double log_beta_prior =
+        std::lgamma(options.q_alpha) + std::lgamma(options.q_beta) -
+        std::lgamma(options.q_alpha + options.q_beta);
+    std::vector<double> integrated(blocks + 1);
+    for (int count = 0; count <= blocks; ++count) {
+        const double log_beta_posterior =
+            std::lgamma(options.q_alpha + count) +
+            std::lgamma(options.q_beta + blocks - count) -
+            std::lgamma(options.q_alpha + options.q_beta + blocks);
+        integrated[count] = coefficients[count] + log_beta_posterior -
+            log_beta_prior;
+    }
+    return log_sum_exp(integrated);
+}
+
 double normal_log_density(double value, double sd) {
     return -0.5 * LOG_2PI - std::log(sd) -
            0.5 * value * value / (sd * sd);
@@ -345,13 +382,6 @@ DecodedParameters decode_parameters(const std::vector<double>& value,
     result.c_path = value[position++];
     if (state.z_sparse) {
         result.lambda = value[position++];
-        const double logit_q = value[position++];
-        if (logit_q >= 0.0) {
-            result.q = 1.0 / (1.0 + std::exp(-logit_q));
-        } else {
-            const double exponential = std::exp(logit_q);
-            result.q = exponential / (1.0 + exponential);
-        }
     }
     if (state.z_directional) result.eta = value[position++];
     return result;
@@ -365,7 +395,6 @@ std::vector<double> parameter_scales(const StateDefinition& state,
     result.push_back(options.prior_sd_c);
     if (state.z_sparse) {
         result.push_back(options.prior_sd_lambda);
-        result.push_back(1.0);
     }
     if (state.z_directional) result.push_back(options.prior_sd_eta);
     return result;
@@ -381,19 +410,15 @@ double log_kernel(const std::vector<double>& value,
         }
     }
     const DecodedParameters parameters = decode_parameters(value, state);
-    double result = model_log_likelihood(data, parameters, state.z_sparse != 0);
+    double result = state.z_sparse
+        ? model_log_likelihood_integrated_q(data, parameters, options)
+        : model_log_likelihood(data, parameters, false);
     if (!std::isfinite(result)) return result;
     if (state.z_xm) result += normal_log_density(parameters.a, options.prior_sd_a);
     if (state.z_my) result += normal_log_density(parameters.b, options.prior_sd_b);
     result += normal_log_density(parameters.c_path, options.prior_sd_c);
     if (state.z_sparse) {
         result += normal_log_density(parameters.lambda, options.prior_sd_lambda);
-        const double q = parameters.q;
-        result += (options.q_alpha - 1.0) * std::log(q) +
-                  (options.q_beta - 1.0) * std::log1p(-q) -
-                  (std::lgamma(options.q_alpha) + std::lgamma(options.q_beta) -
-                   std::lgamma(options.q_alpha + options.q_beta));
-        result += std::log(q) + std::log1p(-q);
     }
     if (state.z_directional) {
         result += normal_log_density(parameters.eta, options.prior_sd_eta);
@@ -519,7 +544,6 @@ std::vector<double> regression_initial(
     result.push_back(limit(c_path));
     if (state.z_sparse) {
         result.push_back(0.25);
-        result.push_back(std::log(0.35 / 0.65));
     }
     if (state.z_directional) result.push_back(0.0);
     return result;
@@ -533,10 +557,6 @@ OptimizerResult optimize_state(
     std::vector<std::vector<double>> starts;
     starts.push_back(regression_initial(observations, state));
     starts.push_back(std::vector<double>(scales.size(), 0.0));
-    if (state.z_sparse) {
-        int q_index = static_cast<int>(scales.size()) - 1 - state.z_directional;
-        starts.back()[q_index] = std::log(0.35 / 0.65);
-    }
     for (int i = 0; i < static_cast<int>(scales.size()); ++i) {
         std::vector<double> start = starts.front();
         start[i] += 0.5 * scales[i];
@@ -619,6 +639,34 @@ std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
                  0.7202352156060509, 0.43265155900255575,
                  0.08847452739437657, 0.004943624275536947,
                  0.00003960697726326438}};
+    }
+    if (order == 11) {
+        return {{-3.6684708465595826, -2.7832900997816519,
+                 -2.0259480158257555, -1.3265570844949328,
+                 -0.65680956688209968, 0.0, 0.65680956688209968,
+                 1.3265570844949328, 2.0259480158257555,
+                 2.7832900997816519, 3.6684708465595826},
+                {0.0000014395603937142596, 0.00034681946632334469,
+                 0.011911395444911535, 0.11722787516770851,
+                 0.42935975235612495, 0.65475928691459162,
+                 0.42935975235612495, 0.11722787516770851,
+                 0.011911395444911535, 0.00034681946632334469,
+                 0.0000014395603937142596}};
+    }
+    if (order == 13) {
+        return {{-4.1013375961786398, -3.2466089783724099,
+                 -2.5197356856782376, -1.8531076516015121,
+                 -1.2200550365907485, -0.60576387917106012, 0.0,
+                 0.60576387917106012, 1.2200550365907485,
+                 1.8531076516015121, 2.5197356856782376,
+                 3.2466089783724099, 4.1013375961786398},
+                {0.000000048257318500731258, 0.000020430360402707091,
+                 0.0012074599927193862, 0.02086277529616995,
+                 0.14032332068702347, 0.42161629689854324,
+                 0.60439318792116137, 0.42161629689854324,
+                 0.14032332068702347, 0.02086277529616995,
+                 0.0012074599927193862, 0.000020430360402707091,
+                 0.000000048257318500731258}};
     }
     throw std::invalid_argument("unsupported adaptive quadrature order");
 }
@@ -721,6 +769,21 @@ void refine_state_quadrature(
             fit.quadrature_difference = std::fabs(evidence9 - evidence7);
             fit.log_evidence = evidence9;
             fit.quadrature_order = 9;
+            if (fit.quadrature_difference > options.quadrature_escalation_threshold) {
+                const double evidence11 = adaptive_log_evidence(
+                    fit, state, data, options, 11);
+                fit.quadrature_difference = std::fabs(evidence11 - evidence9);
+                fit.log_evidence = evidence11;
+                fit.quadrature_order = 11;
+                if (fit.quadrature_difference >
+                    options.quadrature_escalation_threshold) {
+                    const double evidence13 = adaptive_log_evidence(
+                        fit, state, data, options, 13);
+                    fit.quadrature_difference = std::fabs(evidence13 - evidence11);
+                    fit.log_evidence = evidence13;
+                    fit.quadrature_order = 13;
+                }
+            }
         }
     }
 }
@@ -1005,6 +1068,8 @@ JointGraphV02Result fit_joint_graph_v02(
     }
     for (int i = 0; i < 16; ++i) {
         result.state_log_evidence[i] = fits[i].log_evidence;
+        result.state_quadrature_difference[i] = fits[i].quadrature_difference;
+        result.state_quadrature_order[i] = fits[i].quadrature_order;
         result.state_pp[i] = std::exp(log_joint[i] - result.log_evidence);
         result.states_converged += fits[i].converged;
         result.states_regularized += fits[i].regularized;
@@ -1067,6 +1132,21 @@ double joint_graph_v02_log_likelihood(
     return model_log_likelihood(data, parameters, sparse_active);
 }
 
+double joint_graph_v02_log_likelihood_integrated_q(
+    const std::vector<JointGraphV02Observation>& observations,
+    const Matrix& ld, double a, double b, double c_path, double lambda,
+    double eta, const JointGraphV02Options& options) {
+    validate_inputs(observations, ld, options);
+    const PreparedData data = prepare_data(observations, ld, options);
+    DecodedParameters parameters;
+    parameters.a = a;
+    parameters.b = b;
+    parameters.c_path = c_path;
+    parameters.lambda = lambda;
+    parameters.eta = eta;
+    return model_log_likelihood_integrated_q(data, parameters, options);
+}
+
 void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
                                       const std::string& path) {
     std::ofstream output(path);
@@ -1074,6 +1154,12 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
     output << "model_version\tidentification_scope";
     for (const auto& state : joint_graph_v02_state_names()) {
         output << "\tPP_" << state;
+    }
+    for (const auto& state : joint_graph_v02_state_names()) {
+        output << "\tquadrature_difference_" << state;
+    }
+    for (const auto& state : joint_graph_v02_state_names()) {
+        output << "\tquadrature_order_" << state;
     }
     output << "\tPP_XM\tPP_global_MY\tPP_sparse_P\tPP_directional_P"
            << "\tPP_any_P\tPP_two_path\tlog_evidence\tn_blocks"
@@ -1089,9 +1175,11 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tquadrature_escalation_threshold"
            << "\tmax_quadrature_discrepancy\tmin_role_blocks"
            << "\toptimizer_iterations\toptimizer_tolerance\n";
-    output << "JG-0.2.2\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.3\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
+    for (double value : result.state_quadrature_difference) output << '\t' << value;
+    for (int value : result.state_quadrature_order) output << '\t' << value;
     output << '\t' << result.pp_xm
            << '\t' << result.pp_global_my
            << '\t' << result.pp_sparse_pleio

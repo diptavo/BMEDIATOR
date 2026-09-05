@@ -51,6 +51,8 @@ struct JointGraphV02Options {
 struct JointGraphV02Result {
     std::array<double, 16> state_pp{};
     std::array<double, 16> state_log_evidence{};
+    std::array<double, 16> state_quadrature_difference{};
+    std::array<int, 16> state_quadrature_order{};
     double pp_xm = 0.0;
     double pp_global_my = 0.0;
     double pp_sparse_pleio = 0.0;
@@ -94,6 +96,12 @@ double joint_graph_v02_log_likelihood(
     const std::vector<std::vector<double>>& ld,
     double a, double b, double c_path, double lambda, double q, double eta,
     bool sparse_active = true,
+    const JointGraphV02Options& options = JointGraphV02Options());
+
+double joint_graph_v02_log_likelihood_integrated_q(
+    const std::vector<JointGraphV02Observation>& observations,
+    const std::vector<std::vector<double>>& ld,
+    double a, double b, double c_path, double lambda, double eta,
     const JointGraphV02Options& options = JointGraphV02Options());
 
 void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,

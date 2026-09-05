@@ -122,7 +122,7 @@ for (protein in seq_len(n_proteins)) {
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,
                              stringsAsFactors = FALSE)
-        if (!identical(result$model_version, "JG-0.2.2")) {
+        if (!identical(result$model_version, "JG-0.2.3")) {
             stop("unexpected joint model version: ", result$model_version)
         }
         values <- result[c(
@@ -182,7 +182,7 @@ metric <- function(selected) {
 bfdr <- metric(protein_results$selected_bfdr05)
 pp80 <- metric(protein_results$selected_pp80)
 summary <- data.frame(
-    model_version = "JG-0.2.2",
+    model_version = "JG-0.2.3",
     scenario = scenario_name,
     replicate = replicate,
     family_seed = family_seed,
