@@ -1440,6 +1440,7 @@ JointGraphV02Result fit_joint_graph_v02(
     int posterior_aware_refinements = 0;
     int sparse_grid_states = 0;
     auto probabilities = normalized_state_probabilities(log_joint);
+    const auto tensor_probabilities = probabilities;
     if (posterior_corner_perturbation(probabilities, fits) >
         options.max_quadrature_posterior_error) {
         for (int i = 0; i < 16; ++i) {
@@ -1547,6 +1548,10 @@ JointGraphV02Result fit_joint_graph_v02(
         if (states[i].z_sparse || states[i].z_directional) {
             result.pp_any_pleio += result.state_pp[i];
         }
+        if (sparse_grid_states > 0) {
+            result.tensor_sparse_posterior_tv +=
+                0.5 * std::fabs(result.state_pp[i] - tensor_probabilities[i]);
+        }
     }
     result.estimated_quadrature_posterior_error =
         posterior_corner_perturbation(result.state_pp, fits);
@@ -1648,7 +1653,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tposterior_aware_refinements"
            << "\tsparse_grid_states\tmax_sparse_grid_level"
            << "\tmax_sparse_grid_cancellation"
-           << "\tmax_tensor_sparse_difference"
+           << "\tmax_tensor_sparse_difference\ttensor_sparse_posterior_tv"
            << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional"
            << "\tprior_sd_a\tprior_sd_b\tprior_sd_c\tprior_sd_lambda"
            << "\tprior_sd_eta\tq_alpha\tq_beta\tmax_cross_block_ld"
@@ -1697,6 +1702,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.max_sparse_grid_level
            << '\t' << result.max_sparse_grid_cancellation
            << '\t' << result.max_tensor_sparse_difference
+           << '\t' << result.tensor_sparse_posterior_tv
            << '\t' << result.options.pi_xm
            << '\t' << result.options.pi_my
            << '\t' << result.options.pi_sparse

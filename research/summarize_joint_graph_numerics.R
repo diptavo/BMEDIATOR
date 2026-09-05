@@ -15,7 +15,7 @@ required <- c(
     "estimated_quadrature_posterior_error", "max_quadrature_order",
     "posterior_aware_refinements", "sparse_grid_states",
     "max_sparse_grid_level", "max_sparse_grid_cancellation",
-    "max_tensor_sparse_difference"
+    "max_tensor_sparse_difference", "tensor_sparse_posterior_tv"
 )
 missing <- setdiff(required, names(results))
 if (length(missing)) stop("missing numerical columns: ", paste(missing, collapse = ", "))
@@ -41,6 +41,9 @@ summarize_one <- function(x, scenario) {
         ),
         max_tensor_sparse_difference = finite_quantile(
             successful$max_tensor_sparse_difference, 1.00
+        ),
+        max_tensor_sparse_posterior_tv = finite_quantile(
+            successful$tensor_sparse_posterior_tv, 1.00
         ),
         median_posterior_error = finite_quantile(
             successful$estimated_quadrature_posterior_error, 0.50

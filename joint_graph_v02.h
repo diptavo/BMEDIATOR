@@ -85,6 +85,7 @@ struct JointGraphV02Result {
     int max_sparse_grid_level = 0;
     double max_sparse_grid_cancellation = 0.0;
     double max_tensor_sparse_difference = 0.0;
+    double tensor_sparse_posterior_tv = 0.0;
     JointGraphV02Options options;
 };
 

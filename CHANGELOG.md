@@ -10,10 +10,11 @@
   posterior-scale numerical error gating. The frozen 50,000-analysis JG-0.2.4
   run passed all FDR/power criteria among reportable fits but failed its
   completion gate, so the joint engine remains a research implementation.
-- Add posterior-aware evidence refinement through Gauss-Hermite order 21,
-  preserving the `0.01` posterior-error gate while targeting work to states
-  that can change the normalized posterior. Record refinement counts and
-  per-protein numerical diagnostics in family simulations.
+- Replace posterior-aware tensor refinement above order 13 with deterministic
+  Smolyak sparse-grid integration through level 12, preserving the `0.01`
+  posterior-error gate while targeting work to states that can change the
+  normalized posterior. Record sparse levels, cancellation, tensor-to-sparse
+  evidence differences, and posterior total variation.
 - Add strict joint-input validation, a stable named command-line interface,
   installation support, external-scale input preparation, and a parallel
   protein-manifest runner.

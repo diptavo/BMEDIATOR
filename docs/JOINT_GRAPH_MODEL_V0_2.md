@@ -47,6 +47,16 @@ the `0.01` posterior-error threshold and one-log-unit relevant-state cap are
 unchanged. This is a containment repair for rare difficult fits, not a
 scalable replacement for tensor quadrature.
 
+Patch `JG-0.2.7` keeps tensor Gauss-Hermite quadrature only through order 13.
+If the normalized-posterior error gate is still not met, it recomputes all 16
+state evidences with a Smolyak sparse grid at successive levels. The sparse
+grid begins with levels 5 and 6 and selectively refines posterior-influential
+states through level 12, whose largest one-dimensional rule has order 25.
+Signed Smolyak sums are accumulated separately in log space and fail closed if
+cancellation leaves insufficient numerical precision. The output records the
+sparse level, cancellation, tensor-to-sparse evidence change, and
+tensor-to-sparse posterior total variation.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -165,15 +175,18 @@ Every state is optimized from multiple deterministic starts. Its marginal
 likelihood is calculated with mode-centered adaptive Gauss-Hermite quadrature
 using the numerical posterior Hessian. Relevant states are refined from order
 3 to order 5 and, when needed, to orders 7, 9, 11, and 13. If normalized
-posterior error remains above `0.01`, `JG-0.2.6` refines influential states
-one order at a time through 15, 17, 19, and 21. The executable fails without a
-posterior if:
+posterior error remains above `0.01`, `JG-0.2.7` independently recomputes every
+state with Smolyak levels 5 and 6, then refines influential states one level at
+a time through level 12. Successive sparse levels provide the final evidence
+error radii. The executable fails without a posterior if:
 
 - any of the 16 state optimizations does not converge;
 - the posterior Hessian requires a ridge;
 - the worst-case normalized-posterior total-variation perturbation over the
   successive-quadrature error box exceeds `0.01`;
 - any relevant state's last successive log-evidence change exceeds one unit;
+- a signed sparse-grid sum is non-positive or loses numerical precision through
+  cancellation;
 - fewer than three independent A-role or B-role LD blocks are supplied;
 - the LD, scale, orientation, or sampling-correlation inputs are invalid.
 
@@ -218,10 +231,11 @@ a production engine. See the
 [held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
 [production-readiness assessment](PRODUCTION_READINESS.md).
 
-`JG-0.2.6` is a development repair for that failure and retains the same
-reportability threshold. Its higher-order tensor fallback is expensive and its
-successive-order discrepancy is a stability diagnostic rather than a proven
-bound on integration error. It therefore still requires independent numerical
+`JG-0.2.7` replaces the higher-order tensor fallback and retains the same
+reportability threshold. Its sparse-grid sequence has exact Gaussian-polynomial
+tests and deterministic historical regressions, but its successive-level
+discrepancy remains a stability diagnostic rather than a proven bound on
+integration error. It therefore still requires cluster-scale numerical
 validation and a new frozen family experiment before production use. The
 exact-alignment exclusion is a permanent interpretation boundary, not a
 software issue that can be removed by additional computation.

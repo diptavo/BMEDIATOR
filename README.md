@@ -5,9 +5,10 @@
 Version 1.2.0-dev 
 
 > **Development status:** The current research core is `bmediator-joint`
-> (`JG-0.2.6`), a single joint likelihood over RF, protein, and outcome
-> associations. `JG-0.2.6` is a development repair for the numerical failures
-> that caused the frozen `JG-0.2.4` validation to fail. It has not passed a new
+> (`JG-0.2.7`), a single joint likelihood over RF, protein, and outcome
+> associations. `JG-0.2.7` replaces the costly high-order tensor fallback with
+> deterministic Smolyak sparse-grid integration for numerically difficult
+> posteriors. It has not passed a new
 > frozen confirmatory validation and is not production-ready. It must not be
 > used for definitive mediation claims. See the
 > [held-out results](docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and

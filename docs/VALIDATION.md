@@ -2,7 +2,7 @@
 
 ## Current joint-model status
 
-The current research implementation is the JG-0.2.6 joint model in
+The current research implementation is the JG-0.2.7 joint model in
 `bmediator-joint`. The earlier JG-0.2.4 frozen 50,000-analysis family run passed all
 prespecified FDR and power criteria among reportable fits but failed the
 numerical-completion gate, with only 38 to 48 of 50 complete families in the
@@ -10,6 +10,12 @@ confirmatory scenarios. It is not a production engine. See
 [JG-0.2.4 held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md),
 [JG-0.2.6 development results](JOINT_GRAPH_V0_2_6_DEVELOPMENT_RESULTS.md), and
 [Production readiness](PRODUCTION_READINESS.md).
+
+JG-0.2.7 replaces only the high-order numerical fallback; the likelihood,
+state definitions, priors, and `0.01` posterior-error gate are unchanged. Its
+local exactness, regression, full-suite, and sanitizer tests pass. Historical
+failure replay and fresh small-scale family calibration on Biowulf remain
+required before this repair can advance.
 
 The sections below retain historical validation results for the legacy and
 factorized implementations. They must not be interpreted as validation of the

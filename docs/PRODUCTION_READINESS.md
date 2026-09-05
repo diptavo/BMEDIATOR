@@ -2,7 +2,7 @@
 
 ## Release decision
 
-`bmediator-joint` is the current implementation of the `JG-0.2.6` joint
+`bmediator-joint` is the current implementation of the `JG-0.2.7` joint
 Bayesian graph model. The older `bmediator` six-state and factorized modes are
 retained for reproducibility and compatibility; they are not substitutes for
 the joint model and must not be used to claim calibrated mediation.
@@ -41,10 +41,11 @@ Three different claims must remain separate:
   suppressed when the conservative normalized-posterior quadrature error
   exceeds `0.01` or a relevant state has a successive log-evidence difference
   above one.
-- When aggregate posterior uncertainty remains above `0.01`, influential
-  states are selectively refined through Gauss-Hermite order 21 without
-  changing the acceptance thresholds. The number of these refinements and the
-  maximum order are reported.
+- When aggregate posterior uncertainty remains above `0.01`, all state
+  evidences are independently recomputed with Smolyak sparse-grid quadrature;
+  posterior-influential states are then refined through sparse level 12 without
+  changing the acceptance thresholds. Sparse levels, cancellation, and
+  tensor-versus-sparse differences are reported.
 - Every output records the model version, identification boundary, priors,
   numerical tolerances, role/block counts, state probabilities, and numerical
   diagnostics.
@@ -87,11 +88,11 @@ Every result therefore states
 
 ### P0: required before routine real-data use
 
-- Replace or independently validate the order-21 tensor Gauss-Hermite fallback
-  with a reliable, scalable integrator and a defensible error estimate. The
-  current successive-order posterior diagnostic is designed to be conservative
-  but is not a mathematical upper bound on the true integration error.
-- Freeze `JG-0.2.6` or its successor and pass a new, adequately powered family
+- Complete independent cluster validation of the new sparse-grid fallback and
+  its cancellation safeguard. The successive-level posterior diagnostic is
+  designed to be conservative but is not a mathematical upper bound on the
+  true integration error.
+- Freeze `JG-0.2.7` or its successor and pass a new, adequately powered family
   calibration on untouched seeds without relaxing the `0.01` posterior-error
   criterion. Small development simulations do not satisfy this requirement.
 - Build and validate a cohort-specific pipeline from raw RF, pQTL, outcome,

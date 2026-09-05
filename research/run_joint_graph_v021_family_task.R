@@ -126,7 +126,8 @@ for (protein in seq_len(n_proteins)) {
         "estimated_quadrature_posterior_error", "max_quadrature_order",
         "posterior_aware_refinements", "sparse_grid_states",
         "max_sparse_grid_level", "max_sparse_grid_cancellation",
-        "max_tensor_sparse_difference", "states_regularized"
+        "max_tensor_sparse_difference", "tensor_sparse_posterior_tv",
+        "states_regularized"
     )
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,

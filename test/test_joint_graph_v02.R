@@ -28,11 +28,14 @@ moment_checks <- list(
     list(level = 6L, powers = c(2L, 2L, 2L, 0L, 0L), expected = 1 / 8),
     list(level = 6L, powers = c(4L, 2L, 0L), expected = 3 / 8),
     list(level = 3L, powers = 8L, expected = 105 / 16),
+    list(level = 12L, powers = 20L,
+         expected = prod(seq(1, 19, by = 2)) / 2^10),
     list(level = 6L, powers = c(1L, 0L, 0L, 0L), expected = 0)
 )
 for (check in moment_checks) {
     observed <- sparse_grid_moment(check$level, check$powers)
-    if (!is.finite(observed) || abs(observed - check$expected) > 1e-11) {
+    tolerance <- 1e-11 * max(1, abs(check$expected))
+    if (!is.finite(observed) || abs(observed - check$expected) > tolerance) {
         stop("Smolyak exact-moment check failed: observed=", observed,
              ", expected=", check$expected)
     }
@@ -141,6 +144,7 @@ for (index in seq_along(scenarios)) {
         max_sparse_grid_level = result$max_sparse_grid_level,
         max_sparse_grid_cancellation = result$max_sparse_grid_cancellation,
         max_tensor_sparse_difference = result$max_tensor_sparse_difference,
+        tensor_sparse_posterior_tv = result$tensor_sparse_posterior_tv,
         max_quadrature_order = result$max_quadrature_order,
         elapsed_seconds = timing[["elapsed"]],
         stringsAsFactors = FALSE

@@ -62,10 +62,10 @@ numerical-completion gate; see
 `docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md`. JG-0.2.4 is not a production
 engine.
 
-`JG-0.2.6` adds posterior-aware refinement through order 21 as a development
-repair. Its small-scale results are recorded in
-`docs/JOINT_GRAPH_V0_2_6_DEVELOPMENT_RESULTS.md`; they are not a replacement
-for a frozen confirmatory validation.
+`JG-0.2.7` replaces the JG-0.2.6 high-order tensor fallback with deterministic
+Smolyak sparse-grid integration for difficult posteriors. It retains the same
+joint model and fixed reporting gates. Cluster replay and new-seed development
+validation are required before a frozen confirmatory run.
 
 The evaluator accepts a tab-delimited file with columns:
 

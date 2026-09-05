@@ -93,12 +93,13 @@ for (i in seq_len(nrow(failed))) {
     diagnostic <- if (file.exists(stderr_path)) {
         paste(readLines(stderr_path, warn = FALSE), collapse = " ")
     } else ""
-    values <- setNames(rep(NA_real_, 10L), c(
+    values <- setNames(rep(NA_real_, 11L), c(
         "PP_two_path", "estimated_quadrature_posterior_error",
         "max_relevant_quadrature_difference", "max_quadrature_order",
         "posterior_aware_refinements", "sparse_grid_states",
         "max_sparse_grid_level", "max_sparse_grid_cancellation",
-        "max_tensor_sparse_difference", "states_regularized"
+        "max_tensor_sparse_difference", "tensor_sparse_posterior_tv",
+        "states_regularized"
     ))
     model_version <- NA_character_
     if (success) {
