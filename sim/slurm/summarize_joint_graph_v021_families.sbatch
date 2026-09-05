@@ -5,6 +5,7 @@
 
 set -euo pipefail
 source /etc/profile.d/modules.sh || true
+module load R/4.5.2
 
 : "${BMEDIATOR_DIR:?}"
 : "${OUT_ROOT:?}"
