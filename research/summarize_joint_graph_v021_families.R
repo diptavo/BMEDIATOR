@@ -18,7 +18,7 @@ expected <- 10L * replicates
 if (nrow(families) != expected) {
     stop("expected ", expected, " family summaries, found ", nrow(families))
 }
-if (any(families$model_version != "JG-0.2.6")) {
+if (any(families$model_version != "JG-0.2.7")) {
     stop("family outputs contain an unexpected model version")
 }
 

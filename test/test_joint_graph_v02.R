@@ -16,6 +16,28 @@ output_directory <- file.path(root, "build", "test", "joint_graph_v02")
 unlink(output_directory, recursive = TRUE)
 dir.create(output_directory, recursive = TRUE)
 
+sparse_grid_moment <- function(level, powers) {
+    as.numeric(system2(
+        binary,
+        c("--sparse-grid-moment", level, powers),
+        stdout = TRUE
+    ))
+}
+moment_checks <- list(
+    list(level = 6L, powers = rep(0L, 5L), expected = 1),
+    list(level = 6L, powers = c(2L, 2L, 2L, 0L, 0L), expected = 1 / 8),
+    list(level = 6L, powers = c(4L, 2L, 0L), expected = 3 / 8),
+    list(level = 3L, powers = 8L, expected = 105 / 16),
+    list(level = 6L, powers = c(1L, 0L, 0L, 0L), expected = 0)
+)
+for (check in moment_checks) {
+    observed <- sparse_grid_moment(check$level, check$powers)
+    if (!is.finite(observed) || abs(observed - check$expected) > 1e-11) {
+        stop("Smolyak exact-moment check failed: observed=", observed,
+             ", expected=", check$expected)
+    }
+}
+
 scenarios <- list(
     null = list(seed = 20263001),
     moderate_mediation = list(seed = 20263002, a = 0.40, b = 0.40),
@@ -94,7 +116,7 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.6")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.7")) stop("wrong model version")
     if (result$estimated_quadrature_posterior_error > 0.01 + 1e-10 ||
         result$max_relevant_quadrature_difference > 1 + 1e-10) {
         stop("successfully reported posterior failed quadrature stability")
@@ -115,6 +137,10 @@ for (index in seq_along(scenarios)) {
         estimated_quadrature_posterior_error =
             result$estimated_quadrature_posterior_error,
         posterior_aware_refinements = result$posterior_aware_refinements,
+        sparse_grid_states = result$sparse_grid_states,
+        max_sparse_grid_level = result$max_sparse_grid_level,
+        max_sparse_grid_cancellation = result$max_sparse_grid_cancellation,
+        max_tensor_sparse_difference = result$max_tensor_sparse_difference,
         max_quadrature_order = result$max_quadrature_order,
         elapsed_seconds = timing[["elapsed"]],
         stringsAsFactors = FALSE
@@ -166,14 +192,14 @@ require_result(small_weight_curvature_null$PP_two_path < 0.20,
                "small-weight curved null produced two-path support")
 require_result(posterior_accumulation_null$PP_two_path < 0.20,
                "historical aggregate-error null produced two-path support")
-require_result(posterior_accumulation_null$posterior_aware_refinements > 0,
-               "historical aggregate-error case did not trigger posterior-aware refinement")
+require_result(posterior_accumulation_null$sparse_grid_states == 16,
+               "historical aggregate-error case did not trigger sparse-grid validation")
 require_result(order19_null$PP_two_path < 0.20 &&
-               order19_null$max_quadrature_order >= 19,
-               "order-19 null regression was not resolved correctly")
+               order19_null$sparse_grid_states == 16,
+               "historical order-19 null regression was not resolved correctly")
 require_result(order21_sparse$PP_two_path < 0.80 &&
-               order21_sparse$max_quadrature_order >= 21,
-               "order-21 sparse regression was not resolved correctly")
+               order21_sparse$sparse_grid_states == 16,
+               "historical order-21 sparse regression was not resolved correctly")
 
 scale_fixture <- jg02_simulate(
     seed = 20263007,
@@ -261,11 +287,12 @@ require_result(!identical(unsafe_option_status, 0L),
 
 strict_options <- file.path(output_directory, "strict_options.tsv")
 strict_stderr <- file.path(output_directory, "strict_options.stderr.txt")
-writeLines("max_quadrature_posterior_error\t1e-12", strict_options)
+writeLines(c("max_quadrature_posterior_error\t0.007",
+             "max_sparse_grid_level\t6"), strict_options)
 strict_option_status <- suppressWarnings(system2(
     binary,
-    c(file.path(output_directory, "null.tsv"),
-      file.path(output_directory, "null.ld.tsv"),
+    c(file.path(output_directory, "order21_sparse.tsv"),
+      file.path(output_directory, "order21_sparse.ld.tsv"),
       file.path(output_directory, "strict_options.result.tsv"), strict_options),
     stdout = FALSE, stderr = strict_stderr
 ))
@@ -294,4 +321,4 @@ require_result(!identical(duplicate_input_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.6 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.7 adaptive, sparse-grid, LD, overlap, scale, and directional tests passed.\n")

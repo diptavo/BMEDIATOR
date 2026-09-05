@@ -93,10 +93,12 @@ for (i in seq_len(nrow(failed))) {
     diagnostic <- if (file.exists(stderr_path)) {
         paste(readLines(stderr_path, warn = FALSE), collapse = " ")
     } else ""
-    values <- setNames(rep(NA_real_, 6L), c(
+    values <- setNames(rep(NA_real_, 10L), c(
         "PP_two_path", "estimated_quadrature_posterior_error",
         "max_relevant_quadrature_difference", "max_quadrature_order",
-        "posterior_aware_refinements", "states_regularized"
+        "posterior_aware_refinements", "sparse_grid_states",
+        "max_sparse_grid_level", "max_sparse_grid_cancellation",
+        "max_tensor_sparse_difference", "states_regularized"
     ))
     model_version <- NA_character_
     if (success) {
@@ -120,7 +122,7 @@ write.table(result, output, sep = "\t", quote = FALSE, row.names = FALSE,
 cat("Replayed", nrow(result), "historical failures;",
     sum(result$success), "now reportable\n")
 if (!all(result$success)) quit(status = 2L)
-if (any(result$model_version != "JG-0.2.6") ||
+if (any(result$model_version != "JG-0.2.7") ||
     any(result$estimated_quadrature_posterior_error > 0.01)) {
-    stop("one or more replayed results violated JG-0.2.6 safeguards")
+    stop("one or more replayed results violated JG-0.2.7 safeguards")
 }

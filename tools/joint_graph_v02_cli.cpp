@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -56,6 +57,12 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
         else if (key == "quadrature_escalation_threshold") {
             result.quadrature_escalation_threshold = value;
         }
+        else if (key == "max_sparse_grid_level") {
+            if (value != std::floor(value)) {
+                throw std::runtime_error("max_sparse_grid_level must be an integer");
+            }
+            result.max_sparse_grid_level = static_cast<int>(value);
+        }
         else if (key == "min_role_blocks") {
             if (value != std::floor(value)) {
                 throw std::runtime_error("min_role_blocks must be an integer");
@@ -79,6 +86,8 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    const bool sparse_grid_moment_mode =
+        argc >= 4 && std::string(argv[1]) == "--sparse-grid-moment";
     const bool likelihood_mode = argc == 10 && std::string(argv[1]) == "--loglik";
     const bool integrated_q_mode =
         argc == 9 && std::string(argv[1]) == "--loglik-integrated-q";
@@ -93,14 +102,16 @@ int main(int argc, char** argv) {
                   << " A B C LAMBDA Q ETA\n"
                   << "       " << program
                   << " --loglik-integrated-q INPUT.tsv LD.tsv"
-                  << " A B C LAMBDA ETA\n";
+                  << " A B C LAMBDA ETA\n"
+                  << "       " << program
+                  << " --sparse-grid-moment LEVEL POWER [POWER ...]\n";
     };
     if (argc == 2 && std::string(argv[1]) == "--help") {
         print_usage();
         return 0;
     }
     if (argc == 2 && std::string(argv[1]) == "--version") {
-        std::cout << "BMEDIATOR joint model JG-0.2.6\n";
+        std::cout << "BMEDIATOR joint model JG-0.2.7\n";
         return 0;
     }
     if (argc < 2) {
@@ -108,6 +119,16 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
+        if (sparse_grid_moment_mode) {
+            const int level = std::stoi(argv[2]);
+            std::vector<int> powers;
+            for (int i = 3; i < argc; ++i) powers.push_back(std::stoi(argv[i]));
+            const double value =
+                bmediator::joint_graph_v02_sparse_grid_normalized_moment(
+                    powers, level);
+            std::cout << std::setprecision(17) << value << '\n';
+            return 0;
+        }
         std::string input_path;
         std::string ld_path;
         std::string output_path;

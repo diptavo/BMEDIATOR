@@ -13,7 +13,9 @@ results <- do.call(rbind, lapply(
 required <- c(
     "scenario", "success", "diagnostic", "elapsed_seconds",
     "estimated_quadrature_posterior_error", "max_quadrature_order",
-    "posterior_aware_refinements"
+    "posterior_aware_refinements", "sparse_grid_states",
+    "max_sparse_grid_level", "max_sparse_grid_cancellation",
+    "max_tensor_sparse_difference"
 )
 missing <- setdiff(required, names(results))
 if (length(missing)) stop("missing numerical columns: ", paste(missing, collapse = ", "))
@@ -31,8 +33,15 @@ summarize_one <- function(x, scenario) {
         failures = sum(!x$success),
         failure_rate = mean(!x$success),
         posterior_refined = sum(successful$posterior_aware_refinements > 0),
-        order_19_or_higher = sum(successful$max_quadrature_order >= 19),
-        order_21 = sum(successful$max_quadrature_order >= 21),
+        sparse_grid_fits = sum(successful$sparse_grid_states > 0),
+        sparse_level_10_or_higher = sum(successful$max_sparse_grid_level >= 10),
+        sparse_level_12 = sum(successful$max_sparse_grid_level >= 12),
+        max_sparse_cancellation = finite_quantile(
+            successful$max_sparse_grid_cancellation, 1.00
+        ),
+        max_tensor_sparse_difference = finite_quantile(
+            successful$max_tensor_sparse_difference, 1.00
+        ),
         median_posterior_error = finite_quantile(
             successful$estimated_quadrature_posterior_error, 0.50
         ),

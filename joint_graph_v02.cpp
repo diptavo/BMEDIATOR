@@ -60,6 +60,10 @@ struct StateFit {
     double adaptive_laplace_difference = 0.0;
     double quadrature_difference = 0.0;
     int quadrature_order = 3;
+    bool sparse_grid_active = false;
+    int sparse_grid_level = 0;
+    double sparse_grid_cancellation = 0.0;
+    double tensor_sparse_difference = 0.0;
     std::vector<double> mode;
     Matrix precision_lower;
     double log_precision_determinant = 0.0;
@@ -614,6 +618,9 @@ Matrix numerical_hessian(const std::function<double(const std::vector<double>&)>
 }
 
 std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
+    if (order == 1) {
+        return {{0.0}, {1.7724538509055160273}};
+    }
     if (order == 3) {
         return {{-1.224744871391589, 0.0, 1.224744871391589},
                 {0.2954089751509193, 1.1816359006036772,
@@ -754,31 +761,74 @@ std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
                  2.5712301800593154e-08, 8.8186112420499332e-11,
                  3.7203650701360227e-14}};
     }
+    if (order >= 23 && order <= 31 && order % 2 == 1) {
+        std::vector<double> nodes(order, 0.0);
+        std::vector<double> weights(order, 0.0);
+        const int roots = (order + 1) / 2;
+        double root = 0.0;
+        for (int i = 0; i < roots; ++i) {
+            if (i == 0) {
+                root = std::sqrt(2.0 * order + 1.0) -
+                    1.85575 * std::pow(2.0 * order + 1.0, -1.0 / 6.0);
+            } else if (i == 1) {
+                root -= 1.14 * std::pow(static_cast<double>(order), 0.426) /
+                    root;
+            } else if (i == 2) {
+                root = 1.86 * root - 0.86 * nodes[order - 1];
+            } else if (i == 3) {
+                root = 1.91 * root - 0.91 * nodes[order - 2];
+            } else {
+                root = 2.0 * root - nodes[order - i + 1];
+            }
+            double derivative = 0.0;
+            for (int iteration = 0; iteration < 20; ++iteration) {
+                double polynomial = std::pow(std::acos(-1.0), -0.25);
+                double previous = 0.0;
+                for (int degree = 1; degree <= order; ++degree) {
+                    const double older = previous;
+                    previous = polynomial;
+                    polynomial = root * std::sqrt(2.0 / degree) * previous -
+                        std::sqrt((degree - 1.0) / degree) * older;
+                }
+                derivative = std::sqrt(2.0 * order) * previous;
+                const double updated = root - polynomial / derivative;
+                if (std::fabs(updated - root) <= 1e-14) {
+                    root = updated;
+                    break;
+                }
+                root = updated;
+            }
+            nodes[i] = -root;
+            nodes[order - 1 - i] = root;
+            const double weight = 2.0 / (derivative * derivative);
+            weights[i] = weight;
+            weights[order - 1 - i] = weight;
+        }
+        return {nodes, weights};
+    }
     throw std::invalid_argument("unsupported adaptive quadrature order");
 }
 
-double adaptive_log_evidence(
+double tensor_log_integral(
     const StateFit& fit, const StateDefinition& state,
     const PreparedData& data, const JointGraphV02Options& options,
-    int order) {
-    const auto rule = quadrature_rule(order);
-    const auto& nodes = rule.first;
-    const auto& weights = rule.second;
+    const std::vector<int>& orders) {
     const int dimension = static_cast<int>(fit.mode.size());
-    std::vector<double> log_terms;
-    int count = 1;
-    for (int i = 0; i < dimension; ++i) count *= order;
-    log_terms.reserve(count);
     std::vector<double> z(dimension, 0.0);
+    std::vector<std::pair<std::vector<double>, std::vector<double>>> rules;
+    rules.reserve(dimension);
+    for (int order : orders) rules.push_back(quadrature_rule(order));
+    double log_total = -std::numeric_limits<double>::infinity();
 
     std::function<void(int, double, double)> visit = [&](int position,
                                                          double log_weight,
                                                          double z_squared) {
         if (position < dimension) {
-            for (int i = 0; i < order; ++i) {
-                z[position] = nodes[i];
-                visit(position + 1, log_weight + std::log(weights[i]),
-                      z_squared + nodes[i] * nodes[i]);
+            const auto& rule = rules[position];
+            for (int i = 0; i < orders[position]; ++i) {
+                z[position] = rule.first[i];
+                visit(position + 1, log_weight + std::log(rule.second[i]),
+                      z_squared + rule.first[i] * rule.first[i]);
             }
             return;
         }
@@ -792,11 +842,106 @@ double adaptive_log_evidence(
         }
         std::vector<double> point = fit.mode;
         for (int i = 0; i < dimension; ++i) point[i] += delta[i];
-        log_terms.push_back(log_kernel(point, state, data, options) +
-                            log_weight + z_squared);
+        log_total = log_add_exp(
+            log_total,
+            log_kernel(point, state, data, options) + log_weight + z_squared);
     };
     visit(0, 0.0, 0.0);
-    return log_sum_exp(log_terms) + 0.5 * dimension * std::log(2.0) -
+    return log_total;
+}
+
+double adaptive_log_evidence(
+    const StateFit& fit, const StateDefinition& state,
+    const PreparedData& data, const JointGraphV02Options& options,
+    int order) {
+    const int dimension = static_cast<int>(fit.mode.size());
+    return tensor_log_integral(
+        fit, state, data, options, std::vector<int>(dimension, order)) +
+        0.5 * dimension * std::log(2.0) -
+        0.5 * fit.log_precision_determinant;
+}
+
+long long binomial_coefficient(int n, int k) {
+    if (k < 0 || k > n) return 0;
+    k = std::min(k, n - k);
+    long long result = 1;
+    for (int i = 1; i <= k; ++i) {
+        result = result * (n - k + i) / i;
+    }
+    return result;
+}
+
+template <typename Visitor>
+void visit_smolyak_components(int dimension, int level_increment,
+                               const Visitor& visitor) {
+    const int q = dimension + level_increment;
+    std::vector<int> levels(dimension, 1);
+    std::function<void(int, int)> visit = [&](int position, int level_sum) {
+        if (position == dimension) {
+            const int alternating_index = q - level_sum;
+            if (alternating_index < 0 || alternating_index >= dimension) return;
+            const long long magnitude =
+                binomial_coefficient(dimension - 1, alternating_index);
+            const long long coefficient = alternating_index % 2
+                ? -magnitude : magnitude;
+            visitor(levels, coefficient);
+            return;
+        }
+        const int remaining = dimension - position - 1;
+        const int maximum_level = level_increment + 1;
+        for (int level = 1; level <= maximum_level; ++level) {
+            const int partial_sum = level_sum + level;
+            if (partial_sum + remaining > q) break;
+            if (partial_sum + remaining * maximum_level < q - dimension + 1) {
+                continue;
+            }
+            levels[position] = level;
+            visit(position + 1, partial_sum);
+        }
+    };
+    visit(0, 0);
+}
+
+double sparse_grid_log_evidence(
+    const StateFit& fit, const StateDefinition& state,
+    const PreparedData& data, const JointGraphV02Options& options,
+    int level_increment, double& cancellation) {
+    const int dimension = static_cast<int>(fit.mode.size());
+    double positive = -std::numeric_limits<double>::infinity();
+    double negative = -std::numeric_limits<double>::infinity();
+    visit_smolyak_components(
+        dimension, level_increment,
+        [&](const std::vector<int>& levels, long long coefficient) {
+            std::vector<int> orders(dimension);
+            for (int i = 0; i < dimension; ++i) {
+                orders[i] = 2 * levels[i] - 1;
+            }
+            const double term = std::log(std::fabs(
+                static_cast<double>(coefficient))) +
+                tensor_log_integral(fit, state, data, options, orders);
+            if (coefficient > 0) positive = log_add_exp(positive, term);
+            else negative = log_add_exp(negative, term);
+        });
+    if (!std::isfinite(positive)) {
+        throw std::runtime_error("sparse-grid integration produced no positive mass");
+    }
+    long double retained = 1.0L;
+    cancellation = 0.0;
+    if (std::isfinite(negative)) {
+        const long double log_ratio =
+            static_cast<long double>(negative - positive);
+        if (!(log_ratio < 0.0L)) {
+            throw std::runtime_error("sparse-grid integration produced non-positive mass");
+        }
+        cancellation = static_cast<double>(std::exp(log_ratio));
+        retained = -std::expm1(log_ratio);
+        if (!(retained > 1e-12L)) {
+            throw std::runtime_error(
+                "sparse-grid integration lost precision through cancellation");
+        }
+    }
+    return positive + std::log(static_cast<double>(retained)) +
+        0.5 * dimension * std::log(2.0) -
         0.5 * fit.log_precision_determinant;
 }
 
@@ -877,6 +1022,47 @@ void refine_state_quadrature(
     }
 }
 
+void activate_sparse_grid(
+    StateFit& fit, const StateDefinition& state, const PreparedData& data,
+    const JointGraphV02Options& options) {
+    constexpr int initial_level = 6;
+    double previous_cancellation = 0.0;
+    double current_cancellation = 0.0;
+    const double tensor_evidence = fit.log_evidence;
+    const double previous = sparse_grid_log_evidence(
+        fit, state, data, options, initial_level - 1,
+        previous_cancellation);
+    const double current = sparse_grid_log_evidence(
+        fit, state, data, options, initial_level, current_cancellation);
+    fit.log_evidence = current;
+    fit.quadrature_difference = std::fabs(current - previous);
+    fit.sparse_grid_active = true;
+    fit.sparse_grid_level = initial_level;
+    fit.sparse_grid_cancellation = std::max(
+        previous_cancellation, current_cancellation);
+    fit.tensor_sparse_difference = std::fabs(current - tensor_evidence);
+    fit.quadrature_order = 2 * initial_level + 1;
+}
+
+bool refine_sparse_grid_once(
+    StateFit& fit, const StateDefinition& state, const PreparedData& data,
+    const JointGraphV02Options& options, int maximum_level) {
+    if (!fit.sparse_grid_active || fit.sparse_grid_level >= maximum_level) {
+        return false;
+    }
+    const int level = fit.sparse_grid_level + 1;
+    double cancellation = 0.0;
+    const double evidence = sparse_grid_log_evidence(
+        fit, state, data, options, level, cancellation);
+    fit.quadrature_difference = std::fabs(evidence - fit.log_evidence);
+    fit.log_evidence = evidence;
+    fit.sparse_grid_level = level;
+    fit.sparse_grid_cancellation = std::max(
+        fit.sparse_grid_cancellation, cancellation);
+    fit.quadrature_order = 2 * level + 1;
+    return true;
+}
+
 double bernoulli_log_probability(int indicator, double probability) {
     return indicator ? std::log(probability) : std::log1p(-probability);
 }
@@ -939,6 +1125,32 @@ std::array<double, 16> normalized_state_probabilities(
         probabilities[i] = std::exp(log_joint[i] - normalizer);
     }
     return probabilities;
+}
+
+long double normalized_rule_moment(int order, int power) {
+    const auto rule = quadrature_rule(order);
+    long double result = 0.0L;
+    for (int i = 0; i < order; ++i) {
+        result += static_cast<long double>(rule.second[i]) *
+            std::pow(static_cast<long double>(rule.first[i]), power);
+    }
+    return result / std::sqrt(std::acos(-1.0L));
+}
+
+long double sparse_grid_normalized_moment_impl(
+    const std::vector<int>& powers, int level_increment) {
+    long double result = 0.0L;
+    visit_smolyak_components(
+        static_cast<int>(powers.size()), level_increment,
+        [&](const std::vector<int>& levels, long long coefficient) {
+            long double component = static_cast<long double>(coefficient);
+            for (int i = 0; i < static_cast<int>(powers.size()); ++i) {
+                component *= normalized_rule_moment(
+                    2 * levels[i] - 1, powers[i]);
+            }
+            result += component;
+        });
+    return result;
 }
 
 void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
@@ -1030,6 +1242,7 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
           options.max_evidence_discrepancy > 0.0 &&
           options.quadrature_escalation_threshold > 0.0 &&
           options.max_quadrature_posterior_error > 0.0 &&
+          options.max_sparse_grid_level >= 6 &&
           options.min_role_blocks >= 2)) {
         throw std::invalid_argument("continuous priors or optimizer options are invalid");
     }
@@ -1042,6 +1255,7 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
               release.quadrature_escalation_threshold &&
           options.max_quadrature_posterior_error <=
               release.max_quadrature_posterior_error &&
+          options.max_sparse_grid_level <= release.max_sparse_grid_level &&
           options.min_role_blocks >= release.min_role_blocks &&
           options.optimizer_iterations >= release.optimizer_iterations &&
           options.optimizer_tolerance <= release.optimizer_tolerance)) {
@@ -1051,6 +1265,23 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
 }
 
 }  // namespace
+
+double joint_graph_v02_sparse_grid_normalized_moment(
+    const std::vector<int>& powers, int level_increment) {
+    if (powers.empty() || powers.size() > 5) {
+        throw std::invalid_argument("sparse-grid moment dimension must be 1 to 5");
+    }
+    if (level_increment < 0 || level_increment > 15) {
+        throw std::invalid_argument("sparse-grid level increment must be 0 to 15");
+    }
+    for (int power : powers) {
+        if (power < 0 || power > 20) {
+            throw std::invalid_argument("sparse-grid moment powers must be 0 to 20");
+        }
+    }
+    return static_cast<double>(
+        sparse_grid_normalized_moment_impl(powers, level_increment));
+}
 
 const std::array<std::string, 16>& joint_graph_v02_state_names() {
     static const std::array<std::string, 16> names{{
@@ -1207,8 +1438,19 @@ JointGraphV02Result fit_joint_graph_v02(
     }
 
     int posterior_aware_refinements = 0;
-    for (int pass = 0; pass < 64; ++pass) {
-        const auto probabilities = normalized_state_probabilities(log_joint);
+    int sparse_grid_states = 0;
+    auto probabilities = normalized_state_probabilities(log_joint);
+    if (posterior_corner_perturbation(probabilities, fits) >
+        options.max_quadrature_posterior_error) {
+        for (int i = 0; i < 16; ++i) {
+            activate_sparse_grid(fits[i], states[i], data, options);
+            log_joint[i] = fits[i].log_evidence +
+                state_log_prior(states[i], options);
+            ++sparse_grid_states;
+        }
+    }
+    for (int pass = 0; pass < 128; ++pass) {
+        probabilities = normalized_state_probabilities(log_joint);
         if (posterior_corner_perturbation(probabilities, fits) <=
             options.max_quadrature_posterior_error) {
             break;
@@ -1216,7 +1458,8 @@ JointGraphV02Result fit_joint_graph_v02(
         int candidate = -1;
         double largest_contribution = -1.0;
         for (int i = 0; i < 16; ++i) {
-            if (probabilities[i] <= 1e-6 || fits[i].quadrature_order >= 21) {
+            if (probabilities[i] <= 1e-8 || !fits[i].sparse_grid_active ||
+                fits[i].sparse_grid_level >= options.max_sparse_grid_level) {
                 continue;
             }
             const double contribution =
@@ -1226,8 +1469,9 @@ JointGraphV02Result fit_joint_graph_v02(
                 candidate = i;
             }
         }
-        if (candidate < 0 || !refine_state_once(
-                fits[candidate], states[candidate], data, options, 21)) {
+        if (candidate < 0 || !refine_sparse_grid_once(
+                fits[candidate], states[candidate], data, options,
+                options.max_sparse_grid_level)) {
             break;
         }
         log_joint[candidate] = fits[candidate].log_evidence +
@@ -1239,6 +1483,7 @@ JointGraphV02Result fit_joint_graph_v02(
     result.log_evidence = log_sum_exp(log_joint);
     result.options = options;
     result.posterior_aware_refinements = posterior_aware_refinements;
+    result.sparse_grid_states = sparse_grid_states;
     result.max_ignored_ld = data.max_ignored_ld;
     result.n_blocks = static_cast<int>(data.blocks.size());
     std::map<char, std::set<std::string>> role_blocks;
@@ -1259,6 +1504,11 @@ JointGraphV02Result fit_joint_graph_v02(
         result.state_log_evidence[i] = fits[i].log_evidence;
         result.state_quadrature_difference[i] = fits[i].quadrature_difference;
         result.state_quadrature_order[i] = fits[i].quadrature_order;
+        result.state_sparse_grid_level[i] = fits[i].sparse_grid_level;
+        result.state_sparse_grid_cancellation[i] =
+            fits[i].sparse_grid_cancellation;
+        result.state_tensor_sparse_difference[i] =
+            fits[i].tensor_sparse_difference;
         result.state_pp[i] = std::exp(log_joint[i] - result.log_evidence);
         result.states_converged += fits[i].converged;
         result.states_regularized += fits[i].regularized;
@@ -1267,6 +1517,16 @@ JointGraphV02Result fit_joint_graph_v02(
             fits[i].adaptive_laplace_difference);
         result.max_quadrature_order = std::max(
             result.max_quadrature_order, fits[i].quadrature_order);
+        if (fits[i].sparse_grid_active) {
+            result.max_sparse_grid_level = std::max(
+                result.max_sparse_grid_level, fits[i].sparse_grid_level);
+            result.max_sparse_grid_cancellation = std::max(
+                result.max_sparse_grid_cancellation,
+                fits[i].sparse_grid_cancellation);
+            result.max_tensor_sparse_difference = std::max(
+                result.max_tensor_sparse_difference,
+                fits[i].tensor_sparse_difference);
+        }
         if (result.state_pp[i] > 1e-6) {
             result.max_relevant_evidence_difference = std::max(
                 result.max_relevant_evidence_difference,
@@ -1300,11 +1560,16 @@ JointGraphV02Result fit_joint_graph_v02(
             options.max_quadrature_posterior_error) {
         std::ostringstream message;
         message << std::setprecision(17)
-                << "adaptive quadrature did not converge"
+                << "posterior integration did not converge"
                 << " (posterior_error="
                 << result.estimated_quadrature_posterior_error
                 << ", max_relevant_quadrature_difference="
                 << result.max_relevant_quadrature_difference
+                << ", sparse_grid_states=" << result.sparse_grid_states
+                << ", max_sparse_grid_level="
+                << result.max_sparse_grid_level
+                << ", max_sparse_grid_cancellation="
+                << result.max_sparse_grid_cancellation
                 << ", regularized_states=" << result.states_regularized
                 << "); no posterior is reportable";
         throw std::runtime_error(message.str());
@@ -1362,6 +1627,15 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
     for (const auto& state : joint_graph_v02_state_names()) {
         output << "\tquadrature_order_" << state;
     }
+    for (const auto& state : joint_graph_v02_state_names()) {
+        output << "\tsparse_grid_level_" << state;
+    }
+    for (const auto& state : joint_graph_v02_state_names()) {
+        output << "\tsparse_grid_cancellation_" << state;
+    }
+    for (const auto& state : joint_graph_v02_state_names()) {
+        output << "\ttensor_sparse_difference_" << state;
+    }
     output << "\tPP_XM\tPP_global_MY\tPP_sparse_P\tPP_directional_P"
            << "\tPP_any_P\tPP_two_path\tlog_evidence\tn_blocks"
            << "\tmax_block_size\tn_role_a\tn_role_b\tn_role_c"
@@ -1372,18 +1646,29 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tmax_relevant_quadrature_difference"
            << "\testimated_quadrature_posterior_error\tmax_quadrature_order"
            << "\tposterior_aware_refinements"
+           << "\tsparse_grid_states\tmax_sparse_grid_level"
+           << "\tmax_sparse_grid_cancellation"
+           << "\tmax_tensor_sparse_difference"
            << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional"
            << "\tprior_sd_a\tprior_sd_b\tprior_sd_c\tprior_sd_lambda"
            << "\tprior_sd_eta\tq_alpha\tq_beta\tmax_cross_block_ld"
            << "\tmax_evidence_discrepancy"
            << "\tquadrature_escalation_threshold"
-           << "\tmax_quadrature_posterior_error\tmin_role_blocks"
+           << "\tmax_quadrature_posterior_error"
+           << "\tmax_sparse_grid_level_option\tmin_role_blocks"
            << "\toptimizer_iterations\toptimizer_tolerance\n";
-    output << "JG-0.2.6\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.7\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     for (double value : result.state_quadrature_difference) output << '\t' << value;
     for (int value : result.state_quadrature_order) output << '\t' << value;
+    for (int value : result.state_sparse_grid_level) output << '\t' << value;
+    for (double value : result.state_sparse_grid_cancellation) {
+        output << '\t' << value;
+    }
+    for (double value : result.state_tensor_sparse_difference) {
+        output << '\t' << value;
+    }
     output << '\t' << result.pp_xm
            << '\t' << result.pp_global_my
            << '\t' << result.pp_sparse_pleio
@@ -1408,6 +1693,10 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.estimated_quadrature_posterior_error
            << '\t' << result.max_quadrature_order
            << '\t' << result.posterior_aware_refinements
+           << '\t' << result.sparse_grid_states
+           << '\t' << result.max_sparse_grid_level
+           << '\t' << result.max_sparse_grid_cancellation
+           << '\t' << result.max_tensor_sparse_difference
            << '\t' << result.options.pi_xm
            << '\t' << result.options.pi_my
            << '\t' << result.options.pi_sparse
@@ -1423,6 +1712,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.options.max_evidence_discrepancy
            << '\t' << result.options.quadrature_escalation_threshold
            << '\t' << result.options.max_quadrature_posterior_error
+           << '\t' << result.options.max_sparse_grid_level
            << '\t' << result.options.min_role_blocks
            << '\t' << result.options.optimizer_iterations
            << '\t' << result.options.optimizer_tolerance << '\n';

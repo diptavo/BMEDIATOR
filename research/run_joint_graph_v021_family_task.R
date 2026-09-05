@@ -124,12 +124,14 @@ for (protein in seq_len(n_proteins)) {
         "PP_any_P", "PP_two_path", "max_relevant_evidence_difference",
         "max_relevant_quadrature_difference",
         "estimated_quadrature_posterior_error", "max_quadrature_order",
-        "posterior_aware_refinements", "states_regularized"
+        "posterior_aware_refinements", "sparse_grid_states",
+        "max_sparse_grid_level", "max_sparse_grid_cancellation",
+        "max_tensor_sparse_difference", "states_regularized"
     )
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,
                              stringsAsFactors = FALSE)
-        if (!identical(result$model_version, "JG-0.2.6")) {
+        if (!identical(result$model_version, "JG-0.2.7")) {
             stop("unexpected joint model version: ", result$model_version)
         }
         values <- result[result_columns]
@@ -191,7 +193,7 @@ metric <- function(selected) {
 bfdr <- metric(protein_results$selected_bfdr05)
 pp80 <- metric(protein_results$selected_pp80)
 summary <- data.frame(
-    model_version = "JG-0.2.6",
+    model_version = "JG-0.2.7",
     scenario = scenario_name,
     replicate = replicate,
     family_seed = family_seed,

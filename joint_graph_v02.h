@@ -43,6 +43,7 @@ struct JointGraphV02Options {
     double max_evidence_discrepancy = 1.0;
     double quadrature_escalation_threshold = 0.05;
     double max_quadrature_posterior_error = 0.01;
+    int max_sparse_grid_level = 12;
     int min_role_blocks = 3;
     int optimizer_iterations = 1500;
     double optimizer_tolerance = 1e-6;
@@ -53,6 +54,9 @@ struct JointGraphV02Result {
     std::array<double, 16> state_log_evidence{};
     std::array<double, 16> state_quadrature_difference{};
     std::array<int, 16> state_quadrature_order{};
+    std::array<int, 16> state_sparse_grid_level{};
+    std::array<double, 16> state_sparse_grid_cancellation{};
+    std::array<double, 16> state_tensor_sparse_difference{};
     double pp_xm = 0.0;
     double pp_global_my = 0.0;
     double pp_sparse_pleio = 0.0;
@@ -77,6 +81,10 @@ struct JointGraphV02Result {
     double estimated_quadrature_posterior_error = 0.0;
     int max_quadrature_order = 3;
     int posterior_aware_refinements = 0;
+    int sparse_grid_states = 0;
+    int max_sparse_grid_level = 0;
+    double max_sparse_grid_cancellation = 0.0;
+    double max_tensor_sparse_difference = 0.0;
     JointGraphV02Options options;
 };
 
@@ -105,6 +113,9 @@ double joint_graph_v02_log_likelihood_integrated_q(
     const std::vector<std::vector<double>>& ld,
     double a, double b, double c_path, double lambda, double eta,
     const JointGraphV02Options& options = JointGraphV02Options());
+
+double joint_graph_v02_sparse_grid_normalized_moment(
+    const std::vector<int>& powers, int level_increment);
 
 void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
                                       const std::string& path);
