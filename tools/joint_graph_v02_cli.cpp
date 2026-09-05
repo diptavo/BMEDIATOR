@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (argc == 2 && std::string(argv[1]) == "--version") {
-        std::cout << "BMEDIATOR joint model JG-0.2.7\n";
+        std::cout << "BMEDIATOR joint model JG-0.2.8\n";
         return 0;
     }
     if (argc < 2) {

@@ -64,6 +64,7 @@ struct StateFit {
     int sparse_grid_level = 0;
     double sparse_grid_cancellation = 0.0;
     double tensor_sparse_difference = 0.0;
+    std::map<std::vector<int>, double> sparse_component_log_integral;
     std::vector<double> mode;
     Matrix precision_lower;
     double log_precision_determinant = 0.0;
@@ -903,7 +904,7 @@ void visit_smolyak_components(int dimension, int level_increment,
 }
 
 double sparse_grid_log_evidence(
-    const StateFit& fit, const StateDefinition& state,
+    StateFit& fit, const StateDefinition& state,
     const PreparedData& data, const JointGraphV02Options& options,
     int level_increment, double& cancellation) {
     const int dimension = static_cast<int>(fit.mode.size());
@@ -912,13 +913,20 @@ double sparse_grid_log_evidence(
     visit_smolyak_components(
         dimension, level_increment,
         [&](const std::vector<int>& levels, long long coefficient) {
-            std::vector<int> orders(dimension);
-            for (int i = 0; i < dimension; ++i) {
-                orders[i] = 2 * levels[i] - 1;
+            auto cached = fit.sparse_component_log_integral.find(levels);
+            if (cached == fit.sparse_component_log_integral.end()) {
+                std::vector<int> orders(dimension);
+                for (int i = 0; i < dimension; ++i) {
+                    orders[i] = 2 * levels[i] - 1;
+                }
+                const double integral = tensor_log_integral(
+                    fit, state, data, options, orders);
+                cached = fit.sparse_component_log_integral.emplace(
+                    levels, integral).first;
             }
             const double term = std::log(std::fabs(
                 static_cast<double>(coefficient))) +
-                tensor_log_integral(fit, state, data, options, orders);
+                cached->second;
             if (coefficient > 0) positive = log_add_exp(positive, term);
             else negative = log_add_exp(negative, term);
         });
@@ -1662,7 +1670,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tmax_quadrature_posterior_error"
            << "\tmax_sparse_grid_level_option\tmin_role_blocks"
            << "\toptimizer_iterations\toptimizer_tolerance\n";
-    output << "JG-0.2.7\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.8\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     for (double value : result.state_quadrature_difference) output << '\t' << value;

@@ -123,7 +123,7 @@ write.table(result, output, sep = "\t", quote = FALSE, row.names = FALSE,
 cat("Replayed", nrow(result), "historical failures;",
     sum(result$success), "now reportable\n")
 if (!all(result$success)) quit(status = 2L)
-if (any(result$model_version != "JG-0.2.7") ||
+if (any(result$model_version != "JG-0.2.8") ||
     any(result$estimated_quadrature_posterior_error > 0.01)) {
-    stop("one or more replayed results violated JG-0.2.7 safeguards")
+    stop("one or more replayed results violated JG-0.2.8 safeguards")
 }

@@ -59,14 +59,19 @@ scenarios <- list(
     posterior_accumulation_null = list(seed = 50504004),
     order19_null = list(seed = 60604006),
     order21_sparse = list(seed = 60702061, a = 0.60,
-                          lambda = 0.70, q = 0.35)
+                          lambda = 0.70, q = 0.35),
+    jg027_mixed_failure = list(seed = 80802097, blocks = 30L,
+                               a = 0.40, b = 0.40,
+                               lambda = 0.70, q = 0.35),
+    jg027_strong_ld_failure = list(seed = 80909080, ld_rho = 0.70)
 )
 
 rows <- vector("list", length(scenarios))
 for (index in seq_along(scenarios)) {
     name <- names(scenarios)[index]
-    arguments <- c(list(blocks = 20L, variants_per_block = 2L),
-                   scenarios[[index]])
+    arguments <- modifyList(
+        list(blocks = 20L, variants_per_block = 2L), scenarios[[index]]
+    )
     fixture <- do.call(jg02_simulate, arguments)
     input <- file.path(output_directory, paste0(name, ".tsv"))
     ld_path <- file.path(output_directory, paste0(name, ".ld.tsv"))
@@ -119,7 +124,7 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.7")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.8")) stop("wrong model version")
     if (result$estimated_quadrature_posterior_error > 0.01 + 1e-10 ||
         result$max_relevant_quadrature_difference > 1 + 1e-10) {
         stop("successfully reported posterior failed quadrature stability")
@@ -173,6 +178,8 @@ small_weight_curvature_null <- row_for("small_weight_curvature_null")
 posterior_accumulation_null <- row_for("posterior_accumulation_null")
 order19_null <- row_for("order19_null")
 order21_sparse <- row_for("order21_sparse")
+jg027_mixed_failure <- row_for("jg027_mixed_failure")
+jg027_strong_ld_failure <- row_for("jg027_strong_ld_failure")
 require_result(null$PP_two_path < 0.20, "null produced two-path support")
 require_result(mediation$PP_two_path > 0.80,
                "off-grid moderate mediation was not recovered")
@@ -204,6 +211,12 @@ require_result(order19_null$PP_two_path < 0.20 &&
 require_result(order21_sparse$PP_two_path < 0.80 &&
                order21_sparse$sparse_grid_states == 16,
                "historical order-21 sparse regression was not resolved correctly")
+require_result(jg027_mixed_failure$PP_two_path > 0.80 &&
+               jg027_mixed_failure$sparse_grid_states == 16,
+               "JG-0.2.7 mixed-case numerical failure was not repaired")
+require_result(jg027_strong_ld_failure$PP_two_path < 0.20 &&
+               jg027_strong_ld_failure$sparse_grid_states == 16,
+               "JG-0.2.7 strong-LD null numerical failure was not repaired")
 
 scale_fixture <- jg02_simulate(
     seed = 20263007,
@@ -325,4 +338,4 @@ require_result(!identical(duplicate_input_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.7 adaptive, sparse-grid, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.8 adaptive, sparse-grid, LD, overlap, scale, and directional tests passed.\n")

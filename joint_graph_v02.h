@@ -43,7 +43,7 @@ struct JointGraphV02Options {
     double max_evidence_discrepancy = 1.0;
     double quadrature_escalation_threshold = 0.05;
     double max_quadrature_posterior_error = 0.01;
-    int max_sparse_grid_level = 12;
+    int max_sparse_grid_level = 15;
     int min_role_blocks = 3;
     int optimizer_iterations = 1500;
     double optimizer_tolerance = 1e-6;

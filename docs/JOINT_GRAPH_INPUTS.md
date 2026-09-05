@@ -1,6 +1,6 @@
 # Joint-model input contract
 
-`bmediator-joint` runs the `JG-0.2.7` joint Bayesian model for one protein. It
+`bmediator-joint` runs the `JG-0.2.8` joint Bayesian model for one protein. It
 does not select variants or estimate nuisance scales from the same analyzed
 associations. Inputs must be harmonized and prepared before this command is
 used.

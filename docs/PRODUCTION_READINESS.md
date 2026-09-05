@@ -2,7 +2,7 @@
 
 ## Release decision
 
-`bmediator-joint` is the current implementation of the `JG-0.2.7` joint
+`bmediator-joint` is the current implementation of the `JG-0.2.8` joint
 Bayesian graph model. The older `bmediator` six-state and factorized modes are
 retained for reproducibility and compatibility; they are not substitutes for
 the joint model and must not be used to claim calibrated mediation.
@@ -43,7 +43,7 @@ Three different claims must remain separate:
   above one.
 - When aggregate posterior uncertainty remains above `0.01`, all state
   evidences are independently recomputed with Smolyak sparse-grid quadrature;
-  posterior-influential states are then refined through sparse level 12 without
+  posterior-influential states are then refined through sparse level 15 without
   changing the acceptance thresholds. Sparse levels, cancellation, and
   tensor-versus-sparse differences are reported.
 - Every output records the model version, identification boundary, priors,
@@ -92,7 +92,7 @@ Every result therefore states
   its cancellation safeguard. The successive-level posterior diagnostic is
   designed to be conservative but is not a mathematical upper bound on the
   true integration error.
-- Freeze `JG-0.2.7` or its successor and pass a new, adequately powered family
+- Freeze `JG-0.2.8` or its successor and pass a new, adequately powered family
   calibration on untouched seeds without relaxing the `0.01` posterior-error
   criterion. Small development simulations do not satisfy this requirement.
 - Build and validate a cohort-specific pipeline from raw RF, pQTL, outcome,

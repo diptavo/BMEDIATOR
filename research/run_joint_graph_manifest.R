@@ -63,7 +63,7 @@ run_one <- function(index) {
     required_result <- c("model_version", "PP_two_path")
     valid_result <- nrow(result) == 1L &&
         all(required_result %in% names(result)) &&
-        identical(result$model_version, "JG-0.2.7") &&
+        identical(result$model_version, "JG-0.2.8") &&
         is.finite(result$PP_two_path) &&
         result$PP_two_path >= 0 && result$PP_two_path <= 1
     if (!valid_result) {

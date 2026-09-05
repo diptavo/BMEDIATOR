@@ -57,6 +57,12 @@ cancellation leaves insufficient numerical precision. The output records the
 sparse level, cancellation, tensor-to-sparse evidence change, and
 tensor-to-sparse posterior total variation.
 
+Patch `JG-0.2.8` caches each state-specific tensor component across successive
+Smolyak levels and extends the bounded sparse sequence through level 15
+(maximum one-dimensional order 31). This addresses two JG-0.2.7 development
+fits that exhausted level 12 while preserving the same likelihood and
+reportability thresholds.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -175,9 +181,9 @@ Every state is optimized from multiple deterministic starts. Its marginal
 likelihood is calculated with mode-centered adaptive Gauss-Hermite quadrature
 using the numerical posterior Hessian. Relevant states are refined from order
 3 to order 5 and, when needed, to orders 7, 9, 11, and 13. If normalized
-posterior error remains above `0.01`, `JG-0.2.7` independently recomputes every
+posterior error remains above `0.01`, `JG-0.2.8` independently recomputes every
 state with Smolyak levels 5 and 6, then refines influential states one level at
-a time through level 12. Successive sparse levels provide the final evidence
+a time through level 15. Successive sparse levels provide the final evidence
 error radii. The executable fails without a posterior if:
 
 - any of the 16 state optimizations does not converge;
@@ -231,7 +237,7 @@ a production engine. See the
 [held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
 [production-readiness assessment](PRODUCTION_READINESS.md).
 
-`JG-0.2.7` replaces the higher-order tensor fallback and retains the same
+`JG-0.2.8` replaces the higher-order tensor fallback and retains the same
 reportability threshold. Its sparse-grid sequence has exact Gaussian-polynomial
 tests and deterministic historical regressions, but its successive-level
 discrepancy remains a stability diagnostic rather than a proven bound on

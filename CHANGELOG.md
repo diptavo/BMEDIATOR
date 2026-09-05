@@ -11,7 +11,7 @@
   run passed all FDR/power criteria among reportable fits but failed its
   completion gate, so the joint engine remains a research implementation.
 - Replace posterior-aware tensor refinement above order 13 with deterministic
-  Smolyak sparse-grid integration through level 12, preserving the `0.01`
+  cached Smolyak sparse-grid integration through level 15, preserving the `0.01`
   posterior-error gate while targeting work to states that can change the
   normalized posterior. Record sparse levels, cancellation, tensor-to-sparse
   evidence differences, and posterior total variation.

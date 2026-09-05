@@ -34,8 +34,8 @@ summarize_one <- function(x, scenario) {
         failure_rate = mean(!x$success),
         posterior_refined = sum(successful$posterior_aware_refinements > 0),
         sparse_grid_fits = sum(successful$sparse_grid_states > 0),
-        sparse_level_10_or_higher = sum(successful$max_sparse_grid_level >= 10),
-        sparse_level_12 = sum(successful$max_sparse_grid_level >= 12),
+        sparse_level_13_or_higher = sum(successful$max_sparse_grid_level >= 13),
+        sparse_level_15 = sum(successful$max_sparse_grid_level >= 15),
         max_sparse_cancellation = finite_quantile(
             successful$max_sparse_grid_cancellation, 1.00
         ),
