@@ -42,7 +42,7 @@ OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/gsmr_qc.o \
             $(BUILD_DIR)/regional_ld.o
 
-.PHONY: all clean test test-joint-graph test-joint-adversarial test-regional-stress joint-graph-prototype help
+.PHONY: all clean test test-joint-graph test-joint-graph-v02 test-joint-adversarial test-regional-stress joint-graph-prototype joint-graph-v02-prototype help
 
 all: $(BIN)
 
@@ -58,17 +58,26 @@ $(BUILD_DIR)/%.o: %.cpp $(HDRS) | $(BUILD_DIR)
 clean:
 	rm -rf $(BUILD_DIR) $(BIN)
 
-test: $(BIN) $(BUILD_DIR)/joint_graph_cli
+test: $(BIN) $(BUILD_DIR)/joint_graph_cli $(BUILD_DIR)/joint_graph_v02_cli
 	bash test/run_test.sh
 	Rscript test/test_joint_graph_reference.R
+	Rscript test/test_joint_graph_v02.R
 
 joint-graph-prototype: $(BUILD_DIR)/joint_graph_cli
+
+joint-graph-v02-prototype: $(BUILD_DIR)/joint_graph_v02_cli
 
 $(BUILD_DIR)/joint_graph_cli: joint_graph_model.cpp joint_graph_model.h tools/joint_graph_cli.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) joint_graph_model.cpp tools/joint_graph_cli.cpp -o $@ $(LDFLAGS)
 
+$(BUILD_DIR)/joint_graph_v02_cli: joint_graph_v02.cpp joint_graph_v02.h tools/joint_graph_v02_cli.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) joint_graph_v02.cpp tools/joint_graph_v02_cli.cpp -o $@ $(LDFLAGS)
+
 test-joint-graph: $(BUILD_DIR)/joint_graph_cli
 	Rscript test/test_joint_graph_reference.R
+
+test-joint-graph-v02: $(BUILD_DIR)/joint_graph_v02_cli
+	Rscript test/test_joint_graph_v02.R
 
 test-joint-adversarial: $(BUILD_DIR)/joint_graph_cli
 	Rscript research/evaluate_joint_graph_adversarial.R $(BUILD_DIR)/test/joint_graph_adversarial.tsv 2 2
@@ -81,8 +90,10 @@ help:
 	@echo "  make              Build bmediator"
 	@echo "  make test         Run the smoke test"
 	@echo "  make test-joint-graph  Compare the JG-0.1 R and C++ reference implementations"
+	@echo "  make test-joint-graph-v02  Test adaptive JG-0.2 inference and covariance handling"
 	@echo "  make test-joint-adversarial  Smoke-test the JG-0.1 adversarial runner"
 	@echo "  make joint-graph-prototype  Build the standalone JG-0.1 evaluator"
+	@echo "  make joint-graph-v02-prototype  Build the standalone JG-0.2 evaluator"
 	@echo "  make test-regional-stress  Run the stochastic genotype/LD smoke stress"
 	@echo "  make clean        Remove build artifacts"
 	@echo ""

@@ -35,6 +35,30 @@ See `docs/JOINT_GRAPH_V0_1_ADVERSARIAL_RESULTS.md` for interpretation. The
 evaluation rejects JG-0.1 as a production engine; the files are retained to
 prevent the development failures from being hidden by later model changes.
 
+## JG-0.2 repair
+
+Build and test the adaptive signed-LD implementation with:
+
+```bash
+make test-joint-graph-v02
+```
+
+Estimate role variances from an independent, LD-pruned estimation panel with:
+
+```bash
+Rscript research/estimate_joint_graph_v02_scales.R external.tsv scales.tsv
+```
+
+Run the frozen new-seed development matrix with:
+
+```bash
+Rscript research/evaluate_joint_graph_v02.R
+```
+
+The model specification and validation plan are in
+`docs/JOINT_GRAPH_MODEL_V0_2.md` and
+`docs/JOINT_GRAPH_V0_2_VALIDATION_PLAN.md`. JG-0.2 is not a production mode.
+
 The evaluator accepts a tab-delimited file with columns:
 
 ```text
