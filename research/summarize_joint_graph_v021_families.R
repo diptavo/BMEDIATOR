@@ -25,6 +25,8 @@ summaries <- do.call(rbind, lapply(scenario_order, function(name) {
         scenario = name,
         families = nrow(x),
         complete_families = sum(x$successful == x$proteins),
+        failed_proteins = sum(x$proteins - x$successful),
+        max_failed_proteins_per_family = max(x$proteins - x$successful),
         mean_bfdr05_discoveries = mean(x$bfdr05_discoveries),
         mean_bfdr05_false_discoveries = mean(x$bfdr05_false_discoveries),
         families_with_bfdr05_discovery = mean(x$bfdr05_discoveries > 0),
@@ -66,6 +68,9 @@ decisions <- data.frame(
 dir.create(dirname(args[[2]]), recursive = TRUE, showWarnings = FALSE)
 write.table(summaries, args[[2]], sep = "\t", quote = FALSE, row.names = FALSE)
 write.table(decisions, sub("\\.tsv$", "_decision.tsv", args[[2]]), sep = "\t",
+            quote = FALSE, row.names = FALSE)
+incomplete <- families[families$successful != families$proteins, ]
+write.table(incomplete, sub("\\.tsv$", "_incomplete.tsv", args[[2]]), sep = "\t",
             quote = FALSE, row.names = FALSE)
 print(summaries, row.names = FALSE)
 print(decisions, row.names = FALSE)

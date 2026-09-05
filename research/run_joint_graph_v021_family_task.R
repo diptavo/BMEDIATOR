@@ -101,11 +101,19 @@ for (protein in seq_len(n_proteins)) {
     input <- file.path(temporary, "input.tsv")
     ld_path <- file.path(temporary, "ld.tsv")
     result_path <- file.path(temporary, "result.tsv")
+    stderr_path <- file.path(temporary, "stderr.txt")
+    unlink(c(result_path, stderr_path))
     jg02_write_fixture(fixture, input, ld_path)
     timing <- system.time(status <- system2(
-        binary, c(input, ld_path, result_path), stdout = FALSE, stderr = FALSE
+        binary, c(input, ld_path, result_path), stdout = FALSE,
+        stderr = stderr_path
     ))
     success <- identical(status, 0L) && file.exists(result_path)
+    diagnostic <- if (file.exists(stderr_path)) {
+        paste(readLines(stderr_path, warn = FALSE), collapse = " ")
+    } else {
+        ""
+    }
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,
                              stringsAsFactors = FALSE)
@@ -126,6 +134,8 @@ for (protein in seq_len(n_proteins)) {
         truth = type,
         true_mediator = type %in% c("mediation", "mediation_sparse", "weak_mediation"),
         success = success,
+        exit_status = as.integer(status),
+        diagnostic = diagnostic,
         values,
         elapsed_seconds = timing[["elapsed"]],
         check.names = FALSE,
