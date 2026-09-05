@@ -8,17 +8,22 @@ root <- normalizePath(file.path(dirname(script_path), ".."))
 source(file.path(root, "research", "joint_graph_v02_simulation.R"))
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 5L) {
-    stop("usage: run_joint_graph_v021_family_task.R BINARY SCENARIO REPLICATE OUTDIR N_PROTEINS")
+if (!length(args) %in% c(5L, 6L)) {
+    stop(paste(
+        "usage: run_joint_graph_v021_family_task.R",
+        "BINARY SCENARIO REPLICATE OUTDIR N_PROTEINS [SEED_BASE]"
+    ))
 }
 binary <- normalizePath(args[[1]])
 scenario_name <- args[[2]]
 replicate <- as.integer(args[[3]])
 outdir <- args[[4]]
 n_proteins <- as.integer(args[[5]])
+seed_base <- if (length(args) == 6L) as.integer(args[[6]]) else 20400000L
 if (!is.finite(replicate) || replicate < 1L ||
-    !is.finite(n_proteins) || n_proteins < 1L || n_proteins > 100L) {
-    stop("replicate and N_PROTEINS must be positive; N_PROTEINS cannot exceed 100")
+    !is.finite(n_proteins) || n_proteins < 1L || n_proteins > 100L ||
+    !is.finite(seed_base) || seed_base < 1L) {
+    stop("replicate, N_PROTEINS, and SEED_BASE are invalid")
 }
 
 scenario_names <- c(
@@ -45,7 +50,7 @@ composition <- switch(
     aligned_sensitivity = c(aligned = 20, null = 80)
 )
 types <- rep(names(composition), composition)
-family_seed <- 20400000L + scenario_index * 100000L + replicate * 1000L
+family_seed <- seed_base + scenario_index * 100000L + replicate * 1000L
 set.seed(family_seed)
 types <- sample(types, length(types), replace = FALSE)
 types <- types[seq_len(n_proteins)]
@@ -117,6 +122,9 @@ for (protein in seq_len(n_proteins)) {
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,
                              stringsAsFactors = FALSE)
+        if (!identical(result$model_version, "JG-0.2.2")) {
+            stop("unexpected joint model version: ", result$model_version)
+        }
         values <- result[c(
             "PP_XM", "PP_global_MY", "PP_sparse_P", "PP_directional_P",
             "PP_any_P", "PP_two_path", "max_relevant_evidence_difference"
@@ -174,6 +182,7 @@ metric <- function(selected) {
 bfdr <- metric(protein_results$selected_bfdr05)
 pp80 <- metric(protein_results$selected_pp80)
 summary <- data.frame(
+    model_version = "JG-0.2.2",
     scenario = scenario_name,
     replicate = replicate,
     family_seed = family_seed,

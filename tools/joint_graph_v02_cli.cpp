@@ -1,5 +1,6 @@
 #include "joint_graph_v02.h"
 
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <iomanip>
@@ -38,7 +39,22 @@ bmediator::JointGraphV02Options read_options(const std::string& path) {
         else if (key == "max_evidence_discrepancy") {
             result.max_evidence_discrepancy = value;
         }
+        else if (key == "max_quadrature_discrepancy") {
+            result.max_quadrature_discrepancy = value;
+        }
+        else if (key == "quadrature_escalation_threshold") {
+            result.quadrature_escalation_threshold = value;
+        }
+        else if (key == "min_role_blocks") {
+            if (value != std::floor(value)) {
+                throw std::runtime_error("min_role_blocks must be an integer");
+            }
+            result.min_role_blocks = static_cast<int>(value);
+        }
         else if (key == "optimizer_iterations") {
+            if (value != std::floor(value)) {
+                throw std::runtime_error("optimizer_iterations must be an integer");
+            }
             result.optimizer_iterations = static_cast<int>(value);
         } else if (key == "optimizer_tolerance") {
             result.optimizer_tolerance = value;

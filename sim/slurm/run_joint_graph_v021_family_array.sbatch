@@ -10,6 +10,7 @@ module load R/4.5.2
 : "${BMEDIATOR_DIR:?}"
 : "${MANIFEST:?}"
 : "${OUT_ROOT:?}"
+: "${SEED_BASE:?}"
 
 row=$(awk -F '\t' -v idx="${SLURM_ARRAY_TASK_ID:?}" '
   NR == 1 { next }
@@ -24,4 +25,4 @@ IFS=$'\t' read -r scenario replicate proteins <<<"$row"
 cd "$BMEDIATOR_DIR"
 Rscript research/run_joint_graph_v021_family_task.R \
   "$BMEDIATOR_DIR/build/joint_graph_v02_cli" \
-  "$scenario" "$replicate" "$OUT_ROOT" "$proteins"
+  "$scenario" "$replicate" "$OUT_ROOT" "$proteins" "$SEED_BASE"

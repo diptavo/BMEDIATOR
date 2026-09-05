@@ -12,6 +12,13 @@ orientation calls and applies the adaptive-evidence diagnostic only to graph
 states with posterior probability above `1e-6`. The original `JG-0.2` run and
 its failures remain reproducible at commit `efdeee8`.
 
+Patch `JG-0.2.2` replaces disagreement with a Laplace approximation as a
+failure rule. Relevant states are checked by successive adaptive
+Gauss-Hermite rules at orders 3, 5, 7, and 9. This directly tests convergence
+of the numerical integral and retains the Laplace difference only as an audit
+diagnostic. It also requires at least three independent A-role blocks and
+three independent B-role blocks by default.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -127,15 +134,16 @@ and `0.175` for `c`. Active `q` has a `Beta(2,2)` prior and is optimized on the
 logit scale with the Jacobian included.
 
 Every state is optimized from multiple deterministic starts. Its marginal
-likelihood is calculated with mode-centered three-node adaptive
-Gauss-Hermite quadrature using the numerical posterior Hessian. This fixes the
-off-grid failure of fixed prior-centered quadrature. The executable fails
-without a posterior if:
+likelihood is calculated with mode-centered adaptive Gauss-Hermite quadrature
+using the numerical posterior Hessian. Relevant states are refined from order
+3 to order 5 and, when needed, to orders 7 and 9. The executable fails without
+a posterior if:
 
 - any of the 16 state optimizations does not converge;
 - the posterior Hessian requires a ridge;
-- adaptive and ordinary Laplace log evidence differ by more than one log unit
-  in any state with posterior probability above `1e-6`;
+- successive adaptive quadrature orders differ by more than `0.10` log units
+  after the allowed escalation;
+- fewer than three independent A-role or B-role LD blocks are supplied;
 - the LD, scale, orientation, or sampling-correlation inputs are invalid.
 
 The frozen optimizer limit is 1,500 iterations with a `1e-6` convergence
@@ -171,7 +179,7 @@ carried by the number of independent LD blocks, not the raw number of SNPs.
 
 ## Current production boundary
 
-`JG-0.2` is not production-ready until it passes the frozen new-seed matrix,
-larger held-out calibration, prior sensitivity, LD/reference mismatch,
-winner's-curse, missing-data, and competitor benchmarks. It must not be wired
-into the main executable before those gates are passed.
+`JG-0.2.2` is not production-ready until it passes its independent frozen
+family calibration and the remaining input-pipeline and competitor gates. The
+exact-alignment exclusion is a permanent interpretation boundary, not a
+software issue that can be removed by additional computation.

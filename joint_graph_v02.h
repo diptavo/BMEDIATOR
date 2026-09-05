@@ -41,6 +41,9 @@ struct JointGraphV02Options {
     double q_beta = 2.0;
     double max_cross_block_ld = 0.05;
     double max_evidence_discrepancy = 1.0;
+    double quadrature_escalation_threshold = 0.05;
+    double max_quadrature_discrepancy = 0.10;
+    int min_role_blocks = 3;
     int optimizer_iterations = 1500;
     double optimizer_tolerance = 1e-6;
 };
@@ -58,10 +61,18 @@ struct JointGraphV02Result {
     double max_ignored_ld = 0.0;
     int n_blocks = 0;
     int max_block_size = 0;
+    int n_role_a = 0;
+    int n_role_b = 0;
+    int n_role_c = 0;
+    int n_role_a_blocks = 0;
+    int n_role_b_blocks = 0;
+    int n_role_c_blocks = 0;
     int states_converged = 0;
     int states_regularized = 0;
     double max_adaptive_laplace_difference = 0.0;
     double max_relevant_evidence_difference = 0.0;
+    double max_relevant_quadrature_difference = 0.0;
+    int max_quadrature_order = 3;
     JointGraphV02Options options;
 };
 

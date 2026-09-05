@@ -57,7 +57,10 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.1")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.2")) stop("wrong model version")
+    if (result$max_relevant_quadrature_difference > 0.10 + 1e-10) {
+        stop("successfully reported posterior failed quadrature convergence")
+    }
     if (!identical(
         result$identification_scope,
         "CONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
@@ -141,7 +144,22 @@ bad_status <- suppressWarnings(system2(binary, c(bad_input, bad_ld, bad_output),
                                        stdout = FALSE, stderr = FALSE))
 require_result(!identical(bad_status, 0L),
                "cross-block LD violation did not fail closed")
+
+underidentified <- jg02_simulate(seed = 20263009, blocks = 4L,
+                                 variants_per_block = 3L)
+underidentified$data$role <- "C"
+underidentified$data$role[underidentified$data$ld_block == "block001"] <- "A"
+underidentified$data$role[underidentified$data$ld_block == "block002"] <- "B"
+under_input <- file.path(output_directory, "underidentified.tsv")
+under_ld <- file.path(output_directory, "underidentified.ld.tsv")
+under_output <- file.path(output_directory, "underidentified.result.tsv")
+jg02_write_fixture(underidentified, under_input, under_ld)
+under_status <- suppressWarnings(system2(
+    binary, c(under_input, under_ld, under_output), stdout = FALSE, stderr = FALSE
+))
+require_result(!identical(under_status, 0L),
+               "single-block A/B evidence did not fail closed")
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.1 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.2 adaptive, LD, overlap, scale, and directional tests passed.\n")

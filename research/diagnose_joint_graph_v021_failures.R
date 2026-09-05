@@ -91,9 +91,19 @@ for (i in seq_len(nrow(failed))) {
     relaxed_status <- NA_integer_
     max_relevant_difference <- NA_real_
     pp_two_path <- NA_real_
-    if (!identical(status, 0L) && grepl("adaptive evidence diagnostic", message)) {
+    if (replay_succeeded) {
+        replay_result <- read.delim(result_path, check.names = FALSE)
+        max_relevant_difference <- if (
+            "max_relevant_quadrature_difference" %in% names(replay_result)
+        ) replay_result$max_relevant_quadrature_difference else
+            replay_result$max_relevant_evidence_difference
+        pp_two_path <- replay_result$PP_two_path
+    }
+    if (!identical(status, 0L) &&
+        grepl("adaptive (evidence diagnostic|quadrature did not converge)", message)) {
         options_path <- file.path(temporary, "diagnostic_options.tsv")
-        writeLines("max_evidence_discrepancy\t100", options_path)
+        writeLines(c("max_evidence_discrepancy\t100",
+                     "max_quadrature_discrepancy\t100"), options_path)
         unlink(result_path)
         relaxed_status <- system2(
             binary, c(input, ld_path, result_path, options_path),

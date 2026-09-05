@@ -58,6 +58,11 @@ struct StateFit {
     bool converged = false;
     bool regularized = false;
     double adaptive_laplace_difference = 0.0;
+    double quadrature_difference = 0.0;
+    int quadrature_order = 3;
+    std::vector<double> mode;
+    Matrix precision_lower;
+    double log_precision_determinant = 0.0;
 };
 
 struct OptimizerResult {
@@ -582,42 +587,53 @@ Matrix numerical_hessian(const std::function<double(const std::vector<double>&)>
     return result;
 }
 
-StateFit integrate_state(
-    const std::vector<JointGraphV02Observation>& observations,
-    const StateDefinition& state, const PreparedData& data,
-    const JointGraphV02Options& options) {
-    const OptimizerResult mode = optimize_state(observations, state, data, options);
-    auto negative_kernel = [&](const std::vector<double>& value) {
-        const double kernel = log_kernel(value, state, data, options);
-        return std::isfinite(kernel) ? -kernel : 1e100;
-    };
-    Matrix hessian = numerical_hessian(negative_kernel, mode.point);
-    Matrix precision_lower;
-    double log_precision_determinant = 0.0;
-    bool regularized = false;
-    bool factorized = false;
-    for (int attempt = 0; attempt < 10; ++attempt) {
-        const double ridge = attempt == 0 ? 0.0 : std::pow(10.0, attempt - 7);
-        if (cholesky(hessian, precision_lower, log_precision_determinant, ridge)) {
-            factorized = true;
-            regularized = attempt > 0;
-            break;
-        }
+std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
+    if (order == 3) {
+        return {{-1.224744871391589, 0.0, 1.224744871391589},
+                {0.2954089751509193, 1.1816359006036772,
+                 0.2954089751509193}};
     }
-    if (!factorized) {
-        throw std::runtime_error("adaptive integration Hessian is not positive definite");
+    if (order == 5) {
+        return {{-2.0201828704560856, -0.9585724646138185, 0.0,
+                 0.9585724646138185, 2.0201828704560856},
+                {0.019953242059045913, 0.39361932315224116,
+                 0.9453087204829419, 0.39361932315224116,
+                 0.019953242059045913}};
     }
+    if (order == 7) {
+        return {{-2.6519613568352334, -1.6735516287674714,
+                 -0.8162878828589647, 0.0, 0.8162878828589647,
+                 1.6735516287674714, 2.6519613568352334},
+                {0.0009717812450995192, 0.05451558281912703,
+                 0.4256072526101278, 0.8102646175568073,
+                 0.4256072526101278, 0.05451558281912703,
+                 0.0009717812450995192}};
+    }
+    if (order == 9) {
+        return {{-3.1909932017815276, -2.266580584531843,
+                 -1.468553289216668, -0.7235510187528376, 0.0,
+                 0.7235510187528376, 1.468553289216668,
+                 2.266580584531843, 3.1909932017815276},
+                {0.00003960697726326438, 0.004943624275536947,
+                 0.08847452739437657, 0.43265155900255575,
+                 0.7202352156060509, 0.43265155900255575,
+                 0.08847452739437657, 0.004943624275536947,
+                 0.00003960697726326438}};
+    }
+    throw std::invalid_argument("unsupported adaptive quadrature order");
+}
 
-    constexpr std::array<double, 3> nodes{{
-        -1.224744871391589, 0.0, 1.224744871391589
-    }};
-    constexpr std::array<double, 3> weights{{
-        0.2954089751509193, 1.1816359006036772, 0.2954089751509193
-    }};
-    const int dimension = static_cast<int>(mode.point.size());
+double adaptive_log_evidence(
+    const StateFit& fit, const StateDefinition& state,
+    const PreparedData& data, const JointGraphV02Options& options,
+    int order) {
+    const auto rule = quadrature_rule(order);
+    const auto& nodes = rule.first;
+    const auto& weights = rule.second;
+    const int dimension = static_cast<int>(fit.mode.size());
     std::vector<double> log_terms;
     int count = 1;
-    for (int i = 0; i < dimension; ++i) count *= 3;
+    for (int i = 0; i < dimension; ++i) count *= order;
     log_terms.reserve(count);
     std::vector<double> z(dimension, 0.0);
 
@@ -625,7 +641,7 @@ StateFit integrate_state(
                                                          double log_weight,
                                                          double z_squared) {
         if (position < dimension) {
-            for (int i = 0; i < 3; ++i) {
+            for (int i = 0; i < order; ++i) {
                 z[position] = nodes[i];
                 visit(position + 1, log_weight + std::log(weights[i]),
                       z_squared + nodes[i] * nodes[i]);
@@ -636,27 +652,77 @@ StateFit integrate_state(
         for (int i = dimension - 1; i >= 0; --i) {
             double value = std::sqrt(2.0) * z[i];
             for (int j = i + 1; j < dimension; ++j) {
-                value -= precision_lower[j][i] * delta[j];
+                value -= fit.precision_lower[j][i] * delta[j];
             }
-            delta[i] = value / precision_lower[i][i];
+            delta[i] = value / fit.precision_lower[i][i];
         }
-        std::vector<double> point = mode.point;
+        std::vector<double> point = fit.mode;
         for (int i = 0; i < dimension; ++i) point[i] += delta[i];
         log_terms.push_back(log_kernel(point, state, data, options) +
                             log_weight + z_squared);
     };
     visit(0, 0.0, 0.0);
+    return log_sum_exp(log_terms) + 0.5 * dimension * std::log(2.0) -
+        0.5 * fit.log_precision_determinant;
+}
+
+StateFit integrate_state(
+    const std::vector<JointGraphV02Observation>& observations,
+    const StateDefinition& state, const PreparedData& data,
+    const JointGraphV02Options& options) {
+    const OptimizerResult mode = optimize_state(observations, state, data, options);
+    auto negative_kernel = [&](const std::vector<double>& value) {
+        const double kernel = log_kernel(value, state, data, options);
+        return std::isfinite(kernel) ? -kernel : 1e100;
+    };
+    Matrix hessian = numerical_hessian(negative_kernel, mode.point);
 
     StateFit result;
-    result.log_evidence = log_sum_exp(log_terms) +
-        0.5 * dimension * std::log(2.0) - 0.5 * log_precision_determinant;
+    result.mode = mode.point;
+    bool factorized = false;
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        const double ridge = attempt == 0 ? 0.0 : std::pow(10.0, attempt - 7);
+        if (cholesky(hessian, result.precision_lower,
+                     result.log_precision_determinant, ridge)) {
+            factorized = true;
+            result.regularized = attempt > 0;
+            break;
+        }
+    }
+    if (!factorized) {
+        throw std::runtime_error("adaptive integration Hessian is not positive definite");
+    }
+    result.log_evidence = adaptive_log_evidence(result, state, data, options, 3);
+    const int dimension = static_cast<int>(mode.point.size());
     const double laplace_evidence = -mode.value +
-        0.5 * dimension * LOG_2PI - 0.5 * log_precision_determinant;
+        0.5 * dimension * LOG_2PI - 0.5 * result.log_precision_determinant;
     result.adaptive_laplace_difference =
         std::fabs(result.log_evidence - laplace_evidence);
     result.converged = mode.converged;
-    result.regularized = regularized;
     return result;
+}
+
+void refine_state_quadrature(
+    StateFit& fit, const StateDefinition& state, const PreparedData& data,
+    const JointGraphV02Options& options) {
+    const double evidence3 = fit.log_evidence;
+    const double evidence5 = adaptive_log_evidence(fit, state, data, options, 5);
+    fit.quadrature_difference = std::fabs(evidence5 - evidence3);
+    fit.log_evidence = evidence5;
+    fit.quadrature_order = 5;
+    if (fit.quadrature_difference > options.quadrature_escalation_threshold) {
+        const double evidence7 = adaptive_log_evidence(fit, state, data, options, 7);
+        fit.quadrature_difference = std::fabs(evidence7 - evidence5);
+        fit.log_evidence = evidence7;
+        fit.quadrature_order = 7;
+        if (fit.quadrature_difference > options.quadrature_escalation_threshold) {
+            const double evidence9 = adaptive_log_evidence(
+                fit, state, data, options, 9);
+            fit.quadrature_difference = std::fabs(evidence9 - evidence7);
+            fit.log_evidence = evidence9;
+            fit.quadrature_order = 9;
+        }
+    }
 }
 
 double bernoulli_log_probability(int indicator, double probability) {
@@ -690,6 +756,7 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
         throw std::invalid_argument("LD matrix dimension does not match input");
     }
     std::set<std::string> variants;
+    std::map<char, std::set<std::string>> role_blocks;
     for (int i = 0; i < n; ++i) {
         if (static_cast<int>(ld[i].size()) != n) {
             throw std::invalid_argument("LD matrix must be square");
@@ -702,6 +769,7 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
             observation.role != 'C') {
             throw std::invalid_argument("role must be A, B, or C");
         }
+        role_blocks[observation.role].insert(observation.ld_block);
         if (observation.ld_block.empty()) {
             throw std::invalid_argument("ld_block must not be empty");
         }
@@ -736,6 +804,11 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
                 "sampling correlations must be constant within an analysis");
         }
     }
+    if (static_cast<int>(role_blocks['A'].size()) < options.min_role_blocks ||
+        static_cast<int>(role_blocks['B'].size()) < options.min_role_blocks) {
+        throw std::invalid_argument(
+            "insufficient independent A/B role blocks for mediation identification");
+    }
     const double r12 = observations[0].rho_xm;
     const double r13 = observations[0].rho_xy;
     const double r23 = observations[0].rho_my;
@@ -760,7 +833,10 @@ void validate_inputs(const std::vector<JointGraphV02Observation>& observations,
           options.prior_sd_c > 0.0 && options.prior_sd_lambda > 0.0 &&
           options.prior_sd_eta > 0.0 && options.optimizer_iterations >= 100 &&
           options.optimizer_tolerance > 0.0 &&
-          options.max_evidence_discrepancy > 0.0)) {
+          options.max_evidence_discrepancy > 0.0 &&
+          options.quadrature_escalation_threshold > 0.0 &&
+          options.max_quadrature_discrepancy > 0.0 &&
+          options.min_role_blocks >= 2)) {
         throw std::invalid_argument("continuous priors or optimizer options are invalid");
     }
 }
@@ -893,11 +969,36 @@ JointGraphV02Result fit_joint_graph_v02(
         log_joint[i] = fits[i].log_evidence + state_log_prior(states[i], options);
     }
 
+    for (int pass = 0; pass < 16; ++pass) {
+        const double normalizer = log_sum_exp(log_joint);
+        bool refined = false;
+        for (int i = 0; i < 16; ++i) {
+            const double probability = std::exp(log_joint[i] - normalizer);
+            if (probability > 1e-6 && fits[i].quadrature_order == 3) {
+                refine_state_quadrature(fits[i], states[i], data, options);
+                log_joint[i] = fits[i].log_evidence +
+                    state_log_prior(states[i], options);
+                refined = true;
+            }
+        }
+        if (!refined) break;
+    }
+
     JointGraphV02Result result;
     result.log_evidence = log_sum_exp(log_joint);
     result.options = options;
     result.max_ignored_ld = data.max_ignored_ld;
     result.n_blocks = static_cast<int>(data.blocks.size());
+    std::map<char, std::set<std::string>> role_blocks;
+    for (const auto& observation : observations) {
+        role_blocks[observation.role].insert(observation.ld_block);
+        if (observation.role == 'A') ++result.n_role_a;
+        if (observation.role == 'B') ++result.n_role_b;
+        if (observation.role == 'C') ++result.n_role_c;
+    }
+    result.n_role_a_blocks = static_cast<int>(role_blocks['A'].size());
+    result.n_role_b_blocks = static_cast<int>(role_blocks['B'].size());
+    result.n_role_c_blocks = static_cast<int>(role_blocks['C'].size());
     for (const auto& block : data.blocks) {
         result.max_block_size = std::max(
             result.max_block_size, static_cast<int>(block.ld.size()));
@@ -910,10 +1011,15 @@ JointGraphV02Result fit_joint_graph_v02(
         result.max_adaptive_laplace_difference = std::max(
             result.max_adaptive_laplace_difference,
             fits[i].adaptive_laplace_difference);
+        result.max_quadrature_order = std::max(
+            result.max_quadrature_order, fits[i].quadrature_order);
         if (result.state_pp[i] > 1e-6) {
             result.max_relevant_evidence_difference = std::max(
                 result.max_relevant_evidence_difference,
                 fits[i].adaptive_laplace_difference);
+            result.max_relevant_quadrature_difference = std::max(
+                result.max_relevant_quadrature_difference,
+                fits[i].quadrature_difference);
         }
         if (states[i].z_xm) result.pp_xm += result.state_pp[i];
         if (states[i].z_my) result.pp_global_my += result.state_pp[i];
@@ -932,9 +1038,10 @@ JointGraphV02Result fit_joint_graph_v02(
         throw std::runtime_error("one or more graph-state optimizations did not converge");
     }
     if (result.states_regularized != 0 ||
-        result.max_relevant_evidence_difference > options.max_evidence_discrepancy) {
+        result.max_relevant_quadrature_difference >
+            options.max_quadrature_discrepancy) {
         throw std::runtime_error(
-            "adaptive evidence diagnostic failed; no posterior is reportable");
+            "adaptive quadrature did not converge; no posterior is reportable");
     }
     return result;
 }
@@ -970,11 +1077,19 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
     }
     output << "\tPP_XM\tPP_global_MY\tPP_sparse_P\tPP_directional_P"
            << "\tPP_any_P\tPP_two_path\tlog_evidence\tn_blocks"
-           << "\tmax_block_size\tmax_ignored_ld\tstates_converged"
+           << "\tmax_block_size\tn_role_a\tn_role_b\tn_role_c"
+           << "\tn_role_a_blocks\tn_role_b_blocks\tn_role_c_blocks"
+           << "\tmax_ignored_ld\tstates_converged"
            << "\tstates_regularized\tmax_adaptive_laplace_difference"
            << "\tmax_relevant_evidence_difference"
-           << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional\n";
-    output << "JG-0.2.1\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+           << "\tmax_relevant_quadrature_difference\tmax_quadrature_order"
+           << "\tpi_xm\tpi_my\tpi_sparse\tpi_directional"
+           << "\tprior_sd_a\tprior_sd_b\tprior_sd_c\tprior_sd_lambda"
+           << "\tprior_sd_eta\tq_alpha\tq_beta\tmax_cross_block_ld"
+           << "\tquadrature_escalation_threshold"
+           << "\tmax_quadrature_discrepancy\tmin_role_blocks"
+           << "\toptimizer_iterations\toptimizer_tolerance\n";
+    output << "JG-0.2.2\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     output << '\t' << result.pp_xm
@@ -986,15 +1101,36 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << '\t' << result.log_evidence
            << '\t' << result.n_blocks
            << '\t' << result.max_block_size
+           << '\t' << result.n_role_a
+           << '\t' << result.n_role_b
+           << '\t' << result.n_role_c
+           << '\t' << result.n_role_a_blocks
+           << '\t' << result.n_role_b_blocks
+           << '\t' << result.n_role_c_blocks
            << '\t' << result.max_ignored_ld
            << '\t' << result.states_converged
            << '\t' << result.states_regularized
            << '\t' << result.max_adaptive_laplace_difference
            << '\t' << result.max_relevant_evidence_difference
+           << '\t' << result.max_relevant_quadrature_difference
+           << '\t' << result.max_quadrature_order
            << '\t' << result.options.pi_xm
            << '\t' << result.options.pi_my
            << '\t' << result.options.pi_sparse
-           << '\t' << result.options.pi_directional << '\n';
+           << '\t' << result.options.pi_directional
+           << '\t' << result.options.prior_sd_a
+           << '\t' << result.options.prior_sd_b
+           << '\t' << result.options.prior_sd_c
+           << '\t' << result.options.prior_sd_lambda
+           << '\t' << result.options.prior_sd_eta
+           << '\t' << result.options.q_alpha
+           << '\t' << result.options.q_beta
+           << '\t' << result.options.max_cross_block_ld
+           << '\t' << result.options.quadrature_escalation_threshold
+           << '\t' << result.options.max_quadrature_discrepancy
+           << '\t' << result.options.min_role_blocks
+           << '\t' << result.options.optimizer_iterations
+           << '\t' << result.options.optimizer_tolerance << '\n';
 }
 
 }  // namespace bmediator
