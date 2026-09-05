@@ -15,6 +15,15 @@ Run the prespecified 200-dataset development sweep with:
 Rscript research/evaluate_joint_graph_mechanisms.R
 ```
 
+Run the frozen step-5 adversarial matrix with:
+
+```bash
+Rscript research/evaluate_joint_graph_adversarial.R
+```
+
+Its scenarios and interpretation rules are fixed in
+`docs/JOINT_GRAPH_V0_1_ADVERSARIAL_PLAN.md`.
+
 The evaluator accepts a tab-delimited file with columns:
 
 ```text

@@ -42,7 +42,7 @@ OBJS      = $(BUILD_DIR)/main.o \
             $(BUILD_DIR)/gsmr_qc.o \
             $(BUILD_DIR)/regional_ld.o
 
-.PHONY: all clean test test-joint-graph test-regional-stress joint-graph-prototype help
+.PHONY: all clean test test-joint-graph test-joint-adversarial test-regional-stress joint-graph-prototype help
 
 all: $(BIN)
 
@@ -70,6 +70,9 @@ $(BUILD_DIR)/joint_graph_cli: joint_graph_model.cpp joint_graph_model.h tools/jo
 test-joint-graph: $(BUILD_DIR)/joint_graph_cli
 	Rscript test/test_joint_graph_reference.R
 
+test-joint-adversarial: $(BUILD_DIR)/joint_graph_cli
+	Rscript research/evaluate_joint_graph_adversarial.R $(BUILD_DIR)/test/joint_graph_adversarial.tsv 2 2
+
 test-regional-stress: $(BIN)
 	python3 sim/run_regional_ld_stress.py --binary ./$(BIN) --outdir build/regional_ld_stress --replicates 3
 
@@ -78,6 +81,7 @@ help:
 	@echo "  make              Build bmediator"
 	@echo "  make test         Run the smoke test"
 	@echo "  make test-joint-graph  Compare the JG-0.1 R and C++ reference implementations"
+	@echo "  make test-joint-adversarial  Smoke-test the JG-0.1 adversarial runner"
 	@echo "  make joint-graph-prototype  Build the standalone JG-0.1 evaluator"
 	@echo "  make test-regional-stress  Run the stochastic genotype/LD smoke stress"
 	@echo "  make clean        Remove build artifacts"
