@@ -42,11 +42,14 @@ Version 1.2.0-dev
 > misspecified role variances. JG-0.1 must therefore not be used for real-data
 > inference.
 
-> **Repair under validation:** `JG-0.2` replaces the failed fixed quadrature,
+> **Joint-core repair:** `JG-0.2.1` replaces the failed fixed quadrature,
 > adds exact within-block signed LD and declared sampling covariance, requires
 > external role scales, and includes a separate directional-pleiotropy state.
-> It remains disconnected from the production command while its frozen
-> validation is completed. See the [JG-0.2 specification](docs/JOINT_GRAPH_MODEL_V0_2.md).
+> Its frozen 1,050-analysis patch matrix passed, including uncertain
+> orientations and prior sensitivity. It remains disconnected from the
+> production command pending larger held-out calibration and competitor
+> benchmarks. See the [JG-0.2 specification](docs/JOINT_GRAPH_MODEL_V0_2.md)
+> and [patch results](docs/JOINT_GRAPH_V0_2_1_RESULTS.md).
 
 ---
 

@@ -212,9 +212,9 @@ if (replicates_per_cell >= 50L) {
         (required & summaries$correct_rate < 0.80)
     ]
     if (length(failed)) {
-        message("JG-0.2 prespecified failures: ", paste(failed, collapse = ", "))
+        message("JG-0.2.1 prespecified failures: ", paste(failed, collapse = ", "))
     } else {
-        message("All JG-0.2 prespecified development cells passed.")
+        message("All JG-0.2.1 prespecified development cells passed.")
     }
 } else {
     message("Smoke run only; full acceptance requires 50 replicates per cell.")

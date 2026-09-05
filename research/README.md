@@ -55,9 +55,10 @@ Run the frozen new-seed development matrix with:
 Rscript research/evaluate_joint_graph_v02.R
 ```
 
-The model specification and validation plan are in
+The model specification and validation plans are in
 `docs/JOINT_GRAPH_MODEL_V0_2.md` and
-`docs/JOINT_GRAPH_V0_2_VALIDATION_PLAN.md`. JG-0.2 is not a production mode.
+`docs/JOINT_GRAPH_V0_2_1_VALIDATION_PLAN.md`. Patch results are in
+`docs/JOINT_GRAPH_V0_2_1_RESULTS.md`. JG-0.2.1 is not a production mode.
 
 The evaluator accepts a tab-delimited file with columns:
 
