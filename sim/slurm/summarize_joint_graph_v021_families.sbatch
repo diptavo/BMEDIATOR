@@ -13,5 +13,5 @@ module load R/4.5.2
 
 cd "$BMEDIATOR_DIR"
 Rscript research/summarize_joint_graph_v021_families.R \
-  "$OUT_ROOT" "$OUT_ROOT/summary/jg025_family_summary.tsv" \
+  "$OUT_ROOT" "$OUT_ROOT/summary/joint_graph_family_summary.tsv" \
   "$REPLICATES_PER_SCENARIO"

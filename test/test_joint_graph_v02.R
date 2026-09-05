@@ -31,7 +31,10 @@ scenarios <- list(
     curved_strong_ld = list(seed = 20915038, ld_rho = 0.70,
                             a = 0.40, b = 0.40),
     small_weight_curvature_null = list(seed = 41401056),
-    posterior_accumulation_null = list(seed = 50504004)
+    posterior_accumulation_null = list(seed = 50504004),
+    order19_null = list(seed = 60604006),
+    order21_sparse = list(seed = 60702061, a = 0.60,
+                          lambda = 0.70, q = 0.35)
 )
 
 rows <- vector("list", length(scenarios))
@@ -112,6 +115,7 @@ for (index in seq_along(scenarios)) {
         estimated_quadrature_posterior_error =
             result$estimated_quadrature_posterior_error,
         posterior_aware_refinements = result$posterior_aware_refinements,
+        max_quadrature_order = result$max_quadrature_order,
         elapsed_seconds = timing[["elapsed"]],
         stringsAsFactors = FALSE
     )
@@ -137,6 +141,8 @@ ld_mediation <- row_for("ld_mediation")
 curved_strong_ld <- row_for("curved_strong_ld")
 small_weight_curvature_null <- row_for("small_weight_curvature_null")
 posterior_accumulation_null <- row_for("posterior_accumulation_null")
+order19_null <- row_for("order19_null")
+order21_sparse <- row_for("order21_sparse")
 require_result(null$PP_two_path < 0.20, "null produced two-path support")
 require_result(mediation$PP_two_path > 0.80,
                "off-grid moderate mediation was not recovered")
@@ -162,6 +168,12 @@ require_result(posterior_accumulation_null$PP_two_path < 0.20,
                "historical aggregate-error null produced two-path support")
 require_result(posterior_accumulation_null$posterior_aware_refinements > 0,
                "historical aggregate-error case did not trigger posterior-aware refinement")
+require_result(order19_null$PP_two_path < 0.20 &&
+               order19_null$max_quadrature_order >= 19,
+               "order-19 null regression was not resolved correctly")
+require_result(order21_sparse$PP_two_path < 0.80 &&
+               order21_sparse$max_quadrature_order >= 21,
+               "order-21 sparse regression was not resolved correctly")
 
 scale_fixture <- jg02_simulate(
     seed = 20263007,

@@ -35,6 +35,18 @@ a hard one-log-unit cap for every relevant state. This avoids discarding a
 protein because a numerically difficult state with negligible posterior mass
 changed by slightly more than 10% on its own evidence scale.
 
+Patch `JG-0.2.5` aligns escalation with that posterior-level acceptance rule.
+When the aggregate posterior perturbation still exceeds `0.01`, it refines the
+posterior-influential state with the largest probability-weighted evidence
+discrepancy, initially through order 17. A 10,000-analysis development run
+showed that this repaired most but not all numerical failures.
+
+Patch `JG-0.2.6` extends that bounded fallback through orders 19 and 21. These
+orders are reached only after the posterior-level rule requests more accuracy;
+the `0.01` posterior-error threshold and one-log-unit relevant-state cap are
+unchanged. This is a containment repair for rare difficult fits, not a
+scalable replacement for tensor quadrature.
+
 The model targets candidate-specific partial mediation of risk factor `X`
 through molecular trait `M` to outcome `Y`. A residual `X -> Y` path remains
 free in every graph.
@@ -152,8 +164,10 @@ marginalization is exact rather than quadrature-based.
 Every state is optimized from multiple deterministic starts. Its marginal
 likelihood is calculated with mode-centered adaptive Gauss-Hermite quadrature
 using the numerical posterior Hessian. Relevant states are refined from order
-3 to order 5 and, when needed, to orders 7, 9, 11, and 13. The executable fails without
-a posterior if:
+3 to order 5 and, when needed, to orders 7, 9, 11, and 13. If normalized
+posterior error remains above `0.01`, `JG-0.2.6` refines influential states
+one order at a time through 15, 17, 19, and 21. The executable fails without a
+posterior if:
 
 - any of the 16 state optimizations does not converge;
 - the posterior Hessian requires a ridge;
@@ -204,7 +218,10 @@ a production engine. See the
 [held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
 [production-readiness assessment](PRODUCTION_READINESS.md).
 
-The next numerical revision must replace tensor adaptive Gauss-Hermite
-quadrature, not merely relax the reportability threshold. The exact-alignment
-exclusion is a permanent interpretation boundary, not a software issue that
-can be removed by additional computation.
+`JG-0.2.6` is a development repair for that failure and retains the same
+reportability threshold. Its higher-order tensor fallback is expensive and its
+successive-order discrepancy is a stability diagnostic rather than a proven
+bound on integration error. It therefore still requires independent numerical
+validation and a new frozen family experiment before production use. The
+exact-alignment exclusion is a permanent interpretation boundary, not a
+software issue that can be removed by additional computation.

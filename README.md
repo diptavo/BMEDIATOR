@@ -4,13 +4,12 @@
 
 Version 1.2.0-dev 
 
-> **Development status:** The supported research core is `bmediator-joint`
-> (`JG-0.2.4`), a single joint likelihood over RF, protein, and outcome
-> associations. Its frozen 50,000-analysis family validation passed every
-> prespecified FDR and power criterion among reportable fits, but failed the
-> numerical-completion criterion: only 38 to 48 of 50 families were complete
-> across confirmatory scenarios. It is therefore not production-ready and
-> must not be used for definitive mediation claims. See the
+> **Development status:** The current research core is `bmediator-joint`
+> (`JG-0.2.6`), a single joint likelihood over RF, protein, and outcome
+> associations. `JG-0.2.6` is a development repair for the numerical failures
+> that caused the frozen `JG-0.2.4` validation to fail. It has not passed a new
+> frozen confirmatory validation and is not production-ready. It must not be
+> used for definitive mediation claims. See the
 > [held-out results](docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
 > [production-readiness assessment](docs/PRODUCTION_READINESS.md).
 

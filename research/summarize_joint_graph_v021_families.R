@@ -56,7 +56,8 @@ criterion <- function(name, expression) {
 decisions <- data.frame(
     criterion = c(
         "baseline", "rare", "composite_null", "mixed", "strong_ld",
-        "confirmatory_completion"
+        if (replicates == 50L) "confirmatory_completion" else
+            "development_completion"
     ),
     passed = c(
         criterion("baseline", "mean_bfdr05_fdr <= 0.05 & mean_bfdr05_power >= 0.70"),
@@ -85,7 +86,15 @@ write.table(incomplete, sub("\\.tsv$", "_incomplete.tsv", args[[2]]), sep = "\t"
 print(summaries, row.names = FALSE)
 print(decisions, row.names = FALSE)
 if (!all(decisions$passed)) {
-    message("One or more frozen held-out criteria failed.")
+    message(if (replicates == 50L) {
+        "One or more frozen held-out criteria failed."
+    } else {
+        "One or more development criteria failed."
+    })
 } else {
-    message("All frozen held-out family criteria passed.")
+    message(if (replicates == 50L) {
+        "All frozen held-out family criteria passed."
+    } else {
+        "All small-scale development criteria passed."
+    })
 }

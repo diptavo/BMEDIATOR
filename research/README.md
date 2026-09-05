@@ -62,6 +62,11 @@ numerical-completion gate; see
 `docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md`. JG-0.2.4 is not a production
 engine.
 
+`JG-0.2.6` adds posterior-aware refinement through order 21 as a development
+repair. Its small-scale results are recorded in
+`docs/JOINT_GRAPH_V0_2_6_DEVELOPMENT_RESULTS.md`; they are not a replacement
+for a frozen confirmatory validation.
+
 The evaluator accepts a tab-delimited file with columns:
 
 ```text
