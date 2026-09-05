@@ -8,10 +8,14 @@ Version 1.2.0-dev
 > (`JG-0.2.8`), a single joint likelihood over RF, protein, and outcome
 > associations. `JG-0.2.8` uses cached deterministic Smolyak sparse-grid
 > integration for numerically difficult
-> posteriors. It has not passed a new
-> frozen confirmatory validation and is not production-ready. It must not be
-> used for definitive mediation claims. See the
-> [held-out results](docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md) and
+> posteriors. A fresh 10,000-fit Biowulf development run completed without a
+> numerical failure, but one of 66 historical difficult cases remained
+> unreportable. It has not passed a new frozen confirmatory validation and is
+> not production-ready. It must not be used for definitive mediation claims.
+> See the
+> [held-out results](docs/JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md),
+> [JG-0.2.8 development results](docs/JOINT_GRAPH_V0_2_8_DEVELOPMENT_RESULTS.md),
+> and the
 > [production-readiness assessment](docs/PRODUCTION_READINESS.md).
 
 > The older six-state and `--structural-method factorized` workflows remain in

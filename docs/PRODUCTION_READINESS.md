@@ -88,10 +88,12 @@ Every result therefore states
 
 ### P0: required before routine real-data use
 
-- Complete independent cluster validation of the new sparse-grid fallback and
-  its cancellation safeguard. The successive-level posterior diagnostic is
-  designed to be conservative but is not a mathematical upper bound on the
-  true integration error.
+- Replace or augment the signed sparse-grid fallback for severe-cancellation
+  cases. Independent Biowulf validation passed 10,000/10,000 fresh fits and
+  65/66 historical failures, but one LD-mismatch null remained unreportable at
+  sparse level 15. A positive-weight fallback needs an independent accuracy
+  assessment; the successive-level posterior diagnostic is conservative but
+  is not a mathematical upper bound on the true integration error.
 - Freeze `JG-0.2.8` or its successor and pass a new, adequately powered family
   calibration on untouched seeds without relaxing the `0.01` posterior-error
   criterion. Small development simulations do not satisfy this requirement.

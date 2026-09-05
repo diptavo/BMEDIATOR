@@ -9,15 +9,19 @@ numerical-completion gate, with only 38 to 48 of 50 complete families in the
 confirmatory scenarios. It is not a production engine. See
 [JG-0.2.4 held-out results](JOINT_GRAPH_V0_2_4_HELDOUT_RESULTS.md),
 [JG-0.2.6 development results](JOINT_GRAPH_V0_2_6_DEVELOPMENT_RESULTS.md),
-[JG-0.2.7 development results](JOINT_GRAPH_V0_2_7_DEVELOPMENT_RESULTS.md), and
+[JG-0.2.7 development results](JOINT_GRAPH_V0_2_7_DEVELOPMENT_RESULTS.md),
+[JG-0.2.8 development results](JOINT_GRAPH_V0_2_8_DEVELOPMENT_RESULTS.md), and
 [Production readiness](PRODUCTION_READINESS.md).
 
 JG-0.2.8 replaces only the high-order numerical fallback; the likelihood,
 state definitions, priors, and `0.01` posterior-error gate are unchanged. Its
 cached sparse-grid implementation extends through level 15. Local exactness
-and targeted regression tests pass. Historical
-failure replay and fresh small-scale family calibration on Biowulf remain
-required before this repair can advance.
+and targeted regression tests pass. On Biowulf, all 10,000 fresh fits and both
+JG-0.2.7 regression cases were reportable, and the sanitizer suite passed.
+However, the broader replay made only 65 of 66 historical numerical failures
+reportable. The remaining severe-cancellation LD-mismatch null failed the
+unchanged `0.01` posterior-error gate at `0.03744`. JG-0.2.8 therefore remains
+developmental and must fail closed for such a fit.
 
 The sections below retain historical validation results for the legacy and
 factorized implementations. They must not be interpreted as validation of the
