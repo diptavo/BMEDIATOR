@@ -119,21 +119,24 @@ for (protein in seq_len(n_proteins)) {
     } else {
         ""
     }
+    result_columns <- c(
+        "PP_XM", "PP_global_MY", "PP_sparse_P", "PP_directional_P",
+        "PP_any_P", "PP_two_path", "max_relevant_evidence_difference",
+        "max_relevant_quadrature_difference",
+        "estimated_quadrature_posterior_error", "max_quadrature_order",
+        "posterior_aware_refinements", "states_regularized"
+    )
     if (success) {
         result <- read.delim(result_path, check.names = FALSE,
                              stringsAsFactors = FALSE)
-        if (!identical(result$model_version, "JG-0.2.5")) {
+        if (!identical(result$model_version, "JG-0.2.6")) {
             stop("unexpected joint model version: ", result$model_version)
         }
-        values <- result[c(
-            "PP_XM", "PP_global_MY", "PP_sparse_P", "PP_directional_P",
-            "PP_any_P", "PP_two_path", "max_relevant_evidence_difference"
-        )]
+        values <- result[result_columns]
     } else {
-        values <- as.data.frame(as.list(setNames(rep(NA_real_, 7), c(
-            "PP_XM", "PP_global_MY", "PP_sparse_P", "PP_directional_P",
-            "PP_any_P", "PP_two_path", "max_relevant_evidence_difference"
-        ))))
+        values <- as.data.frame(as.list(setNames(
+            rep(NA_real_, length(result_columns)), result_columns
+        )))
     }
     rows[[protein]] <- data.frame(
         scenario = scenario_name,
@@ -188,7 +191,7 @@ metric <- function(selected) {
 bfdr <- metric(protein_results$selected_bfdr05)
 pp80 <- metric(protein_results$selected_pp80)
 summary <- data.frame(
-    model_version = "JG-0.2.5",
+    model_version = "JG-0.2.6",
     scenario = scenario_name,
     replicate = replicate,
     family_seed = family_seed,

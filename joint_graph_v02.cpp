@@ -710,6 +710,50 @@ std::pair<std::vector<double>, std::vector<double>> quadrature_rule(int order) {
                  7.1122891400212932e-06, 4.9770789816307699e-08,
                  4.5805789307986096e-11}};
     }
+    if (order == 19) {
+        return {{-5.2202716905374817, -4.4285328066037799,
+                 -3.7621873519640201, -3.1578488183476021,
+                 -2.5911337897945423, -2.0492317098506194,
+                 -1.5241706193935332, -1.0103683871343114,
+                 -0.50352016342388817, 0.0, 0.50352016342388817,
+                 1.0103683871343114, 1.5241706193935332,
+                 2.0492317098506194, 2.5911337897945423,
+                 3.1578488183476021, 3.7621873519640201,
+                 4.4285328066037799, 5.2202716905374817},
+                {1.3262970944985236e-12, 2.1630510098635334e-09,
+                 4.4882431472231158e-07, 2.7209197763161719e-05,
+                 0.00067087752140718236, 0.0079888667777229805,
+                 0.050810386909052083, 0.18363270130699705,
+                 0.39160898861303017, 0.50297488827618653,
+                 0.39160898861303017, 0.18363270130699705,
+                 0.050810386909052083, 0.0079888667777229805,
+                 0.00067087752140718236, 2.7209197763161719e-05,
+                 4.4882431472231158e-07, 2.1630510098635334e-09,
+                 1.3262970944985236e-12}};
+    }
+    if (order == 21) {
+        return {{-5.5503518732646784, -4.7739923434112193,
+                 -4.1219955474918404, -3.5319728771376777,
+                 -2.979991207704598, -2.453552124512838,
+                 -1.9449629491862537, -1.4489342506507319,
+                 -0.96149963441836905, -0.47945070707910753, 0.0,
+                 0.47945070707910753, 0.96149963441836905,
+                 1.4489342506507319, 1.9449629491862537,
+                 2.453552124512838, 2.979991207704598,
+                 3.5319728771376777, 4.1219955474918404,
+                 4.7739923434112193, 5.5503518732646784},
+                {3.7203650701360227e-14, 8.8186112420499332e-11,
+                 2.5712301800593154e-08, 2.1718848980566699e-06,
+                 7.4783988673100628e-05, 0.0012549820417264088,
+                 0.011414065837434397, 0.060179646658912303,
+                 0.19212032406699775, 0.38166907361350222,
+                 0.47902370312017756, 0.38166907361350222,
+                 0.19212032406699775, 0.060179646658912303,
+                 0.011414065837434397, 0.0012549820417264088,
+                 7.4783988673100628e-05, 2.1718848980566699e-06,
+                 2.5712301800593154e-08, 8.8186112420499332e-11,
+                 3.7203650701360227e-14}};
+    }
     throw std::invalid_argument("unsupported adaptive quadrature order");
 }
 
@@ -801,6 +845,8 @@ int next_quadrature_order(int order) {
         case 11: return 13;
         case 13: return 15;
         case 15: return 17;
+        case 17: return 19;
+        case 19: return 21;
         default: return order;
     }
 }
@@ -1161,7 +1207,7 @@ JointGraphV02Result fit_joint_graph_v02(
     }
 
     int posterior_aware_refinements = 0;
-    for (int pass = 0; pass < 32; ++pass) {
+    for (int pass = 0; pass < 64; ++pass) {
         const auto probabilities = normalized_state_probabilities(log_joint);
         if (posterior_corner_perturbation(probabilities, fits) <=
             options.max_quadrature_posterior_error) {
@@ -1170,7 +1216,7 @@ JointGraphV02Result fit_joint_graph_v02(
         int candidate = -1;
         double largest_contribution = -1.0;
         for (int i = 0; i < 16; ++i) {
-            if (probabilities[i] <= 1e-6 || fits[i].quadrature_order >= 17) {
+            if (probabilities[i] <= 1e-6 || fits[i].quadrature_order >= 21) {
                 continue;
             }
             const double contribution =
@@ -1181,7 +1227,7 @@ JointGraphV02Result fit_joint_graph_v02(
             }
         }
         if (candidate < 0 || !refine_state_once(
-                fits[candidate], states[candidate], data, options, 17)) {
+                fits[candidate], states[candidate], data, options, 21)) {
             break;
         }
         log_joint[candidate] = fits[candidate].log_evidence +
@@ -1333,7 +1379,7 @@ void write_joint_graph_v02_result_tsv(const JointGraphV02Result& result,
            << "\tquadrature_escalation_threshold"
            << "\tmax_quadrature_posterior_error\tmin_role_blocks"
            << "\toptimizer_iterations\toptimizer_tolerance\n";
-    output << "JG-0.2.5\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
+    output << "JG-0.2.6\tCONDITIONAL_ON_NO_EXACT_ALIGNED_PLEIOTROPY"
            << std::setprecision(17);
     for (double value : result.state_pp) output << '\t' << value;
     for (double value : result.state_quadrature_difference) output << '\t' << value;

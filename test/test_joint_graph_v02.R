@@ -91,7 +91,7 @@ for (index in seq_along(scenarios)) {
     if (!identical(status, 0L)) stop("JG-0.2 failed for ", name)
     result <- read.delim(output, check.names = FALSE,
                          stringsAsFactors = FALSE)
-    if (!identical(result$model_version, "JG-0.2.5")) stop("wrong model version")
+    if (!identical(result$model_version, "JG-0.2.6")) stop("wrong model version")
     if (result$estimated_quadrature_posterior_error > 0.01 + 1e-10 ||
         result$max_relevant_quadrature_difference > 1 + 1e-10) {
         stop("successfully reported posterior failed quadrature stability")
@@ -282,4 +282,4 @@ require_result(!identical(duplicate_input_status, 0L),
 if (length(failures)) {
     stop("JG-0.2 acceptance failed:\n- ", paste(failures, collapse = "\n- "))
 }
-cat("JG-0.2.5 adaptive, LD, overlap, scale, and directional tests passed.\n")
+cat("JG-0.2.6 adaptive, LD, overlap, scale, and directional tests passed.\n")

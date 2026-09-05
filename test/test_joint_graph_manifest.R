@@ -45,7 +45,7 @@ if (!identical(result$protein, manifest$protein[c(1, 3)])) {
     stop("successful manifest order was not preserved")
 }
 if (failures$protein[[1]] != "BAD_PROTEIN") stop("failed protein was not isolated")
-if (any(result$model_version != "JG-0.2.5")) stop("wrong manifest model version")
+if (any(result$model_version != "JG-0.2.6")) stop("wrong manifest model version")
 if (!(result$PP_two_path[[1]] < 0.01 && result$PP_two_path[[2]] > 0.80)) {
     stop("manifest results do not separate null and mediation fixtures")
 }
@@ -75,4 +75,4 @@ if (!all(complete_result$family_complete) ||
     any(!is.finite(complete_result$posterior_cumulative_fdr))) {
     stop("complete manifest did not expose an auditable family-wide selection")
 }
-cat("JG-0.2.5 manifest runner test passed.\n")
+cat("JG-0.2.6 manifest runner test passed.\n")
